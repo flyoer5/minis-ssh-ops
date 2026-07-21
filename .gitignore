@@ -34,3 +34,4 @@ app/pubspec.lock
 # Local env
 .env
 local.properties
+dist/
