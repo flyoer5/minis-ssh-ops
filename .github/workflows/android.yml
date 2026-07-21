@@ -1,0 +1,63 @@
+name: Android APK
+
+on:
+  push:
+    paths:
+      - "app/**"
+      - "backend/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build Go backend (linux/amd64 for CI smoke)
+        working-directory: backend
+        run: |
+          go build -o bin/server ./cmd/server
+          ./bin/server &
+          sleep 1
+          curl -sf http://127.0.0.1:17890/v1/health
+          kill %1 || true
+
+      - name: Cross-compile Go for android/arm64 into assets
+        run: |
+          chmod +x scripts/build-go-android.sh
+          ./scripts/build-go-android.sh
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+
+      - name: Build APK (debug, arm64-v8a)
+        working-directory: app
+        run: flutter build apk --debug --target-platform android-arm64
+
+      - name: Also build release APK (arm64)
+        working-directory: app
+        run: flutter build apk --release --target-platform android-arm64 || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: ignore

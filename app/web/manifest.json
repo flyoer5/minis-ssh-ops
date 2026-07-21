@@ -1,0 +1,10 @@
+{
+  "name": "SSH AI Agent",
+  "short_name": "ssh_ai_agent",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0175C2",
+  "theme_color": "#0175C2",
+  "description": "Personal AI SSH ops tool",
+  "orientation": "portrait-primary"
+}

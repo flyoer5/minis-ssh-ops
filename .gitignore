@@ -1,40 +1,35 @@
 # Go
-/bin/
+backend/bin/
+backend/vendor/
 *.exe
 *.test
-*.out
+# Rebuilt by scripts/build-go-android.sh / CI (do not commit ~10MB blobs)
+app/android/app/src/main/assets/go/ssh-ai-agent
+app/assets/go/ssh-ai-agent-arm64
 
-# Local runtime data / secrets
-/data/
-**/master.key
-**/ops.db
-**/ops.db-*
-
-# IDE / OS
-.idea/
-.vscode/
-.DS_Store
-*.swp
-*~
-
-# Flutter / Android (also app/.gitignore)
+# Flutter
 app/.dart_tool/
-app/.packages
-app/.pub-cache/
-app/.pub/
-app/build/
 app/.flutter-plugins
 app/.flutter-plugins-dependencies
-app/.metadata
-app/local.properties
-app/android/local.properties
-app/android/.gradle/
-app/android/app/build/
-app/**/GeneratedPluginRegistrant.*
+app/.packages
+app/build/
+app/.pub-cache/
+app/.pub/
+app/pubspec.lock
 
-# Generated large binaries (CI / prepare_assets regenerates)
-app/assets/opsd/opsd_arm64
-app/android/app/src/main/jniLibs/
+# Data / secrets
+**/.ssh-ai-agent/
+**/local.token
+**/master.key
+**/data.db
+**/*.db
 
-# CI output
-/dist/
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Local env
+.env
+local.properties
