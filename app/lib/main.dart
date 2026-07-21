@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/api/client.dart';
-import 'package:ssh_ai_agent/pages/chat_page.dart';
+import 'package:ssh_ai_agent/pages/agent_page.dart';
 import 'package:ssh_ai_agent/pages/hosts_page.dart';
 import 'package:ssh_ai_agent/pages/records_page.dart';
 import 'package:ssh_ai_agent/pages/settings_page.dart';
+import 'package:ssh_ai_agent/pages/terminal_page.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
 void main() {
@@ -22,8 +23,9 @@ class SshAiAgentApp extends StatelessWidget {
       child: MaterialApp(
         title: 'SSH AI Agent',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal, brightness: Brightness.dark),
           useMaterial3: true,
+          scaffoldBackgroundColor: const Color(0xFF0D1117),
         ),
         home: const HomeShell(),
       ),
@@ -43,7 +45,8 @@ class _HomeShellState extends State<HomeShell> {
 
   static const pages = [
     HostsPage(),
-    ChatPage(),
+    AgentPage(),
+    TerminalPage(),
     RecordsPage(),
     SettingsPage(),
   ];
@@ -81,7 +84,8 @@ class _HomeShellState extends State<HomeShell> {
         onDestinationSelected: (i) => setState(() => index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dns_outlined), label: '主机'),
-          NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: 'AI运维'),
+          NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: 'Agent'),
+          NavigationDestination(icon: Icon(Icons.terminal), label: '终端'),
           NavigationDestination(icon: Icon(Icons.history), label: '记录'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), label: '设置'),
         ],

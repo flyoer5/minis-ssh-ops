@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
+import 'package:ssh_ai_agent/models/chat_message.dart';
 
 class AppState extends ChangeNotifier {
   AppState(this.api);
@@ -16,9 +17,52 @@ class AppState extends ChangeNotifier {
   String? selectedHostId;
   String lastExecOutput = '';
 
+  // --- Agent chat ---
   Map<String, dynamic>? lastPlan;
   String? agentSessionId;
   final Map<String, String> stepOutputs = {};
+  final List<ChatMessage> agentMessages = [];
+  /// Index of last plan message in agentMessages (for attaching step outputs).
+  int? _lastPlanMsgIndex;
+
+  // --- Terminal ---
+  final StringBuffer _termBuf = StringBuffer();
+  final List<String> terminalHistory = [];
+  static const int _maxHist = 100;
+  static const int _maxTermChars = 120000;
+
+  String get terminalBuffer => _termBuf.toString();
+
+  String get hostLabel {
+    if (selectedHostId == null) return '未选择主机';
+    for (final h in hosts) {
+      if (h is Map && h['id'] == selectedHostId) {
+        final name = (h['name'] as String?)?.trim();
+        final user = h['username'] ?? '';
+        final host = h['host'] ?? '';
+        final port = h['port'] ?? 22;
+        if (name != null && name.isNotEmpty) {
+          return '$name  $user@$host:$port';
+        }
+        return '$user@$host:$port';
+      }
+    }
+    return selectedHostId!;
+  }
+
+  String get terminalPrompt {
+    if (selectedHostId == null) return 'ssh> ';
+    for (final h in hosts) {
+      if (h is Map && h['id'] == selectedHostId) {
+        final user = h['username'] ?? 'user';
+        final host = (h['host'] as String?) ?? 'host';
+        final short = host.contains('.') ? host.split('.').first : host;
+        return '$user@$short:~\$ ';
+      }
+    }
+    return 'ssh> ';
+  }
+
   List<dynamic> audit = [];
 
   Future<void> bootstrap() async {
@@ -31,7 +75,6 @@ class AppState extends ChangeNotifier {
     api.localToken = prefs.getString('localToken') ?? api.localToken;
 
     if (NativeBackend.isAndroidNative) {
-      // Retry native start a few times — Process/SELinux can flake on cold start.
       Object? lastErr;
       for (var i = 0; i < 3; i++) {
         try {
@@ -43,9 +86,7 @@ class AppState extends ChangeNotifier {
             if (tok.isNotEmpty) api.localToken = tok;
             await prefs.setString('baseUrl', api.baseUrl);
             await prefs.setString('localToken', api.localToken);
-            backendNote = info['alreadyRunning'] == true
-                ? '本机 Go 已在运行'
-                : '已启动内置 Go 后端';
+            backendNote = info['alreadyRunning'] == true ? '本机 Go 已在运行' : '已启动内置 Go 后端';
             lastErr = null;
             break;
           }
@@ -61,7 +102,6 @@ class AppState extends ChangeNotifier {
       }
     }
 
-    // Health with short retries (backend may still be binding).
     for (var i = 0; i < 8; i++) {
       await refreshHealth();
       if (backendOk) break;
@@ -76,6 +116,11 @@ class AppState extends ChangeNotifier {
       } catch (e) {
         backendError = '加载数据失败: $e';
       }
+    }
+    if (_termBuf.isEmpty) {
+      _termBuf.writeln('# SSH AI Agent terminal');
+      _termBuf.writeln('# type a command and press Enter · clear to reset');
+      _termBuf.writeln('');
     }
     notifyListeners();
   }
@@ -144,6 +189,202 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---------- Terminal ----------
+
+  void clearTerminal() {
+    _termBuf.clear();
+    _termBuf.writeln('# cleared');
+    _termBuf.writeln('');
+    notifyListeners();
+  }
+
+  void appendTerminal(String text, {bool dim = false, bool error = false}) {
+    // dim/error only used by UI via prefixes if needed; keep plain for copy
+    _termBuf.write(text);
+    _trimTerm();
+    notifyListeners();
+  }
+
+  void _trimTerm() {
+    final s = _termBuf.toString();
+    if (s.length > _maxTermChars) {
+      _termBuf.clear();
+      _termBuf.write(s.substring(s.length - (_maxTermChars ~/ 2)));
+    }
+  }
+
+  Future<Map<String, dynamic>> runTerminal(String command, {bool confirmed = false}) async {
+    final id = selectedHostId;
+    if (id == null) {
+      throw StateError('no host');
+    }
+    if (terminalHistory.isEmpty || terminalHistory.last != command) {
+      terminalHistory.add(command);
+      if (terminalHistory.length > _maxHist) {
+        terminalHistory.removeAt(0);
+      }
+    }
+    _termBuf.writeln('$terminalPrompt$command');
+    notifyListeners();
+
+    final res = await api.exec(id, command, confirmed: confirmed, sessionId: 'terminal');
+    final out = StringBuffer();
+    final stdout = (res['stdout'] ?? '').toString();
+    final stderr = (res['stderr'] ?? '').toString();
+    if (stdout.isNotEmpty) out.write(stdout.endsWith('\n') ? stdout : '$stdout\n');
+    if (stderr.isNotEmpty) out.write(stderr.endsWith('\n') ? stderr : '$stderr\n');
+    final exit = res['exitCode'];
+    final risk = res['risk'];
+    if (out.isEmpty) {
+      out.writeln('[exit $exit · risk $risk · ${res['durationMs']}ms]');
+    } else {
+      out.writeln('[exit $exit · risk $risk · ${res['durationMs']}ms]');
+    }
+    _termBuf.write(out);
+    _termBuf.writeln('');
+    lastExecOutput = out.toString();
+    _trimTerm();
+    notifyListeners();
+    return res;
+  }
+
+  // ---------- Agent chat ----------
+
+  void clearAgentChat() {
+    agentMessages.clear();
+    lastPlan = null;
+    stepOutputs.clear();
+    agentSessionId = null;
+    _lastPlanMsgIndex = null;
+    notifyListeners();
+  }
+
+  void _pushMsg(ChatMessage m) {
+    agentMessages.add(m);
+    notifyListeners();
+  }
+
+  Future<void> agentChat(String userText) async {
+    final id = selectedHostId;
+    if (id == null) {
+      _pushMsg(ChatMessage(role: 'system', content: '请先选择主机', kind: ChatKind.error));
+      return;
+    }
+    _pushMsg(ChatMessage(role: 'user', content: userText));
+    try {
+      final res = await api.agentPlan(hostId: id, goal: userText, sessionId: agentSessionId);
+      agentSessionId = res['sessionId'] as String? ?? agentSessionId;
+      final planRaw = res['plan'];
+      Map<String, dynamic>? plan;
+      if (planRaw is Map) {
+        plan = Map<String, dynamic>.from(planRaw);
+        lastPlan = plan;
+      }
+      stepOutputs.clear();
+      final summary = plan?['summary']?.toString() ?? '已生成计划';
+      _pushMsg(ChatMessage(role: 'assistant', content: summary, kind: ChatKind.text));
+      if (plan != null) {
+        final planMsg = ChatMessage(
+          role: 'assistant',
+          content: summary,
+          kind: ChatKind.plan,
+          meta: {'plan': plan, 'outputs': <String, String>{}},
+        );
+        agentMessages.add(planMsg);
+        _lastPlanMsgIndex = agentMessages.length - 1;
+        notifyListeners();
+      }
+    } catch (e) {
+      _pushMsg(ChatMessage(role: 'system', content: '规划失败: $e', kind: ChatKind.error));
+      rethrow;
+    }
+  }
+
+  Future<void> runAgentPlan(String goal) => agentChat(goal);
+
+  Future<void> runAgentStep({
+    required int stepId,
+    required String command,
+    required bool confirmed,
+  }) async {
+    final id = selectedHostId;
+    if (id == null) return;
+    try {
+      final res = await api.agentExecStep(
+        hostId: id,
+        command: command,
+        confirmed: confirmed,
+        sessionId: agentSessionId ?? 'agent',
+        stepId: stepId,
+      );
+      final text =
+          'risk=${res['risk']} exit=${res['exitCode']} (${res['durationMs']}ms)\n'
+          '${res['stdout'] ?? ''}${res['stderr'] ?? ''}';
+      stepOutputs['step_$stepId'] = text;
+
+      // attach to plan message outputs
+      final idx = _lastPlanMsgIndex;
+      if (idx != null && idx >= 0 && idx < agentMessages.length) {
+        final old = agentMessages[idx];
+        final meta = Map<String, dynamic>.from(old.meta ?? {});
+        final outs = Map<String, dynamic>.from(meta['outputs'] as Map? ?? {});
+        outs['step_$stepId'] = text;
+        meta['outputs'] = outs;
+        agentMessages[idx] = ChatMessage(
+          role: old.role,
+          content: old.content,
+          kind: old.kind,
+          meta: meta,
+          at: old.at,
+        );
+      }
+
+      _pushMsg(ChatMessage(
+        role: 'tool',
+        content: text,
+        kind: ChatKind.stepResult,
+        meta: {
+          'stepId': stepId,
+          'command': command,
+          'exitCode': res['exitCode'],
+          'risk': res['risk'],
+        },
+      ));
+    } on ApiException catch (e) {
+      if (e.status == 409) {
+        final msg = '需要确认（risk=${e.body?['risk']}）：$command';
+        stepOutputs['step_$stepId'] = msg;
+        _pushMsg(ChatMessage(role: 'system', content: msg, kind: ChatKind.status));
+      } else if (e.status == 403) {
+        _pushMsg(ChatMessage(role: 'system', content: 'blocked: ${e.message}', kind: ChatKind.error));
+      } else {
+        _pushMsg(ChatMessage(role: 'system', content: '$e', kind: ChatKind.error));
+      }
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> runAllReadSteps() async {
+    final plan = lastPlan;
+    if (plan == null) return;
+    final steps = (plan['steps'] as List?) ?? [];
+    for (final raw in steps) {
+      if (raw is! Map) continue;
+      final risk = raw['risk']?.toString() ?? 'read';
+      if (risk != 'read') continue;
+      final id = raw['id'];
+      final stepId = id is int ? id : int.tryParse('$id') ?? 0;
+      final cmd = raw['command']?.toString() ?? '';
+      if (cmd.isEmpty) continue;
+      try {
+        await runAgentStep(stepId: stepId, command: cmd, confirmed: false);
+      } catch (_) {
+        // continue others
+      }
+    }
+  }
+
   Future<void> runExec(String command, {bool confirmed = false}) async {
     final id = selectedHostId;
     if (id == null) {
@@ -184,60 +425,6 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> runAgentPlan(String goal) async {
-    final id = selectedHostId;
-    if (id == null) {
-      setLastExecOutput('请先选择主机');
-      return;
-    }
-    try {
-      final res = await api.agentPlan(hostId: id, goal: goal, sessionId: agentSessionId);
-      agentSessionId = res['sessionId'] as String? ?? agentSessionId;
-      final plan = res['plan'];
-      if (plan is Map) {
-        lastPlan = Map<String, dynamic>.from(plan);
-      } else {
-        lastPlan = null;
-      }
-      stepOutputs.clear();
-      setLastExecOutput(lastPlan?['summary']?.toString() ?? '计划已生成');
-      notifyListeners();
-    } catch (e) {
-      lastPlan = null;
-      setLastExecOutput('规划失败: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> runAgentStep({
-    required int stepId,
-    required String command,
-    required bool confirmed,
-  }) async {
-    final id = selectedHostId;
-    if (id == null) return;
-    try {
-      final res = await api.agentExecStep(
-        hostId: id,
-        command: command,
-        confirmed: confirmed,
-        sessionId: agentSessionId ?? 'agent',
-        stepId: stepId,
-      );
-      stepOutputs['step_$stepId'] =
-          'risk=${res['risk']} exit=${res['exitCode']}\n${res['stdout'] ?? ''}${res['stderr'] ?? ''}';
-      notifyListeners();
-    } on ApiException catch (e) {
-      if (e.status == 409) {
-        stepOutputs['step_$stepId'] = '需要确认（risk=${e.body?['risk']}），请点「确认执行」';
-      } else {
-        stepOutputs['step_$stepId'] = '$e';
-      }
-      notifyListeners();
-      rethrow;
-    }
-  }
-
   Future<void> saveLlm({
     required String baseUrl,
     required String model,
@@ -255,14 +442,10 @@ class AppState extends ChangeNotifier {
   }
 }
 
-// avoid importing dart:convert at top for encoder used only in probe
 class JsonEncoder {
   final String? indent;
   const JsonEncoder.withIndent(this.indent);
-  String convert(Object? value) {
-    // simple pretty for nested maps/lists
-    return _enc(value, 0);
-  }
+  String convert(Object? value) => _enc(value, 0);
 
   String _enc(Object? v, int level) {
     final pad = '  ' * level;
