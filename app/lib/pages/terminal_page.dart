@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
-/// Terminal page — look & feel of common mobile SSH clients.
+/// Plain SSH-tool terminal (JuiceSSH / Termius style).
 class TerminalPage extends StatefulWidget {
   const TerminalPage({super.key});
 
@@ -19,13 +19,10 @@ class _TerminalPageState extends State<TerminalPage> {
   bool _busy = false;
   int _histIdx = -1;
 
-  static const _bg = Color(0xFF0C0C0C);
-  static const _fg = Color(0xFFD4D4D4);
-  static const _green = Color(0xFF4EC9B0);
-  static const _dim = Color(0xFF6A9955);
-  static const _bar = Color(0xFF1E1E1E);
-  static const _amber = Color(0xFFDCDCAA);
-  static const _red = Color(0xFFF44747);
+  static const _bg = Color(0xFF000000);
+  static const _fg = Color(0xFFE0E0E0);
+  static const _green = Color(0xFF00C853);
+  static const _muted = Color(0xFF9E9E9E);
 
   @override
   void dispose() {
@@ -42,76 +39,80 @@ class _TerminalPageState extends State<TerminalPage> {
     });
   }
 
-  Future<void> _run(AppState state, {bool forceConfirm = false}) async {
-    final cmd = _input.text.trim();
-    if (cmd.isEmpty || _busy) return;
+  Future<void> _run(AppState state) async {
+    final cmd = _input.text;
+    final trimmed = cmd.trimRight();
+    if (trimmed.isEmpty || _busy) return;
+
     if (!state.backendOk) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('后端未连接')));
+      _snack('后端未连接');
       return;
     }
     if (state.selectedHostId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先选择主机')));
+      _snack('请先选择主机');
       return;
     }
 
-    // local helpers
-    if (cmd == 'clear' || cmd == 'cls') {
+    final line = trimmed.trim();
+    if (line == 'clear' || line == 'cls') {
       state.clearTerminal();
       _input.clear();
+      return;
+    }
+    if (line == 'exit' || line == 'logout') {
+      state.appendTerminal('${state.terminalPrompt}$line\nConnection closed.\n\n');
+      _input.clear();
+      _scrollEnd();
       return;
     }
 
     setState(() => _busy = true);
     try {
-      await state.runTerminal(cmd, confirmed: forceConfirm);
+      await state.runTerminal(line, confirmed: false);
       _input.clear();
       _histIdx = -1;
       _scrollEnd();
     } on ApiException catch (e) {
       if (e.status == 409) {
-        final risk = e.body?['risk']?.toString() ?? 'write';
         final ok = await showDialog<bool>(
           context: context,
           builder: (c) => AlertDialog(
-            backgroundColor: _bar,
-            title: Text('需要确认 ($risk)', style: const TextStyle(color: _fg)),
-            content: Text(
-              '命令可能修改系统：\n\n$cmd\n\n是否确认执行？',
-              style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 13),
-            ),
+            title: const Text('确认执行'),
+            content: Text('该命令可能修改系统：\n\n$line'),
             actions: [
               TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-              FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: _amber, foregroundColor: Colors.black),
-                onPressed: () => Navigator.pop(c, true),
-                child: const Text('确认执行'),
-              ),
+              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('执行')),
             ],
           ),
         );
         if (ok == true) {
           try {
-            await state.runTerminal(cmd, confirmed: true);
+            await state.runTerminal(line, confirmed: true);
             _input.clear();
             _histIdx = -1;
             _scrollEnd();
           } catch (e2) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e2')));
-            }
+            _snack('$e2');
           }
         } else {
-          state.appendTerminal('^C  (已取消确认)\n', dim: true);
+          // still show the typed line was cancelled
+          state.appendTerminal('${state.terminalPrompt}$line\n');
+          state.appendTerminal('(cancelled)\n\n');
+          _input.clear();
+          _scrollEnd();
         }
       } else if (e.status == 403) {
-        state.appendTerminal('blocked: ${e.message}\n', error: true);
+        state.appendTerminal('${state.terminalPrompt}$line\n');
+        state.appendTerminal('bash: $line: Operation not permitted\n\n');
+        _input.clear();
         _scrollEnd();
       } else {
-        state.appendTerminal('error: $e\n', error: true);
+        state.appendTerminal('${state.terminalPrompt}$line\n');
+        state.appendTerminal('$e\n\n');
         _scrollEnd();
       }
     } catch (e) {
-      state.appendTerminal('error: $e\n', error: true);
+      state.appendTerminal('$e\n\n');
       _scrollEnd();
     } finally {
       if (mounted) {
@@ -121,12 +122,11 @@ class _TerminalPageState extends State<TerminalPage> {
     }
   }
 
-  void _history(AppState state, int delta) {
+  void _hist(AppState state, int d) {
     final h = state.terminalHistory;
     if (h.isEmpty) return;
-    var i = _histIdx;
-    if (i < 0) i = h.length;
-    i += delta;
+    var i = _histIdx < 0 ? h.length : _histIdx;
+    i += d;
     if (i < 0) i = 0;
     if (i >= h.length) {
       _histIdx = -1;
@@ -138,150 +138,150 @@ class _TerminalPageState extends State<TerminalPage> {
     _input.selection = TextSelection.collapsed(offset: _input.text.length);
   }
 
+  void _snack(String s) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(s), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final prompt = state.terminalPrompt;
+    final connected = state.backendOk && state.selectedHostId != null;
 
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
         child: Column(
           children: [
-            // title bar like JuiceSSH / Termius compact
-            Container(
-              color: _bar,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.terminal, color: _green, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('终端', style: TextStyle(color: _fg, fontWeight: FontWeight.w600, fontSize: 14)),
-                        Text(
-                          state.hostLabel,
-                          style: const TextStyle(color: Color(0xFF858585), fontSize: 11, fontFamily: 'monospace'),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+            // session bar
+            Material(
+              color: const Color(0xFF121212),
+              child: ListTile(
+                dense: true,
+                leading: Icon(
+                  connected ? Icons.circle : Icons.circle_outlined,
+                  size: 12,
+                  color: connected ? _green : Colors.redAccent,
+                ),
+                title: Text(
+                  state.selectedHostId == null ? '终端' : state.hostLabel,
+                  style: const TextStyle(color: _fg, fontSize: 14, fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  connected ? 'SSH' : (state.backendOk ? '未选择主机' : '未连接'),
+                  style: const TextStyle(color: _muted, fontSize: 11),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: '清屏',
+                      onPressed: () => state.clearTerminal(),
+                      icon: const Icon(Icons.backspace_outlined, color: _muted, size: 18),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: '清屏',
-                    onPressed: () => state.clearTerminal(),
-                    icon: const Icon(Icons.cleaning_services_outlined, color: Color(0xFF858585), size: 18),
-                  ),
-                  IconButton(
-                    tooltip: '复制全部',
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: state.terminalBuffer));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已复制终端输出'), duration: Duration(seconds: 1)),
-                      );
-                    },
-                    icon: const Icon(Icons.copy, color: Color(0xFF858585), size: 18),
-                  ),
-                ],
-              ),
-            ),
-            // session strip
-            Container(
-              width: double.infinity,
-              color: const Color(0xFF252526),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              child: Text(
-                state.backendOk
-                    ? (state.selectedHostId == null ? '未选择主机 — 请到「主机」页选择' : 'connected · risk gate on · type clear to reset')
-                    : 'backend offline',
-                style: TextStyle(
-                  color: state.backendOk && state.selectedHostId != null ? _dim : _red,
-                  fontSize: 11,
-                  fontFamily: 'monospace',
+                    IconButton(
+                      tooltip: '复制',
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: state.terminalBuffer));
+                        _snack('已复制');
+                      },
+                      icon: const Icon(Icons.copy, color: _muted, size: 18),
+                    ),
+                  ],
                 ),
               ),
             ),
-            // scrollback
+            // screen
             Expanded(
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () => _focus.requestFocus(),
                 child: Container(
                   width: double.infinity,
                   color: _bg,
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
                   child: SingleChildScrollView(
                     controller: _scroll,
                     child: SelectableText(
                       state.terminalBuffer.isEmpty
-                          ? 'SSH session ready.\nSelect a host, then type a command.\n'
+                          ? (connected
+                              ? 'Connected to ${state.hostLabel}.\n'
+                              : 'Select a host on 主机 tab, then type commands here.\n')
                           : state.terminalBuffer,
                       style: const TextStyle(
                         color: _fg,
                         fontFamily: 'monospace',
-                        fontSize: 12.5,
-                        height: 1.35,
+                        fontSize: 13,
+                        height: 1.3,
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-            // input line
+            // input — single line like real ssh apps
             Container(
-              color: _bar,
+              color: const Color(0xFF121212),
               padding: EdgeInsets.only(
                 left: 8,
-                right: 6,
-                top: 6,
-                bottom: 6 + MediaQuery.of(context).viewInsets.bottom,
+                right: 4,
+                top: 4,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 4,
               ),
               child: Row(
                 children: [
                   Text(
-                    prompt,
-                    style: const TextStyle(color: _green, fontFamily: 'monospace', fontSize: 12.5),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: KeyboardListener(
-                      focusNode: FocusNode(),
-                      onKeyEvent: (e) {
-                        if (e is! KeyDownEvent) return;
-                        if (e.logicalKey == LogicalKeyboardKey.arrowUp) {
-                          _history(state, -1);
-                        } else if (e.logicalKey == LogicalKeyboardKey.arrowDown) {
-                          _history(state, 1);
-                        }
-                      },
-                      child: TextField(
-                        controller: _input,
-                        focusNode: _focus,
-                        style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 13),
-                        cursorColor: _green,
-                        enabled: state.backendOk && state.selectedHostId != null && !_busy,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _run(state),
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          border: InputBorder.none,
-                          hintText: 'command…',
-                          hintStyle: TextStyle(color: Color(0xFF555555), fontFamily: 'monospace'),
-                        ),
-                      ),
+                    connected ? state.terminalPrompt : '> ',
+                    style: TextStyle(
+                      color: connected ? _green : _muted,
+                      fontFamily: 'monospace',
+                      fontSize: 13,
                     ),
                   ),
+                  Expanded(
+                    child: TextField(
+                      controller: _input,
+                      focusNode: _focus,
+                      enabled: connected && !_busy,
+                      style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 13),
+                      cursorColor: _green,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _run(state),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 8),
+                      ),
+                      // capture up/down if possible via shortcuts
+                      onTap: () => _focus.requestFocus(),
+                    ),
+                  ),
+                  // history buttons for mobile (no physical arrows)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: connected ? () => _hist(state, -1) : null,
+                    icon: const Icon(Icons.keyboard_arrow_up, color: _muted, size: 20),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: connected ? () => _hist(state, 1) : null,
+                    icon: const Icon(Icons.keyboard_arrow_down, color: _muted, size: 20),
+                  ),
                   if (_busy)
-                    const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: _green),
+                    const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: _green),
+                      ),
                     )
                   else
                     IconButton(
-                      onPressed: () => _run(state),
-                      icon: const Icon(Icons.keyboard_return, color: _green, size: 20),
+                      onPressed: connected ? () => _run(state) : null,
+                      icon: Icon(Icons.keyboard_return, color: connected ? _green : _muted, size: 20),
                     ),
                 ],
               ),

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
-/// Agent chat — transcript UI inspired by agent CLIs (claude/codex style).
+/// Normal chat UI — talk to agent like Claude/Codex CLI, not a "goal form".
 class AgentPage extends StatefulWidget {
   const AgentPage({super.key});
 
@@ -15,23 +15,21 @@ class AgentPage extends StatefulWidget {
 class _AgentPageState extends State<AgentPage> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
+  final _focus = FocusNode();
   bool _busy = false;
 
   @override
   void dispose() {
     _input.dispose();
     _scroll.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
-  void _scrollToEnd() {
+  void _jumpBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
-      _scroll.animateTo(
-        _scroll.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      );
+      _scroll.jumpTo(_scroll.position.maxScrollExtent);
     });
   }
 
@@ -39,86 +37,111 @@ class _AgentPageState extends State<AgentPage> {
     final text = _input.text.trim();
     if (text.isEmpty || _busy) return;
     if (!state.backendOk) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('后端未连接')));
+      _toast('后端未连接');
       return;
     }
     if (state.selectedHostId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先在「主机」页选择主机')));
+      _toast('请先在主机页选一台机器');
       return;
     }
     _input.clear();
     setState(() => _busy = true);
     try {
       await state.agentChat(text);
-      _scrollToEnd();
     } catch (_) {
-      _scrollToEnd();
+      // error already in transcript
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+        _jumpBottom();
+        _focus.requestFocus();
+      }
     }
+  }
+
+  void _toast(String s) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(s), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final host = state.hostLabel;
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF161B22),
-        foregroundColor: const Color(0xFFE6EDF3),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Agent', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const Text('对话'),
             Text(
-              host,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace'),
+              state.hostLabel,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: '清空会话',
-            onPressed: () => state.clearAgentChat(),
-            icon: const Icon(Icons.delete_outline, size: 20),
-          ),
+          if (state.agentMessages.isNotEmpty)
+            TextButton(
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          title: const Text('清空对话？'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+                            TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('清空')),
+                          ],
+                        ),
+                      );
+                      if (ok == true) state.clearAgentChat();
+                    },
+              child: const Text('清空'),
+            ),
         ],
       ),
       body: Column(
         children: [
-          // session bar
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            color: const Color(0xFF21262D),
-            child: Text(
-              state.agentSessionId == null
-                  ? 'session: (new)  ·  model: ${state.llm?['model'] ?? '-'}'
-                  : 'session: ${state.agentSessionId!.substring(0, 8)}…  ·  model: ${state.llm?['model'] ?? '-'}',
-              style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace'),
-            ),
-          ),
           Expanded(
             child: state.agentMessages.isEmpty
-                ? _EmptyHint(onExample: (s) {
-                    _input.text = s;
-                  })
+                ? _Welcome(
+                    host: state.hostLabel,
+                    onPick: (s) {
+                      _input.text = s;
+                      _focus.requestFocus();
+                    },
+                  )
                 : ListView.builder(
                     controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                     itemCount: state.agentMessages.length + (_busy ? 1 : 0),
-                    itemBuilder: (ctx, i) {
+                    itemBuilder: (_, i) {
                       if (_busy && i == state.agentMessages.length) {
-                        return const _TypingRow();
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 10),
+                              Text('思考中…', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                            ],
+                          ),
+                        );
                       }
-                      final m = state.agentMessages[i];
-                      return _MessageBlock(
-                        message: m,
+                      return _ChatRow(
+                        msg: state.agentMessages[i],
                         busy: _busy,
-                        onRunStep: (stepId, cmd, confirmed) async {
+                        onRun: (stepId, cmd, confirmed) async {
                           setState(() => _busy = true);
                           try {
                             await state.runAgentStep(
@@ -126,455 +149,361 @@ class _AgentPageState extends State<AgentPage> {
                               command: cmd,
                               confirmed: confirmed,
                             );
-                            _scrollToEnd();
                           } catch (_) {
-                            _scrollToEnd();
                           } finally {
-                            if (mounted) setState(() => _busy = false);
+                            if (mounted) {
+                              setState(() => _busy = false);
+                              _jumpBottom();
+                            }
                           }
                         },
-                        onRunAllRead: () async {
+                        onRunReads: () async {
                           setState(() => _busy = true);
                           try {
                             await state.runAllReadSteps();
-                            _scrollToEnd();
                           } finally {
-                            if (mounted) setState(() => _busy = false);
+                            if (mounted) {
+                              setState(() => _busy = false);
+                              _jumpBottom();
+                            }
                           }
                         },
                       );
                     },
                   ),
           ),
-          // composer
-          Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF161B22),
-              border: Border(top: BorderSide(color: Color(0xFF30363D))),
-            ),
-            padding: EdgeInsets.only(
-              left: 12,
-              right: 8,
-              top: 8,
-              bottom: 8 + MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _input,
-                    style: const TextStyle(color: Color(0xFFE6EDF3), fontSize: 14),
-                    maxLines: 5,
-                    minLines: 1,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _send(state),
-                    decoration: InputDecoration(
-                      hintText: state.selectedHostId == null
-                          ? '先选择主机，再描述运维目标…'
-                          : '描述目标，例如：磁盘满了帮我只读排查…',
-                      hintStyle: const TextStyle(color: Color(0xFF6E7681), fontSize: 13),
-                      filled: true,
-                      fillColor: const Color(0xFF0D1117),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: Color(0xFF30363D)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: Color(0xFF30363D)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: cs.primary),
+          const Divider(height: 1),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _input,
+                      focusNode: _focus,
+                      minLines: 1,
+                      maxLines: 5,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _send(state),
+                      decoration: InputDecoration(
+                        hintText: state.selectedHostId == null
+                            ? '先选主机，再发消息…'
+                            : '发消息…',
+                        filled: true,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: _busy || !state.backendOk ? null : () => _send(state),
-                  icon: _busy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.arrow_upward),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyHint extends StatelessWidget {
-  final ValueChanged<String> onExample;
-  const _EmptyHint({required this.onExample});
-
-  @override
-  Widget build(BuildContext context) {
-    const examples = [
-      '只读检查：系统版本、磁盘与内存，给一句健康结论',
-      '查一下谁占用磁盘最多（不要删除）',
-      'nginx 是否在跑？最近错误日志最后 30 行',
-    ];
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const SizedBox(height: 24),
-        const Icon(Icons.smart_toy_outlined, size: 40, color: Color(0xFF58A6FF)),
-        const SizedBox(height: 12),
-        const Text(
-          'Agent 会话',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Color(0xFFE6EDF3), fontSize: 18, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          '用自然语言描述目标。Agent 会规划步骤，\n变更类命令需你确认后才会执行。',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Color(0xFF8B949E), fontSize: 13, height: 1.4),
-        ),
-        const SizedBox(height: 20),
-        ...examples.map(
-          (e) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF58A6FF),
-                side: const BorderSide(color: Color(0xFF30363D)),
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.all(12),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: _busy || !state.backendOk ? null : () => _send(state),
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.send),
+                  ),
+                ],
               ),
-              onPressed: () => onExample(e),
-              child: Text(e, style: const TextStyle(fontSize: 13)),
             ),
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TypingRow extends StatelessWidget {
-  const _TypingRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF58A6FF)),
-          ),
-          SizedBox(width: 10),
-          Text('agent 思考 / 规划中…', style: TextStyle(color: Color(0xFF8B949E), fontSize: 12)),
         ],
       ),
     );
   }
 }
 
-class _MessageBlock extends StatelessWidget {
-  final ChatMessage message;
-  final bool busy;
-  final Future<void> Function(int stepId, String cmd, bool confirmed) onRunStep;
-  final Future<void> Function() onRunAllRead;
+class _Welcome extends StatelessWidget {
+  final String host;
+  final ValueChanged<String> onPick;
+  const _Welcome({required this.host, required this.onPick});
 
-  const _MessageBlock({
-    required this.message,
+  @override
+  Widget build(BuildContext context) {
+    final tips = [
+      '现在这台机器状态怎么样？',
+      '磁盘快满了吗？帮我看看',
+      '最近有没有异常日志？',
+    ];
+    return Center(
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.all(24),
+        children: [
+          Icon(Icons.chat_bubble_outline, size: 40, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 12),
+          Text(
+            '和 Agent 对话',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            host,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '直接说你想做什么。需要改系统时会先让你确认。',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 20),
+          ...tips.map(
+            (t) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: OutlinedButton(
+                onPressed: () => onPick(t),
+                child: Align(alignment: Alignment.centerLeft, child: Text(t)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatRow extends StatelessWidget {
+  final ChatMessage msg;
+  final bool busy;
+  final Future<void> Function(int stepId, String cmd, bool confirmed) onRun;
+  final Future<void> Function() onRunReads;
+
+  const _ChatRow({
+    required this.msg,
     required this.busy,
-    required this.onRunStep,
-    required this.onRunAllRead,
+    required this.onRun,
+    required this.onRunReads,
   });
 
   @override
   Widget build(BuildContext context) {
-    switch (message.kind) {
-      case ChatKind.plan:
-        return _PlanCard(message: message, busy: busy, onRunStep: onRunStep, onRunAllRead: onRunAllRead);
-      case ChatKind.stepResult:
-        return _ToolResultCard(message: message);
-      case ChatKind.error:
-        return _Bubble(
-          role: 'system',
-          accent: const Color(0xFFF85149),
-          child: SelectableText(message.content, style: const TextStyle(color: Color(0xFFF85149), fontSize: 13)),
-        );
-      case ChatKind.status:
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Text(
-            '— ${message.content} —',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF6E7681), fontSize: 11),
-          ),
-        );
-      case ChatKind.text:
-        final isUser = message.role == 'user';
-        return _Bubble(
-          role: isUser ? 'you' : 'agent',
-          accent: isUser ? const Color(0xFF238636) : const Color(0xFF58A6FF),
-          child: SelectableText(
-            message.content,
-            style: const TextStyle(color: Color(0xFFE6EDF3), fontSize: 14, height: 1.4),
-          ),
-        );
+    if (msg.kind == ChatKind.plan) {
+      return _PlanInChat(msg: msg, busy: busy, onRun: onRun, onRunReads: onRunReads);
     }
+    if (msg.kind == ChatKind.stepResult) {
+      return _ToolBlock(msg: msg);
+    }
+    if (msg.kind == ChatKind.status) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(
+          msg.content,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
+
+    final isUser = msg.role == 'user';
+    final isError = msg.kind == ChatKind.error;
+    final bg = isUser
+        ? Theme.of(context).colorScheme.primaryContainer
+        : isError
+            ? Theme.of(context).colorScheme.errorContainer
+            : Theme.of(context).colorScheme.surfaceContainerHighest;
+    final fg = isUser
+        ? Theme.of(context).colorScheme.onPrimaryContainer
+        : isError
+            ? Theme.of(context).colorScheme.onErrorContainer
+            : Theme.of(context).colorScheme.onSurface;
+
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.88),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isUser ? 16 : 4),
+            bottomRight: Radius.circular(isUser ? 4 : 16),
+          ),
+        ),
+        child: SelectableText(
+          msg.content,
+          style: TextStyle(color: fg, fontSize: 15, height: 1.35),
+        ),
+      ),
+    );
   }
 }
 
-class _Bubble extends StatelessWidget {
-  final String role;
-  final Color accent;
-  final Widget child;
-  const _Bubble({required this.role, required this.accent, required this.child});
+class _PlanInChat extends StatelessWidget {
+  final ChatMessage msg;
+  final bool busy;
+  final Future<void> Function(int stepId, String cmd, bool confirmed) onRun;
+  final Future<void> Function() onRunReads;
+
+  const _PlanInChat({
+    required this.msg,
+    required this.busy,
+    required this.onRun,
+    required this.onRunReads,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+    final plan = msg.meta?['plan'] as Map<String, dynamic>? ?? {};
+    final steps = (plan['steps'] as List?) ?? [];
+    final notes = plan['notes']?.toString() ?? '';
+    final outputs = msg.meta?['outputs'] as Map<String, dynamic>? ?? {};
+    final hasRead = steps.any((s) => s is Map && (s['risk']?.toString() ?? 'read') == 'read');
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  role,
-                  style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.w600, fontFamily: 'monospace'),
-                ),
-              ),
-            ],
+          Text(
+            '建议步骤',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 6),
-          child,
-        ],
-      ),
-    );
-  }
-}
+          if (notes.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(notes, style: Theme.of(context).textTheme.bodySmall),
+          ],
+          const SizedBox(height: 8),
+          ...steps.map((raw) {
+            final st = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+            final id = st['id'];
+            final stepId = id is int ? id : int.tryParse('$id') ?? 0;
+            final risk = st['risk']?.toString() ?? 'read';
+            final title = st['title']?.toString() ?? '';
+            final command = st['command']?.toString() ?? '';
+            final out = outputs['step_$stepId']?.toString() ?? '';
+            final blocked = risk == 'blocked';
 
-class _PlanCard extends StatelessWidget {
-  final ChatMessage message;
-  final bool busy;
-  final Future<void> Function(int stepId, String cmd, bool confirmed) onRunStep;
-  final Future<void> Function() onRunAllRead;
-
-  const _PlanCard({
-    required this.message,
-    required this.busy,
-    required this.onRunStep,
-    required this.onRunAllRead,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final plan = message.meta?['plan'] as Map<String, dynamic>? ?? {};
-    final steps = (plan['steps'] as List?) ?? [];
-    final summary = plan['summary']?.toString() ?? message.content;
-    final notes = plan['notes']?.toString() ?? '';
-    final outputs = message.meta?['outputs'] as Map<String, dynamic>? ?? {};
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF161B22),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFF30363D)),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.account_tree_outlined, size: 16, color: Color(0xFF58A6FF)),
-                SizedBox(width: 6),
-                Text('plan', style: TextStyle(color: Color(0xFF58A6FF), fontFamily: 'monospace', fontWeight: FontWeight.w600)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SelectableText(summary, style: const TextStyle(color: Color(0xFFE6EDF3), fontSize: 14, fontWeight: FontWeight.w500)),
-            if (notes.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              SelectableText(notes, style: const TextStyle(color: Color(0xFF8B949E), fontSize: 12)),
-            ],
-            const SizedBox(height: 10),
-            ...steps.map((raw) {
-              final st = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
-              final id = st['id'];
-              final stepId = id is int ? id : int.tryParse('$id') ?? 0;
-              final risk = st['risk']?.toString() ?? 'read';
-              final title = st['title']?.toString() ?? '';
-              final command = st['command']?.toString() ?? '';
-              final reason = st['reason']?.toString() ?? '';
-              final out = outputs['step_$stepId']?.toString() ?? '';
-              final riskColor = switch (risk) {
-                'blocked' || 'destructive' => const Color(0xFFF85149),
-                'write' => const Color(0xFFD29922),
-                _ => const Color(0xFF3FB950),
-              };
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: Padding(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0D1117),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF21262D)),
-                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        Text('#$stepId', style: const TextStyle(color: Color(0xFF8B949E), fontFamily: 'monospace', fontSize: 12)),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: riskColor.withOpacity(0.5)),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(risk, style: TextStyle(color: riskColor, fontSize: 10, fontFamily: 'monospace')),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(title, style: const TextStyle(color: Color(0xFFE6EDF3), fontSize: 13), overflow: TextOverflow.ellipsis),
-                        ),
-                      ],
-                    ),
-                    if (reason.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(reason, style: const TextStyle(color: Color(0xFF8B949E), fontSize: 11)),
-                    ],
+                    Text('$stepId. $title', style: const TextStyle(fontWeight: FontWeight.w500)),
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF161B22),
-                        borderRadius: BorderRadius.circular(6),
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: SelectableText(
-                        '\$ $command',
-                        style: const TextStyle(color: Color(0xFF79C0FF), fontFamily: 'monospace', fontSize: 12),
+                        command,
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                       ),
                     ),
-                    if (risk != 'blocked') ...[
+                    if (!blocked) ...[
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
                         children: [
-                          if (risk == 'read')
-                            FilledButton.tonal(
-                              style: FilledButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                backgroundColor: const Color(0xFF21262D),
-                                foregroundColor: const Color(0xFFE6EDF3),
-                              ),
-                              onPressed: busy ? null : () => onRunStep(stepId, command, false),
-                              child: const Text('run'),
-                            )
-                          else ...[
-                            FilledButton.tonal(
-                              style: FilledButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                backgroundColor: const Color(0xFF21262D),
-                                foregroundColor: const Color(0xFFD29922),
-                              ),
-                              onPressed: busy ? null : () => onRunStep(stepId, command, true),
-                              child: const Text('confirm & run'),
-                            ),
-                          ],
+                          FilledButton.tonal(
+                            onPressed: busy
+                                ? null
+                                : () => onRun(stepId, command, risk != 'read'),
+                            child: Text(risk == 'read' ? '执行' : '确认执行'),
+                          ),
                           IconButton(
-                            tooltip: '复制命令',
-                            visualDensity: VisualDensity.compact,
+                            tooltip: '复制',
                             onPressed: () {
                               Clipboard.setData(ClipboardData(text: command));
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
+                                const SnackBar(
+                                  content: Text('已复制'),
+                                  duration: Duration(seconds: 1),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
                               );
                             },
-                            icon: const Icon(Icons.copy, size: 16, color: Color(0xFF8B949E)),
+                            icon: const Icon(Icons.copy, size: 18),
                           ),
                         ],
                       ),
-                    ],
+                    ] else
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text('已拦截（危险命令）', style: TextStyle(color: Colors.redAccent)),
+                      ),
                     if (out.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       SelectableText(
                         out,
-                        style: const TextStyle(color: Color(0xFF8B949E), fontFamily: 'monospace', fontSize: 11),
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ],
                 ),
-              );
-            }),
-            if (steps.any((s) => s is Map && (s['risk']?.toString() ?? 'read') == 'read'))
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: busy ? null : onRunAllRead,
-                  icon: const Icon(Icons.playlist_play, size: 18),
-                  label: const Text('运行全部只读步骤'),
-                ),
               ),
-          ],
-        ),
+            );
+          }),
+          if (hasRead)
+            TextButton(
+              onPressed: busy ? null : onRunReads,
+              child: const Text('执行全部只读步骤'),
+            ),
+        ],
       ),
     );
   }
 }
 
-class _ToolResultCard extends StatelessWidget {
-  final ChatMessage message;
-  const _ToolResultCard({required this.message});
+class _ToolBlock extends StatelessWidget {
+  final ChatMessage msg;
+  const _ToolBlock({required this.msg});
 
   @override
   Widget build(BuildContext context) {
-    final exit = message.meta?['exitCode'];
-    final risk = message.meta?['risk']?.toString() ?? '';
-    final cmd = message.meta?['command']?.toString() ?? '';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D1117),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF21262D)),
-        ),
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'tool · exec  exit=$exit  risk=$risk',
-              style: const TextStyle(color: Color(0xFF8B949E), fontFamily: 'monospace', fontSize: 11),
-            ),
-            if (cmd.isNotEmpty)
-              Text('\$ $cmd', style: const TextStyle(color: Color(0xFF79C0FF), fontFamily: 'monospace', fontSize: 12)),
-            const SizedBox(height: 6),
-            SelectableText(
-              message.content,
-              style: const TextStyle(color: Color(0xFFC9D1D9), fontFamily: 'monospace', fontSize: 12, height: 1.35),
-            ),
-          ],
-        ),
+    final cmd = msg.meta?['command']?.toString() ?? '';
+    final exit = msg.meta?['exitCode'];
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.55),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '执行结果 · exit $exit',
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+          if (cmd.isNotEmpty)
+            Text(cmd, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+          const SizedBox(height: 6),
+          SelectableText(
+            msg.content,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.35),
+          ),
+        ],
       ),
     );
   }

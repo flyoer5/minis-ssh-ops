@@ -2,8 +2,57 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
-class HostsPage extends StatelessWidget {
+class HostsPage extends StatefulWidget {
   const HostsPage({super.key});
+
+  @override
+  State<HostsPage> createState() => _HostsPageState();
+}
+
+class _HostsPageState extends State<HostsPage> {
+  /// hostId -> probing
+  final Set<String> _probing = {};
+  /// hostId -> last probe summary line
+  final Map<String, String> _probeHint = {};
+  /// hostId -> ok/fail/null
+  final Map<String, bool?> _probeOk = {};
+
+  Future<void> _probe(BuildContext context, AppState state, String id, String title) async {
+    setState(() {
+      _probing.add(id);
+      _probeHint[id] = '连接中…';
+      _probeOk[id] = null;
+    });
+    state.selectHost(id);
+    try {
+      final summary = await state.runProbeSummary(id);
+      if (!mounted) return;
+      setState(() {
+        _probing.remove(id);
+        _probeOk[id] = summary.ok;
+        _probeHint[id] = summary.oneLine;
+      });
+      if (!context.mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (c) => _ProbeSheet(title: title, summary: summary),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _probing.remove(id);
+        _probeOk[id] = false;
+        _probeHint[id] = '失败';
+      });
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('探测失败: $e'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,88 +87,93 @@ class HostsPage extends StatelessWidget {
               ? _offline(context, state)
               : state.hosts.isEmpty
                   ? const Center(child: Text('还没有主机，点右下角添加'))
-                  : ListView.builder(
+                  : ListView.separated(
+                      padding: const EdgeInsets.only(bottom: 88),
                       itemCount: state.hosts.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (ctx, i) {
                         final h = state.hosts[i] as Map<String, dynamic>;
                         final id = h['id'] as String;
                         final selected = state.selectedHostId == id;
+                        final name = (h['name'] as String?)?.isNotEmpty == true
+                            ? h['name'] as String
+                            : h['host'] as String;
+                        final subtitle =
+                            '${h['username']}@${h['host']}:${h['port']}';
+                        final probing = _probing.contains(id);
+                        final ok = _probeOk[id];
+                        final hint = _probeHint[id];
+
                         return ListTile(
                           selected: selected,
-                          leading: Icon(selected ? Icons.radio_button_checked : Icons.dns),
-                          title: Text((h['name'] as String?)?.isNotEmpty == true
-                              ? h['name'] as String
-                              : h['host'] as String),
-                          subtitle: Text(
-                            '${h['username']}@${h['host']}:${h['port']}'
-                            '${h['hasPrivateKey'] == true ? ' · key' : ''}'
-                            '${h['hasPassword'] == true ? ' · pwd' : ''}',
+                          leading: CircleAvatar(
+                            backgroundColor: selected
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                : Theme.of(context).colorScheme.surfaceContainerHighest,
+                            child: probing
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Icon(
+                                    ok == true
+                                        ? Icons.check_circle
+                                        : ok == false
+                                            ? Icons.error_outline
+                                            : Icons.dns,
+                                    color: ok == true
+                                        ? Colors.green
+                                        : ok == false
+                                            ? Colors.redAccent
+                                            : null,
+                                  ),
                           ),
+                          title: Text(name),
+                          subtitle: Text(
+                            hint == null ? subtitle : '$subtitle\n$hint',
+                            maxLines: 2,
+                          ),
+                          isThreeLine: hint != null,
                           onTap: () => state.selectHost(id),
-                          trailing: Wrap(
-                            spacing: 0,
-                            children: [
-                              IconButton(
-                                tooltip: '健康探测',
-                                icon: const Icon(Icons.monitor_heart_outlined),
-                                onPressed: () async {
-                                  state.selectHost(id);
-                                  try {
-                                    await state.runProbe(id);
-                                    if (context.mounted) {
-                                      showDialog(
-                                        context: context,
-                                        builder: (c) => AlertDialog(
-                                          title: const Text('探测结果'),
-                                          content: SingleChildScrollView(
-                                            child: SelectableText(
-                                              state.lastExecOutput,
-                                              style: const TextStyle(
-                                                fontFamily: 'monospace',
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(c),
-                                              child: const Text('关闭'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('$e')),
-                                      );
-                                    }
-                                  }
-                                },
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () async {
-                                  final ok = await showDialog<bool>(
-                                    context: context,
-                                    builder: (c) => AlertDialog(
-                                      title: const Text('删除主机？'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(c, false),
-                                          child: const Text('取消'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(c, true),
-                                          child: const Text('删除'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                  if (ok == true) await state.removeHost(id);
-                                },
-                              ),
+                          trailing: PopupMenuButton<String>(
+                            onSelected: (v) async {
+                              if (v == 'probe') {
+                                await _probe(context, state, id, name);
+                              } else if (v == 'select') {
+                                state.selectHost(id);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('已选中 $name'),
+                                    behavior: SnackBarBehavior.floating,
+                                    duration: const Duration(seconds: 1),
+                                  ),
+                                );
+                              } else if (v == 'delete') {
+                                final okDel = await showDialog<bool>(
+                                  context: context,
+                                  builder: (c) => AlertDialog(
+                                    title: const Text('删除主机？'),
+                                    content: Text('确定删除 $name ？'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(c, false),
+                                        child: const Text('取消'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(c, true),
+                                        child: const Text('删除'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (okDel == true) await state.removeHost(id);
+                              }
+                            },
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(value: 'select', child: Text('设为当前')),
+                              PopupMenuItem(value: 'probe', child: Text('测试连接')),
+                              PopupMenuItem(value: 'delete', child: Text('删除')),
                             ],
                           ),
                         );
@@ -137,24 +191,18 @@ class HostsPage extends StatelessWidget {
           children: [
             const Icon(Icons.cloud_off, size: 48, color: Colors.orange),
             const SizedBox(height: 12),
-            const Text('无法连接本机 Go 后端', style: TextStyle(fontSize: 18)),
+            const Text('无法连接本机后端', style: TextStyle(fontSize: 18)),
             const SizedBox(height: 8),
             Text(
               state.backendError ?? state.backendNote ?? '',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.redAccent, fontSize: 13),
             ),
-            const SizedBox(height: 12),
-            const Text(
-              '手机端会自动解压/拉起内置后端（127.0.0.1:17890）。\n'
-              '若持续失败，点下方重试；开发期也可在「设置」手动填 Token。',
-              textAlign: TextAlign.center,
-            ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () => state.bootstrap(),
               icon: const Icon(Icons.refresh),
-              label: const Text('重试启动后端'),
+              label: const Text('重试'),
             ),
           ],
         ),
@@ -212,7 +260,7 @@ class HostsPage extends StatelessWidget {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-          TextButton(
+          FilledButton(
             onPressed: () {
               if (form.currentState?.validate() != true) return;
               Navigator.pop(c, true);
@@ -233,10 +281,103 @@ class HostsPage extends StatelessWidget {
     if (key.text.trim().isNotEmpty) body['privateKeyPem'] = key.text.trim();
     try {
       await context.read<AppState>().addHost(body);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已添加'), behavior: SnackBarBehavior.floating),
+        );
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       }
     }
+  }
+}
+
+class _ProbeSheet extends StatelessWidget {
+  final String title;
+  final ProbeSummary summary;
+  const _ProbeSheet({required this.title, required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  summary.ok ? Icons.check_circle : Icons.error,
+                  color: summary.ok ? Colors.green : Colors.redAccent,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    summary.ok ? '连接正常 · $title' : '连接失败 · $title',
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...summary.lines.map(
+              (line) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 64,
+                      child: Text(
+                        line.label,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: SelectableText(
+                        line.value,
+                        style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (summary.detail.isNotEmpty) ...[
+              const Divider(height: 20),
+              Text(
+                '详情',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 180),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    summary.detail,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('完成'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

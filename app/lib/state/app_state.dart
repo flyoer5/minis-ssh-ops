@@ -117,11 +117,6 @@ class AppState extends ChangeNotifier {
         backendError = '加载数据失败: $e';
       }
     }
-    if (_termBuf.isEmpty) {
-      _termBuf.writeln('# SSH AI Agent terminal');
-      _termBuf.writeln('# type a command and press Enter · clear to reset');
-      _termBuf.writeln('');
-    }
     notifyListeners();
   }
 
@@ -193,8 +188,6 @@ class AppState extends ChangeNotifier {
 
   void clearTerminal() {
     _termBuf.clear();
-    _termBuf.writeln('# cleared');
-    _termBuf.writeln('');
     notifyListeners();
   }
 
@@ -231,17 +224,18 @@ class AppState extends ChangeNotifier {
     final out = StringBuffer();
     final stdout = (res['stdout'] ?? '').toString();
     final stderr = (res['stderr'] ?? '').toString();
-    if (stdout.isNotEmpty) out.write(stdout.endsWith('\n') ? stdout : '$stdout\n');
-    if (stderr.isNotEmpty) out.write(stderr.endsWith('\n') ? stderr : '$stderr\n');
+    // Real SSH feel: print stdout/stderr only; no risk/meta spam.
+    if (stdout.isNotEmpty) {
+      out.write(stdout.endsWith('\n') ? stdout : '$stdout\n');
+    }
+    if (stderr.isNotEmpty) {
+      out.write(stderr.endsWith('\n') ? stderr : '$stderr\n');
+    }
     final exit = res['exitCode'];
-    final risk = res['risk'];
-    if (out.isEmpty) {
-      out.writeln('[exit $exit · risk $risk · ${res['durationMs']}ms]');
-    } else {
-      out.writeln('[exit $exit · risk $risk · ${res['durationMs']}ms]');
+    if (exit is int && exit != 0 && stdout.isEmpty && stderr.isEmpty) {
+      out.writeln('exit $exit');
     }
     _termBuf.write(out);
-    _termBuf.writeln('');
     lastExecOutput = out.toString();
     _trimTerm();
     notifyListeners();
@@ -267,7 +261,7 @@ class AppState extends ChangeNotifier {
   Future<void> agentChat(String userText) async {
     final id = selectedHostId;
     if (id == null) {
-      _pushMsg(ChatMessage(role: 'system', content: '请先选择主机', kind: ChatKind.error));
+      _pushMsg(ChatMessage(role: 'assistant', content: '先选一台主机再聊。', kind: ChatKind.error));
       return;
     }
     _pushMsg(ChatMessage(role: 'user', content: userText));
@@ -281,9 +275,29 @@ class AppState extends ChangeNotifier {
         lastPlan = plan;
       }
       stepOutputs.clear();
-      final summary = plan?['summary']?.toString() ?? '已生成计划';
-      _pushMsg(ChatMessage(role: 'assistant', content: summary, kind: ChatKind.text));
-      if (plan != null) {
+
+      final summary = plan?['summary']?.toString().trim() ?? '';
+      final notes = plan?['notes']?.toString().trim() ?? '';
+      final steps = (plan?['steps'] as List?) ?? [];
+
+      // Natural reply bubble first
+      final reply = StringBuffer();
+      if (summary.isNotEmpty) {
+        reply.writeln(summary);
+      } else {
+        reply.writeln('好的，我看一下。');
+      }
+      if (notes.isNotEmpty) {
+        reply.writeln();
+        reply.write(notes);
+      }
+      if (steps.isEmpty && reply.isEmpty) {
+        reply.write(planRaw?.toString() ?? '（没有可执行步骤）');
+      }
+      _pushMsg(ChatMessage(role: 'assistant', content: reply.toString().trim(), kind: ChatKind.text));
+
+      // Optional actionable steps card (still chat-native)
+      if (steps.isNotEmpty && plan != null) {
         final planMsg = ChatMessage(
           role: 'assistant',
           content: summary,
@@ -295,7 +309,7 @@ class AppState extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      _pushMsg(ChatMessage(role: 'system', content: '规划失败: $e', kind: ChatKind.error));
+      _pushMsg(ChatMessage(role: 'assistant', content: '出错了：$e', kind: ChatKind.error));
       rethrow;
     }
   }
@@ -411,16 +425,24 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> runProbe([String? hostId]) async {
+    await runProbeSummary(hostId);
+  }
+
+  /// Human-readable probe for host list UI.
+  Future<ProbeSummary> runProbeSummary([String? hostId]) async {
     final id = hostId ?? selectedHostId;
     if (id == null) {
-      setLastExecOutput('请先选择主机');
-      return;
+      throw StateError('请先选择主机');
     }
     try {
       final res = await api.probe(id);
-      setLastExecOutput(const JsonEncoder.withIndent('  ').convert(res));
+      final summary = ProbeSummary.fromProbeJson(res);
+      lastExecOutput = summary.detail.isEmpty ? summary.oneLine : '${summary.oneLine}\n\n${summary.detail}';
+      notifyListeners();
+      return summary;
     } catch (e) {
-      setLastExecOutput('探测失败: $e');
+      lastExecOutput = '探测失败: $e';
+      notifyListeners();
       rethrow;
     }
   }
@@ -474,5 +496,102 @@ class JsonEncoder {
     }
     if (v is String) return '"${v.replaceAll('"', '\\"')}"';
     return '$v';
+  }
+}
+
+class ProbeLine {
+  final String label;
+  final String value;
+  ProbeLine(this.label, this.value);
+}
+
+class ProbeSummary {
+  final bool ok;
+  final String oneLine;
+  final List<ProbeLine> lines;
+  final String detail;
+
+  ProbeSummary({
+    required this.ok,
+    required this.oneLine,
+    required this.lines,
+    required this.detail,
+  });
+
+  factory ProbeSummary.fromProbeJson(Map<String, dynamic> res) {
+    String pick(String key) {
+      final v = res[key];
+      if (v is Map) {
+        if (v['error'] != null) return '错误: ${v['error']}';
+        final s = (v['stdout'] ?? '').toString().trim();
+        final e = (v['stderr'] ?? '').toString().trim();
+        if (s.isNotEmpty) return s;
+        if (e.isNotEmpty) return e;
+        return 'exit ${v['exitCode']}';
+      }
+      if (v == null) return '-';
+      return v.toString();
+    }
+
+    String firstLine(String s) {
+      final t = s.trim();
+      if (t.isEmpty) return '-';
+      return t.split('\n').first.trim();
+    }
+
+    final uname = pick('uname');
+    final uptime = pick('uptime');
+    final disk = pick('disk');
+    final memory = pick('memory');
+    final load = pick('load');
+
+    final hasErr = [uname, uptime, disk, memory, load].any((s) => s.startsWith('错误:'));
+    final ok = !hasErr && uname != '-';
+
+    // disk use%
+    String diskHint = firstLine(disk);
+    final useMatch = RegExp(r'(\d+)%').firstMatch(disk);
+    if (useMatch != null) {
+      diskHint = '使用 ${useMatch.group(1)}%';
+      // try root line
+      for (final line in disk.split('\n')) {
+        if (line.trim().endsWith(' /') || line.contains(' /$')) {
+          final m = RegExp(r'(\d+)%').firstMatch(line);
+          if (m != null) {
+            diskHint = '根分区 ${m.group(1)}%';
+            break;
+          }
+        }
+      }
+    }
+
+    final memLine = firstLine(memory);
+    final loadLine = firstLine(load);
+    final upLine = firstLine(uptime);
+    final one = ok
+        ? '${firstLine(uname).length > 48 ? '${firstLine(uname).substring(0, 48)}…' : firstLine(uname)} · $diskHint'
+        : '连接或采集失败';
+
+    final lines = <ProbeLine>[
+      ProbeLine('系统', firstLine(uname)),
+      ProbeLine('运行', upLine),
+      ProbeLine('负载', loadLine),
+      ProbeLine('磁盘', diskHint),
+      ProbeLine('内存', memLine),
+    ];
+
+    final detail = StringBuffer()
+      ..writeln('uname:\n$uname\n')
+      ..writeln('uptime:\n$uptime\n')
+      ..writeln('load:\n$load\n')
+      ..writeln('disk:\n$disk\n')
+      ..writeln('memory:\n$memory\n');
+
+    return ProbeSummary(
+      ok: ok,
+      oneLine: one,
+      lines: lines,
+      detail: detail.toString().trim(),
+    );
   }
 }

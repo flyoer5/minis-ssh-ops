@@ -84,7 +84,7 @@ class _HomeShellState extends State<HomeShell> {
         onDestinationSelected: (i) => setState(() => index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dns_outlined), label: '主机'),
-          NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: 'Agent'),
+          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: '对话'),
           NavigationDestination(icon: Icon(Icons.terminal), label: '终端'),
           NavigationDestination(icon: Icon(Icons.history), label: '记录'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), label: '设置'),
