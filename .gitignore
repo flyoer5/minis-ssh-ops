@@ -5,6 +5,7 @@ backend/vendor/
 *.test
 # Rebuilt by scripts/build-go-android.sh / CI (do not commit ~10MB blobs)
 app/android/app/src/main/assets/go/ssh-ai-agent
+app/android/app/src/main/jniLibs/
 app/assets/go/ssh-ai-agent-arm64
 
 # Flutter

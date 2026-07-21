@@ -5,6 +5,7 @@ on:
     paths:
       - "app/**"
       - "backend/**"
+      - "scripts/**"
       - ".github/workflows/android.yml"
   pull_request:
   workflow_dispatch:
@@ -19,19 +20,30 @@ jobs:
         with:
           go-version: "1.22"
 
-      - name: Build Go backend (linux/amd64 for CI smoke)
+      - name: Build Go backend (linux smoke)
         working-directory: backend
         run: |
           go build -o bin/server ./cmd/server
-          ./bin/server &
-          sleep 1
-          curl -sf http://127.0.0.1:17890/v1/health
-          kill %1 || true
+          SSH_AI_DATA_DIR="$RUNNER_TEMP/ssh-ai-data" SSH_AI_PORT=17890 SSH_AI_LOCAL_TOKEN=citoken \
+            ./bin/server >"$RUNNER_TEMP/be.log" 2>&1 &
+          echo $! >"$RUNNER_TEMP/be.pid"
+          for i in $(seq 1 20); do
+            if curl -sf "http://127.0.0.1:17890/v1/health"; then
+              echo
+              break
+            fi
+            sleep 0.3
+          done
+          curl -sf "http://127.0.0.1:17890/v1/health"
+          kill "$(cat "$RUNNER_TEMP/be.pid")" || true
 
-      - name: Cross-compile Go for android/arm64 into assets
+      - name: Cross-compile Go for android/arm64 (assets + jniLibs)
         run: |
           chmod +x scripts/build-go-android.sh
           ./scripts/build-go-android.sh
+          test -s app/android/app/src/main/assets/go/ssh-ai-agent
+          test -s app/android/app/src/main/jniLibs/arm64-v8a/libssh_ai_agent.so
+          ls -lah app/android/app/src/main/assets/go/ app/android/app/src/main/jniLibs/arm64-v8a/
 
       - uses: subosito/flutter-action@v2
         with:
@@ -42,13 +54,13 @@ jobs:
         working-directory: app
         run: flutter pub get
 
-      - name: Build APK (debug, arm64-v8a)
+      - name: Build debug APK (arm64)
         working-directory: app
         run: flutter build apk --debug --target-platform android-arm64
 
-      - name: Also build release APK (arm64)
+      - name: Build release APK (arm64)
         working-directory: app
-        run: flutter build apk --release --target-platform android-arm64 || true
+        run: flutter build apk --release --target-platform android-arm64
 
       - uses: actions/upload-artifact@v4
         with:
@@ -60,4 +72,4 @@ jobs:
         with:
           name: app-release
           path: app/build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: ignore
+          if-no-files-found: error

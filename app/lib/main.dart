@@ -52,24 +52,40 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     return Scaffold(
-      body: pages[index],
+      body: Column(
+        children: [
+          if (!state.backendOk || state.startingBackend)
+            MaterialBanner(
+              content: Text(
+                state.startingBackend
+                    ? (state.backendNote ?? '正在启动本机后端…')
+                    : (state.backendError ?? '后端未连接'),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              leading: Icon(
+                state.startingBackend ? Icons.hourglass_top : Icons.warning_amber,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: state.startingBackend ? null : () => state.bootstrap(),
+                  child: const Text('重试'),
+                ),
+              ],
+            ),
+          Expanded(child: pages[index]),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (i) => setState(() => index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dns_outlined), label: '主机'),
-          NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: '对话'),
+          NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: 'AI运维'),
           NavigationDestination(icon: Icon(Icons.history), label: '记录'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), label: '设置'),
         ],
       ),
-      floatingActionButton: state.backendOk
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: () => state.bootstrap(),
-              icon: const Icon(Icons.refresh),
-              label: const Text('重连后端'),
-            ),
     );
   }
 }

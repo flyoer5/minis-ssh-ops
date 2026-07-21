@@ -4,9 +4,10 @@
 
     <application
         android:label="SSH AI Agent"
-        android:name="${applicationName}"
+        android:name=".SshAiApp"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
+        android:extractNativeLibs="true"
         android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"

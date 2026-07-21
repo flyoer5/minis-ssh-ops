@@ -8,6 +8,7 @@ class AppState extends ChangeNotifier {
 
   final ApiClient api;
   bool backendOk = false;
+  bool startingBackend = false;
   String? backendError;
   String? backendNote;
   List<dynamic> hosts = [];
@@ -21,34 +22,62 @@ class AppState extends ChangeNotifier {
   List<dynamic> audit = [];
 
   Future<void> bootstrap() async {
+    startingBackend = true;
+    backendError = null;
+    notifyListeners();
+
     final prefs = await SharedPreferences.getInstance();
     api.baseUrl = prefs.getString('baseUrl') ?? api.baseUrl;
     api.localToken = prefs.getString('localToken') ?? api.localToken;
 
     if (NativeBackend.isAndroidNative) {
-      try {
-        final info = await NativeBackend.ensureStarted();
-        if (info != null) {
-          final base = (info['baseUrl'] as String?) ?? api.baseUrl;
-          final tok = (info['token'] as String?) ?? '';
-          api.baseUrl = base;
-          if (tok.isNotEmpty) api.localToken = tok;
-          await prefs.setString('baseUrl', api.baseUrl);
-          await prefs.setString('localToken', api.localToken);
-          backendNote = info['alreadyRunning'] == true ? '本机 Go 已在运行' : '已启动内置 Go 后端';
+      // Retry native start a few times — Process/SELinux can flake on cold start.
+      Object? lastErr;
+      for (var i = 0; i < 3; i++) {
+        try {
+          final info = await NativeBackend.ensureStarted();
+          if (info != null) {
+            final base = (info['baseUrl'] as String?) ?? api.baseUrl;
+            final tok = (info['token'] as String?) ?? '';
+            api.baseUrl = base;
+            if (tok.isNotEmpty) api.localToken = tok;
+            await prefs.setString('baseUrl', api.baseUrl);
+            await prefs.setString('localToken', api.localToken);
+            backendNote = info['alreadyRunning'] == true
+                ? '本机 Go 已在运行'
+                : '已启动内置 Go 后端';
+            lastErr = null;
+            break;
+          }
+        } catch (e) {
+          lastErr = e;
+          backendNote = '启动后端重试 ${i + 1}/3…';
+          notifyListeners();
+          await Future<void>.delayed(Duration(milliseconds: 600 * (i + 1)));
         }
-      } catch (e) {
-        backendError = '启动内置后端失败: $e';
-        backendOk = false;
-        notifyListeners();
+      }
+      if (lastErr != null) {
+        backendError = '启动内置后端失败: $lastErr';
       }
     }
 
-    await refreshHealth();
-    if (backendOk) {
-      await refreshHosts();
-      await refreshLlm();
+    // Health with short retries (backend may still be binding).
+    for (var i = 0; i < 8; i++) {
+      await refreshHealth();
+      if (backendOk) break;
+      await Future<void>.delayed(const Duration(milliseconds: 400));
     }
+
+    startingBackend = false;
+    if (backendOk) {
+      try {
+        await refreshHosts();
+        await refreshLlm();
+      } catch (e) {
+        backendError = '加载数据失败: $e';
+      }
+    }
+    notifyListeners();
   }
 
   Future<void> saveConnection({required String baseUrl, required String token}) async {
@@ -68,7 +97,7 @@ class AppState extends ChangeNotifier {
     try {
       final h = await api.health();
       backendOk = h['ok'] == true;
-      backendError = null;
+      if (backendOk) backendError = null;
     } catch (e) {
       backendOk = false;
       backendError = e.toString();
@@ -136,6 +165,21 @@ class AppState extends ChangeNotifier {
       rethrow;
     } catch (e) {
       setLastExecOutput('$e');
+      rethrow;
+    }
+  }
+
+  Future<void> runProbe([String? hostId]) async {
+    final id = hostId ?? selectedHostId;
+    if (id == null) {
+      setLastExecOutput('请先选择主机');
+      return;
+    }
+    try {
+      final res = await api.probe(id);
+      setLastExecOutput(const JsonEncoder.withIndent('  ').convert(res));
+    } catch (e) {
+      setLastExecOutput('探测失败: $e');
       rethrow;
     }
   }
@@ -208,5 +252,44 @@ class AppState extends ChangeNotifier {
     }
     llm = await api.putLlm(body);
     notifyListeners();
+  }
+}
+
+// avoid importing dart:convert at top for encoder used only in probe
+class JsonEncoder {
+  final String? indent;
+  const JsonEncoder.withIndent(this.indent);
+  String convert(Object? value) {
+    // simple pretty for nested maps/lists
+    return _enc(value, 0);
+  }
+
+  String _enc(Object? v, int level) {
+    final pad = '  ' * level;
+    final pad1 = '  ' * (level + 1);
+    if (v is Map) {
+      if (v.isEmpty) return '{}';
+      final b = StringBuffer('{\n');
+      final keys = v.keys.toList();
+      for (var i = 0; i < keys.length; i++) {
+        final k = keys[i];
+        b.write('$pad1"$k": ${_enc(v[k], level + 1)}');
+        b.write(i == keys.length - 1 ? '\n' : ',\n');
+      }
+      b.write('$pad}');
+      return b.toString();
+    }
+    if (v is List) {
+      if (v.isEmpty) return '[]';
+      final b = StringBuffer('[\n');
+      for (var i = 0; i < v.length; i++) {
+        b.write('$pad1${_enc(v[i], level + 1)}');
+        b.write(i == v.length - 1 ? '\n' : ',\n');
+      }
+      b.write('$pad]');
+      return b.toString();
+    }
+    if (v is String) return '"${v.replaceAll('"', '\\"')}"';
+    return '$v';
   }
 }
