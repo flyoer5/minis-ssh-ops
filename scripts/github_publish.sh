@@ -37,16 +37,13 @@ else
   exit 1
 fi
 
-REMOTE="https://x-access-token:${TOKEN}@github.com/${OWNER}/${REPO_NAME}.git"
-
 git remote remove origin 2>/dev/null || true
-git remote add origin "$REMOTE"
+git remote add origin "https://github.com/${OWNER}/${REPO_NAME}.git"
 
-# Avoid storing token in .git/config permanently: use push URL once
-git push -u origin HEAD:main
-
-# Rewrite remote without token
-git remote set-url origin "https://github.com/${OWNER}/${REPO_NAME}.git"
+# PRoot often has no TTY for credential prompt — use helper (token not stored in remote URL)
+export GIT_TERMINAL_PROMPT=0
+git -c credential.helper="!f() { echo username=x-access-token; echo password=${TOKEN}; }; f" \
+  push -u origin HEAD:main
 
 echo ""
 echo "OK: https://github.com/${OWNER}/${REPO_NAME}"
