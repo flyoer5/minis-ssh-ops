@@ -70,6 +70,13 @@ jobs:
 
       - name: Restore our Android overlays (after flutter create)
         run: |
+          # flutter create may add *.gradle.kts alongside our Groovy files — remove them
+          rm -f \
+            app/android/build.gradle.kts \
+            app/android/settings.gradle.kts \
+            app/android/app/build.gradle.kts \
+            app/android/app/src/main/kotlin/com/minis/minis_ssh_ops/MainActivity.kt || true
+
           git checkout -- \
             app/android/app/src/main/AndroidManifest.xml \
             app/android/app/src/main/kotlin/com/minis/sshops/MainActivity.kt \
@@ -77,15 +84,26 @@ jobs:
             app/android/build.gradle \
             app/android/settings.gradle \
             app/android/gradle.properties \
+            app/android/gradle/wrapper/gradle-wrapper.properties \
             app/android/app/src/main/res/xml/network_security_config.xml \
             app/android/app/src/main/res/values/styles.xml \
             app/android/app/src/main/res/values/strings.xml \
             app/pubspec.yaml \
             app/lib || true
-          # ensure package path exists if create used different org layout
+
+          # Force Gradle >= Flutter minimum (8.7+); keep AGP on 8.x via settings.gradle
+          sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11.1-all.zip|' \
+            app/android/gradle/wrapper/gradle-wrapper.properties
+          grep distributionUrl app/android/gradle/wrapper/gradle-wrapper.properties
+
           mkdir -p app/android/app/src/main/kotlin/com/minis/sshops
           if [ ! -f app/android/app/src/main/kotlin/com/minis/sshops/MainActivity.kt ]; then
             echo "MainActivity missing after restore" >&2
+            exit 1
+          fi
+          # Sanity: no dual Groovy/KTS
+          if ls app/android/*.gradle.kts app/android/app/*.gradle.kts 2>/dev/null; then
+            echo "ERROR: leftover .gradle.kts files" >&2
             exit 1
           fi
 
