@@ -1,0 +1,40 @@
+# Go
+/bin/
+*.exe
+*.test
+*.out
+
+# Local runtime data / secrets
+/data/
+**/master.key
+**/ops.db
+**/ops.db-*
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*~
+
+# Flutter / Android (also app/.gitignore)
+app/.dart_tool/
+app/.packages
+app/.pub-cache/
+app/.pub/
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.metadata
+app/local.properties
+app/android/local.properties
+app/android/.gradle/
+app/android/app/build/
+app/**/GeneratedPluginRegistrant.*
+
+# Generated large binaries (CI / prepare_assets regenerates)
+app/assets/opsd/opsd_arm64
+app/android/app/src/main/jniLibs/
+
+# CI output
+/dist/

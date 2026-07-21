@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Minis SSH Ops</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --border: #2d3a4d;
+      --text: #e7ecf3;
+      --muted: #8b9bb4;
+      --accent: #3b82f6;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+    }
+    header {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      background: #121a24;
+    }
+    header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+    header .badge { font-size: 12px; color: var(--muted); }
+    main { display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 54px); }
+    @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+    aside { border-right: 1px solid var(--border); padding: 12px; background: #121820; }
+    section { padding: 14px 16px; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px; margin-bottom: 12px;
+    }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+    input, select, textarea {
+      width: 100%; background: #0d1218; border: 1px solid var(--border); color: var(--text);
+      border-radius: 8px; padding: 8px 10px; font-size: 14px;
+    }
+    textarea { min-height: 72px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    button {
+      background: var(--accent); color: white; border: 0; border-radius: 8px;
+      padding: 8px 12px; font-size: 13px; cursor: pointer; margin: 4px 4px 0 0;
+    }
+    button.secondary { background: #334155; }
+    button.danger { background: var(--danger); }
+    button.warn { background: var(--warn); color: #111; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .host-item {
+      padding: 10px; border-radius: 8px; border: 1px solid transparent; cursor: pointer;
+      margin-bottom: 6px; background: #151c27;
+    }
+    .host-item.active { border-color: var(--accent); background: #1a2740; }
+    .host-item .name { font-weight: 600; font-size: 14px; }
+    .host-item .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    pre {
+      background: #0a0e14; border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px; overflow: auto; font-size: 12px; max-height: 320px; white-space: pre-wrap;
+    }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+    .row > * { flex: 1; min-width: 120px; }
+    .risk-read { color: var(--ok); }
+    .risk-write { color: var(--warn); }
+    .risk-destructive, .risk-blocked { color: var(--danger); }
+    .step {
+      border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin: 8px 0; background: #121820;
+    }
+    .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .tabs button { background: #1e293b; }
+    .tabs button.on { background: var(--accent); }
+    .hidden { display: none; }
+    #toast {
+      position: fixed; bottom: 16px; right: 16px; background: #1e293b; border: 1px solid var(--border);
+      padding: 10px 14px; border-radius: 8px; display: none; max-width: 80vw; z-index: 9;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Minis SSH Ops</h1>
+    <span class="badge" id="status">connecting…</span>
+    <span class="badge" id="selHost">未选主机</span>
+  </header>
+  <main>
+    <aside>
+      <h2>主机</h2>
+      <div id="hostList"></div>
+      <div class="card">
+        <h2>添加主机</h2>
+        <label>名称</label><input id="hName" placeholder="prod-vps" />
+        <label>地址</label><input id="hHost" placeholder="192.168.1.10" />
+        <label>端口</label><input id="hPort" type="number" value="22" />
+        <label>用户</label><input id="hUser" value="root" />
+        <label>密码（或下方私钥）</label><input id="hPass" type="password" />
+        <label>私钥 PEM（可选）</label><textarea id="hKey" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
+        <button onclick="addHost()">保存</button>
+      </div>
+    </aside>
+    <section>
+      <div class="tabs">
+        <button class="on" data-tab="term" onclick="tab('term')">命令</button>
+        <button data-tab="pty" onclick="tab('pty')">交互终端</button>
+        <button data-tab="files" onclick="tab('files')">文件 SFTP</button>
+        <button data-tab="agent" onclick="tab('agent')">AI Agent</button>
+        <button data-tab="llm" onclick="tab('llm')">模型配置</button>
+        <button data-tab="audit" onclick="tab('audit')">审计</button>
+      </div>
+
+      <div id="tab-term">
+        <div class="card">
+          <div class="row">
+            <div><button onclick="connectHost()">连接测试</button>
+              <button class="secondary" onclick="probe()">健康探测</button>
+              <button class="secondary" onclick="disconnectHost()">断开</button></div>
+          </div>
+          <label>命令</label>
+          <textarea id="cmd" placeholder="df -h"></textarea>
+          <button onclick="runCmd(false)">执行</button>
+          <button class="warn" onclick="runCmd(true)">确认并执行（变更类）</button>
+          <pre id="out">就绪。请选择主机后操作。</pre>
+        </div>
+      </div>
+
+      <div id="tab-pty" class="hidden">
+        <div class="card">
+          <div class="row">
+            <div>
+              <button onclick="ptyOpen()">打开 PTY</button>
+              <button class="danger" onclick="ptyClose()">关闭</button>
+              <button class="secondary" onclick="ptyClear()">清屏</button>
+              <span class="badge" id="ptyStatus">未连接</span>
+            </div>
+          </div>
+          <div id="termWrap" style="margin-top:10px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#0a0e14;height:420px;"></div>
+          <p style="color:var(--muted);font-size:12px;margin:8px 0 0">WebSocket → SSH PTY。需先选主机。本地 xterm.js CDN。</p>
+        </div>
+      </div>
+
+      <div id="tab-files" class="hidden">
+        <div class="card">
+          <label>远程路径</label>
+          <div class="row">
+            <input id="fsPath" value="/root" />
+          </div>
+          <button onclick="fsList()">列出</button>
+          <button class="secondary" onclick="fsUp()">上级</button>
+          <button class="secondary" onclick="fsRead()">读文件</button>
+          <button class="warn" onclick="fsWrite()">写入(需确认)</button>
+          <pre id="fsListOut" style="max-height:220px"></pre>
+          <label>文件内容</label>
+          <textarea id="fsContent" placeholder="读/写内容"></textarea>
+          <pre id="fsOut"></pre>
+        </div>
+      </div>
+
+      <div id="tab-agent" class="hidden">
+        <div class="card">
+          <label>运维目标</label>
+          <textarea id="goal" placeholder="磁盘使用率过高，帮我定位最大目录（只读）"></textarea>
+          <button onclick="makePlan()">生成计划</button>
+          <div id="planBox"></div>
+        </div>
+      </div>
+
+      <div id="tab-llm" class="hidden">
+        <div class="card">
+          <label>Base URL</label><input id="llmBase" placeholder="https://api.openai.com/v1" />
+          <label>API Key</label><input id="llmKey" type="password" placeholder="sk-...（留空则保留原值）" />
+          <label>Model</label><input id="llmModel" placeholder="gpt-4o-mini" />
+          <button onclick="saveLLM()">保存</button>
+          <pre id="llmInfo"></pre>
+        </div>
+      </div>
+
+      <div id="tab-audit" class="hidden">
+        <div class="card">
+          <button class="secondary" onclick="loadAudit()">刷新</button>
+          <pre id="auditOut"></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div id="toast"></div>
+  <script>
+    const TOKEN_KEY = 'opsd_token';
+    let token = localStorage.getItem(TOKEN_KEY) || '';
+    let hosts = [];
+    let current = null;
+    let lastPlan = null;
+
+    async function api(path, opts = {}) {
+      const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+      if (token) headers['X-Ops-Token'] = token;
+      const res = await fetch(path, { ...opts, headers });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { raw: text }; }
+      if (!res.ok) {
+        const msg = data.error || res.statusText;
+        throw Object.assign(new Error(msg), { status: res.status, data });
+      }
+      return data;
+    }
+
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 3200);
+    }
+
+    function tab(name) {
+      document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+      ['term','pty','files','agent','llm','audit'].forEach(t => {
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
+      });
+      if (name === 'llm') loadLLM();
+      if (name === 'audit') loadAudit();
+      if (name === 'files') fsList();
+      if (name === 'pty') {
+        ensureTerm();
+        setTimeout(() => { if (window._fit) window._fit.fit(); }, 50);
+      }
+    }
+
+    let ptyWS = null;
+    let term = null;
+
+    function ensureTerm() {
+      if (term) return;
+      if (typeof Terminal === 'undefined') {
+        document.getElementById('ptyStatus').textContent = 'xterm 加载失败(需联网 CDN)';
+        return;
+      }
+      term = new Terminal({
+        cursorBlink: true,
+        fontSize: 13,
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+        theme: { background: '#0a0e14', foreground: '#e7ecf3', cursor: '#3b82f6' },
+        scrollback: 5000,
+      });
+      const fit = new FitAddon.FitAddon();
+      window._fit = fit;
+      term.loadAddon(fit);
+      term.open(document.getElementById('termWrap'));
+      fit.fit();
+      term.onData(data => {
+        if (!ptyWS || ptyWS.readyState !== 1) return;
+        ptyWS.send(JSON.stringify({ type: 'input', data }));
+      });
+      window.addEventListener('resize', () => {
+        if (window._fit) window._fit.fit();
+        ptySendResize();
+      });
+    }
+
+    function ptySendResize() {
+      if (!ptyWS || ptyWS.readyState !== 1 || !term) return;
+      ptyWS.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    }
+
+    function ptyOpen() {
+      if (!current) return toast('先选主机');
+      ensureTerm();
+      if (!term) return;
+      ptyClose();
+      const cols = term.cols || 80;
+      const rows = term.rows || 24;
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const url = `${proto}//${location.host}/api/pty?token=${encodeURIComponent(token)}&host_id=${encodeURIComponent(current.id)}&cols=${cols}&rows=${rows}`;
+      document.getElementById('ptyStatus').textContent = '连接中…';
+      const ws = new WebSocket(url);
+      ws.binaryType = 'arraybuffer';
+      ptyWS = ws;
+      ws.onopen = () => {
+        document.getElementById('ptyStatus').textContent = '已连接';
+        if (window._fit) window._fit.fit();
+        ptySendResize();
+      };
+      ws.onmessage = (ev) => {
+        if (typeof ev.data === 'string') {
+          try {
+            const msg = JSON.parse(ev.data);
+            if (msg.type === 'ready') {
+              term.writeln('\r\n\x1b[32m[pty ready]\x1b[0m');
+            } else if (msg.type === 'error') {
+              term.writeln('\r\n\x1b[31m[error] ' + msg.data + '\x1b[0m');
+            } else if (msg.type === 'exit') {
+              term.writeln('\r\n\x1b[33m[session exit]\x1b[0m');
+              document.getElementById('ptyStatus').textContent = '已退出';
+            }
+          } catch (_) {
+            term.write(ev.data);
+          }
+          return;
+        }
+        // binary
+        term.write(new Uint8Array(ev.data));
+      };
+      ws.onclose = () => {
+        document.getElementById('ptyStatus').textContent = '已断开';
+        ptyWS = null;
+      };
+      ws.onerror = () => {
+        document.getElementById('ptyStatus').textContent = '错误';
+        toast('PTY WebSocket 错误');
+      };
+    }
+
+    function ptyClose() {
+      if (ptyWS) {
+        try { ptyWS.close(); } catch (_) {}
+        ptyWS = null;
+      }
+      document.getElementById('ptyStatus').textContent = '未连接';
+    }
+
+    function ptyClear() {
+      if (term) term.clear();
+    }
+
+    async function fsList() {
+      if (!current) return toast('先选主机');
+      const path = document.getElementById('fsPath').value || '/';
+      try {
+        const r = await api('/api/fs/list', { method: 'POST', body: JSON.stringify({ host_id: current.id, path }) });
+        const lines = (r.entries || []).map(e => {
+          const mark = e.is_dir ? 'DIR ' : 'FILE';
+          return `${mark}  ${e.mode.padEnd(12)} ${String(e.size).padStart(10)}  ${e.name}`;
+        });
+        document.getElementById('fsListOut').textContent = (lines.join('\n') || '(empty)') + '\n\n// 双击逻辑：点「读文件」读当前路径文件，或把路径改成子目录再列出';
+        document.getElementById('fsOut').textContent = `path=${r.path || path} count=${(r.entries||[]).length}`;
+        // clickable via data store
+        window._fsEntries = r.entries || [];
+      } catch (e) {
+        document.getElementById('fsListOut').textContent = e.message;
+      }
+    }
+
+    function fsUp() {
+      let p = document.getElementById('fsPath').value || '/';
+      if (p === '/') return;
+      p = p.replace(/\/+$/, '');
+      const i = p.lastIndexOf('/');
+      document.getElementById('fsPath').value = i <= 0 ? '/' : p.slice(0, i);
+      fsList();
+    }
+
+    async function fsRead() {
+      if (!current) return toast('先选主机');
+      const path = document.getElementById('fsPath').value;
+      try {
+        const r = await api('/api/fs/read', { method: 'POST', body: JSON.stringify({ host_id: current.id, path }) });
+        document.getElementById('fsContent').value = r.text || '';
+        document.getElementById('fsOut').textContent = `read ${r.path} size=${r.size}`;
+      } catch (e) {
+        document.getElementById('fsOut').textContent = e.message;
+      }
+    }
+
+    async function fsWrite() {
+      if (!current) return toast('先选主机');
+      const path = document.getElementById('fsPath').value;
+      const content = document.getElementById('fsContent').value;
+      if (!confirm('确认写入远程文件?\n' + path)) return;
+      try {
+        const r = await api('/api/fs/write', {
+          method: 'POST',
+          body: JSON.stringify({ host_id: current.id, path, content, confirmed: true })
+        });
+        document.getElementById('fsOut').textContent = JSON.stringify(r);
+        toast('已写入');
+      } catch (e) {
+        document.getElementById('fsOut').textContent = e.message;
+      }
+    }
+
+    async function bootstrap() {
+      try {
+        if (!token) {
+          const t = await fetch('/api/token').then(r => r.json());
+          token = t.token;
+          localStorage.setItem(TOKEN_KEY, token);
+        }
+        await api('/api/health');
+        document.getElementById('status').textContent = 'API OK · token 已就绪';
+        await refreshHosts();
+        await loadLLM();
+      } catch (e) {
+        document.getElementById('status').textContent = '连接失败: ' + e.message;
+        // allow paste token
+        const manual = prompt('无法自动取 token，请粘贴 OPSD token:');
+        if (manual) {
+          token = manual.trim();
+          localStorage.setItem(TOKEN_KEY, token);
+          bootstrap();
+        }
+      }
+    }
+
+    async function refreshHosts() {
+      const data = await api('/api/hosts');
+      hosts = data.hosts || [];
+      const box = document.getElementById('hostList');
+      box.innerHTML = '';
+      hosts.forEach(h => {
+        const div = document.createElement('div');
+        div.className = 'host-item' + (current && current.id === h.id ? ' active' : '');
+        div.innerHTML = `<div class="name">${escapeHtml(h.name)}</div>
+          <div class="meta">${escapeHtml(h.user)}@${escapeHtml(h.host)}:${h.port}</div>`;
+        div.onclick = () => selectHost(h);
+        box.appendChild(div);
+      });
+    }
+
+    function selectHost(h) {
+      current = h;
+      document.getElementById('selHost').textContent = h.name + ' · ' + h.user + '@' + h.host;
+      refreshHosts();
+    }
+
+    async function addHost() {
+      const body = {
+        name: document.getElementById('hName').value.trim(),
+        host: document.getElementById('hHost').value.trim(),
+        port: parseInt(document.getElementById('hPort').value || '22', 10),
+        user: document.getElementById('hUser').value.trim(),
+        password: document.getElementById('hPass').value,
+        private_key: document.getElementById('hKey').value,
+      };
+      try {
+        await api('/api/hosts', { method: 'POST', body: JSON.stringify(body) });
+        toast('主机已保存（密钥已加密）');
+        document.getElementById('hPass').value = '';
+        document.getElementById('hKey').value = '';
+        await refreshHosts();
+      } catch (e) { toast(e.message); }
+    }
+
+    async function connectHost() {
+      if (!current) return toast('先选主机');
+      try {
+        const r = await api('/api/hosts/' + current.id + '/connect', { method: 'POST', body: '{}' });
+        document.getElementById('out').textContent = r.banner || JSON.stringify(r, null, 2);
+        toast('连接成功');
+      } catch (e) { document.getElementById('out').textContent = e.message; }
+    }
+
+    async function disconnectHost() {
+      if (!current) return;
+      await api('/api/hosts/' + current.id + '/disconnect', { method: 'POST', body: '{}' });
+      toast('已断开');
+    }
+
+    async function probe() {
+      if (!current) return toast('先选主机');
+      try {
+        const r = await api('/api/probe', { method: 'POST', body: JSON.stringify({ host_id: current.id }) });
+        document.getElementById('out').textContent = JSON.stringify(r, null, 2);
+      } catch (e) { document.getElementById('out').textContent = e.message; }
+    }
+
+    async function runCmd(confirmed) {
+      if (!current) return toast('先选主机');
+      const command = document.getElementById('cmd').value;
+      try {
+        const r = await api('/api/exec', {
+          method: 'POST',
+          body: JSON.stringify({ host_id: current.id, command, confirmed, session_id: 'ui' })
+        });
+        const step = r.step || {};
+        const res = step.result || {};
+        document.getElementById('out').textContent =
+          `risk=${step.risk}\nexit=${res.exit_code}\n--- stdout ---\n${res.stdout || ''}\n--- stderr ---\n${res.stderr || ''}\n${r.error || ''}`;
+      } catch (e) {
+        if (e.status === 409) {
+          document.getElementById('out').textContent = '需要确认后执行:\n' + JSON.stringify(e.data, null, 2);
+          toast('该命令需确认，点「确认并执行」');
+        } else {
+          document.getElementById('out').textContent = e.message + '\n' + JSON.stringify(e.data || {}, null, 2);
+        }
+      }
+    }
+
+    async function makePlan() {
+      if (!current) return toast('先选主机');
+      const goal = document.getElementById('goal').value.trim();
+      if (!goal) return toast('填写目标');
+      document.getElementById('planBox').innerHTML = '<p>规划中…</p>';
+      try {
+        const r = await api('/api/agent/plan', {
+          method: 'POST',
+          body: JSON.stringify({ host_id: current.id, goal, session_id: 'ui-agent' })
+        });
+        lastPlan = r;
+        renderPlan(r);
+      } catch (e) {
+        document.getElementById('planBox').innerHTML = '<pre>' + escapeHtml(e.message) + '</pre>';
+      }
+    }
+
+    function renderPlan(r) {
+      const plan = r.plan || {};
+      let html = `<p><b>${escapeHtml(plan.summary || '')}</b></p>`;
+      if (plan.notes) html += `<p style="color:var(--muted)">${escapeHtml(plan.notes)}</p>`;
+      (plan.steps || []).forEach(st => {
+        const risk = st.risk || st.risk_real || 'read';
+        html += `<div class="step">
+          <div><b>#${st.id}</b> ${escapeHtml(st.title || '')}
+            <span class="risk-${risk}">[${risk}]</span>
+            <span style="color:var(--muted)">${escapeHtml(st.status || '')}</span></div>
+          <div style="color:var(--muted);font-size:12px;margin:4px 0">${escapeHtml(st.reason || '')}</div>
+          <pre style="max-height:80px">${escapeHtml(st.command || '')}</pre>
+          <button onclick='runStep(${st.id}, ${JSON.stringify(st.command)}, false)'>执行</button>
+          <button class="warn" onclick='runStep(${st.id}, ${JSON.stringify(st.command)}, true)'>确认执行</button>
+          <pre id="step-out-${st.id}" style="display:none"></pre>
+        </div>`;
+      });
+      document.getElementById('planBox').innerHTML = html;
+    }
+
+    async function runStep(stepId, command, confirmed) {
+      if (!current || !lastPlan) return;
+      try {
+        const r = await api('/api/agent/exec-step', {
+          method: 'POST',
+          body: JSON.stringify({
+            host_id: current.id,
+            session_id: lastPlan.session_id,
+            plan_id: lastPlan.plan_id,
+            step_id: stepId,
+            command,
+            confirmed
+          })
+        });
+        const el = document.getElementById('step-out-' + stepId);
+        el.style.display = 'block';
+        const res = (r.step && r.step.result) || {};
+        el.textContent = `exit=${res.exit_code}\n${res.stdout || ''}\n${res.stderr || ''}\n${r.error || ''}`;
+      } catch (e) {
+        toast(e.message);
+        const el = document.getElementById('step-out-' + stepId);
+        if (el) { el.style.display = 'block'; el.textContent = e.message + '\n' + JSON.stringify(e.data || {}, null, 2); }
+      }
+    }
+
+    async function loadLLM() {
+      try {
+        const m = await api('/api/llm');
+        document.getElementById('llmBase').value = m.base_url || '';
+        document.getElementById('llmModel').value = m.model || '';
+        document.getElementById('llmInfo').textContent = JSON.stringify(m, null, 2);
+      } catch (e) {
+        document.getElementById('llmInfo').textContent = e.message;
+      }
+    }
+
+    async function saveLLM() {
+      const body = {
+        base_url: document.getElementById('llmBase').value.trim(),
+        model: document.getElementById('llmModel').value.trim(),
+        api_key: document.getElementById('llmKey').value,
+      };
+      try {
+        const m = await api('/api/llm', { method: 'PUT', body: JSON.stringify(body) });
+        document.getElementById('llmKey').value = '';
+        document.getElementById('llmInfo').textContent = JSON.stringify(m, null, 2);
+        toast('模型配置已保存');
+      } catch (e) { toast(e.message); }
+    }
+
+    async function loadAudit() {
+      try {
+        const r = await api('/api/audit');
+        document.getElementById('auditOut').textContent = JSON.stringify(r.entries || [], null, 2);
+      } catch (e) {
+        document.getElementById('auditOut').textContent = e.message;
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>

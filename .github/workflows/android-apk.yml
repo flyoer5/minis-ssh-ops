@@ -1,0 +1,163 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - "cmd/**"
+      - "internal/**"
+      - "web/**"
+      - "app/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/android-apk.yml"
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Flutter arm64 APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+          cache-dependency-path: go.sum
+
+      - name: Build opsd (linux/arm64 static)
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: arm64
+        run: |
+          mkdir -p bin
+          go build -trimpath -ldflags='-s -w' -o bin/opsd ./cmd/opsd/
+          file bin/opsd || true
+          ls -la bin/opsd
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # pin when something breaks; empty = latest stable
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Ensure Flutter Android scaffolding
+        working-directory: app
+        run: |
+          # Generates missing gradle wrapper / local bits; may touch android/*
+          flutter create . --project-name minis_ssh_ops --org com.minis --platforms=android
+
+      - name: Restore our Android overlays (after flutter create)
+        run: |
+          git checkout -- \
+            app/android/app/src/main/AndroidManifest.xml \
+            app/android/app/src/main/kotlin/com/minis/sshops/MainActivity.kt \
+            app/android/app/build.gradle \
+            app/android/build.gradle \
+            app/android/settings.gradle \
+            app/android/gradle.properties \
+            app/android/app/src/main/res/xml/network_security_config.xml \
+            app/android/app/src/main/res/values/styles.xml \
+            app/android/app/src/main/res/values/strings.xml \
+            app/pubspec.yaml \
+            app/lib || true
+          # ensure package path exists if create used different org layout
+          mkdir -p app/android/app/src/main/kotlin/com/minis/sshops
+          if [ ! -f app/android/app/src/main/kotlin/com/minis/sshops/MainActivity.kt ]; then
+            echo "MainActivity missing after restore" >&2
+            exit 1
+          fi
+
+      - name: Prepare assets (opsd + web UI)
+        run: |
+          chmod +x app/scripts/prepare_assets.sh
+          ./app/scripts/prepare_assets.sh
+          test -s app/assets/opsd/opsd_arm64
+          test -s app/android/app/src/main/jniLibs/arm64-v8a/libopsd.so
+          test -f app/assets/web/index.html
+          # real UI should be larger than placeholder
+          wc -c app/assets/web/index.html
+
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+
+      - name: Build release APK (arm64)
+        working-directory: app
+        run: |
+          flutter build apk --release --target-platform android-arm64
+          ls -lah build/app/outputs/flutter-apk/
+
+      - name: Rename artifact
+        run: |
+          mkdir -p dist
+          VER=$(grep '^version:' app/pubspec.yaml | awk '{print $2}' | tr -d '\r')
+          SRC="app/build/app/outputs/flutter-apk/app-release.apk"
+          OUT="dist/minis-ssh-ops-${VER}-arm64.apk"
+          cp -f "$SRC" "$OUT"
+          cp -f "$SRC" dist/minis-ssh-ops-latest-arm64.apk
+          ls -lah dist/
+          # checksums
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+          cat dist/SHA256SUMS.txt
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: minis-ssh-ops-apk
+          path: |
+            dist/*.apk
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload opsd binary (debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: opsd-linux-arm64
+          path: bin/opsd
+          retention-days: 14
+
+  # Optional: attach APK to GitHub Release when tagging v*
+  release:
+    name: Attach to Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: minis-ssh-ops-apk
+          path: dist
+
+      - name: Create / update release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.apk
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
