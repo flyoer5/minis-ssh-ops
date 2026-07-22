@@ -355,9 +355,30 @@ class AppState extends ChangeNotifier {
         // nothing
       }
     } catch (e) {
-      _pushMsg(ChatMessage(role: 'assistant', content: e.toString(), kind: ChatKind.error));
+      _pushMsg(ChatMessage(role: 'assistant', content: _friendlyErr(e), kind: ChatKind.error));
       rethrow;
     }
+  }
+
+  String _friendlyErr(Object e) {
+    final s = e.toString();
+    final low = s.toLowerCase();
+    if (low.contains('connection abort') || low.contains('connection reset') || low.contains('broken pipe')) {
+      return '模型网关连接中断，点重发即可';
+    }
+    if (low.contains('timeout') || low.contains('timed out')) {
+      return '模型请求超时，请重试';
+    }
+    if (low.contains('401') || low.contains('403') || low.contains('鉴权')) {
+      return '模型鉴权失败，请检查设置里的 Base URL / API Key';
+    }
+    if (low.contains('llm not configured') || low.contains('未配置')) {
+      return '未配置模型，请到设置页填写';
+    }
+    // strip ApiException wrapper noise
+    final m = RegExp(r'ApiException\(\d+\):\s*(.*)').firstMatch(s);
+    if (m != null) return m.group(1)!;
+    return s;
   }
 
   Future<void> runAgentPlan(String goal) => agentChat(goal);

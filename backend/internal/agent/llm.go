@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -23,11 +24,27 @@ type Msg struct {
 }
 
 func NewClient(baseURL, apiKey, model string) *Client {
+	tr := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   15 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     false, // some gateways flake on h2
+		MaxIdleConns:          4,
+		IdleConnTimeout:       60 * time.Second,
+		TLSHandshakeTimeout:   15 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ResponseHeaderTimeout: 90 * time.Second,
+	}
 	return &Client{
 		BaseURL: strings.TrimRight(baseURL, "/"),
 		APIKey:  apiKey,
 		Model:   model,
-		HTTP:    &http.Client{Timeout: 120 * time.Second},
+		HTTP: &http.Client{
+			Timeout:   120 * time.Second,
+			Transport: tr,
+		},
 	}
 }
 
@@ -35,6 +52,22 @@ func (c *Client) Chat(messages []Msg) (string, error) {
 	if c.BaseURL == "" || c.Model == "" {
 		return "", fmt.Errorf("llm not configured")
 	}
+	var last error
+	for attempt := 1; attempt <= 3; attempt++ {
+		text, err := c.chatOnce(messages)
+		if err == nil {
+			return text, nil
+		}
+		last = err
+		if !isRetryable(err) || attempt == 3 {
+			break
+		}
+		time.Sleep(time.Duration(attempt) * 800 * time.Millisecond)
+	}
+	return "", friendlyLLMError(last)
+}
+
+func (c *Client) chatOnce(messages []Msg) (string, error) {
 	body, _ := json.Marshal(map[string]any{
 		"model":       c.Model,
 		"messages":    messages,
@@ -45,6 +78,7 @@ func (c *Client) Chat(messages []Msg) (string, error) {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Connection", "close")
 	if c.APIKey != "" {
 		req.Header.Set("Authorization", "Bearer "+c.APIKey)
 	}
@@ -53,9 +87,9 @@ func (c *Client) Chat(messages []Msg) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if resp.StatusCode >= 300 {
-		return "", fmt.Errorf("llm http %d: %s", resp.StatusCode, truncate(string(raw), 400))
+		return "", fmt.Errorf("llm http %d: %s", resp.StatusCode, truncate(string(raw), 300))
 	}
 	var out struct {
 		Choices []struct {
@@ -66,7 +100,7 @@ func (c *Client) Chat(messages []Msg) (string, error) {
 		} `json:"error"`
 	}
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return "", err
+		return "", fmt.Errorf("llm decode: %w", err)
 	}
 	if out.Error != nil {
 		return "", fmt.Errorf("llm: %s", out.Error.Message)
@@ -75,6 +109,55 @@ func (c *Client) Chat(messages []Msg) (string, error) {
 		return "", fmt.Errorf("llm empty choices")
 	}
 	return out.Choices[0].Message.Content, nil
+}
+
+func isRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	for _, k := range []string{
+		"connection abort", "connection reset", "broken pipe",
+		"timeout", "temporary", "eof", "i/o timeout",
+		"tls handshake", "server closed", "http2",
+	} {
+		if strings.Contains(s, k) {
+			return true
+		}
+	}
+	// retry 502/503/429 body markers
+	if strings.Contains(s, "llm http 502") || strings.Contains(s, "llm http 503") || strings.Contains(s, "llm http 429") {
+		return true
+	}
+	return false
+}
+
+func friendlyLLMError(err error) error {
+	if err == nil {
+		return fmt.Errorf("llm unknown error")
+	}
+	s := err.Error()
+	low := strings.ToLower(s)
+	switch {
+	case strings.Contains(low, "connection abort"), strings.Contains(low, "connection reset"), strings.Contains(low, "broken pipe"):
+		return fmt.Errorf("模型网关连接中断，请重试")
+	case strings.Contains(low, "timeout"), strings.Contains(low, "deadline"):
+		return fmt.Errorf("模型请求超时，请重试")
+	case strings.Contains(low, "llm http 401"), strings.Contains(low, "llm http 403"):
+		return fmt.Errorf("模型鉴权失败，请检查 API Key / Base URL")
+	case strings.Contains(low, "llm http 404"):
+		return fmt.Errorf("模型接口不存在，请检查 Base URL（需含 /v1）")
+	case strings.Contains(low, "llm not configured"):
+		return fmt.Errorf("未配置模型，请到设置页填写")
+	default:
+		// strip noisy Go transport prefix
+		if i := strings.Index(s, "Post \""); i >= 0 {
+			if j := strings.Index(s, "\": "); j > i {
+				return fmt.Errorf("模型请求失败: %s", s[j+3:])
+			}
+		}
+		return fmt.Errorf("模型请求失败: %s", truncate(s, 180))
+	}
 }
 
 func truncate(s string, n int) string {
