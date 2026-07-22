@@ -34,12 +34,24 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     });
   }
 
+  String _busyHint = '处理中…';
+
   Future<void> _send(AppState state) async {
     final text = _input.text.trim();
     if (text.isEmpty || _busy) return;
-    if (!state.backendOk || state.selectedHostId == null) return;
+    if (!state.backendOk) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('后端未连接')));
+      return;
+    }
+    if (state.selectedHostId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('先选主机')));
+      return;
+    }
     _input.clear();
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _busyHint = '思考 / 调工具中…';
+    });
     try {
       await state.agentChat(text);
     } catch (_) {
@@ -47,7 +59,6 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       if (mounted) {
         setState(() => _busy = false);
         _bottom();
-        _focus.requestFocus();
       }
     }
   }
@@ -86,13 +97,13 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                     itemCount: state.agentMessages.length + (_busy ? 1 : 0),
                     itemBuilder: (_, i) {
                       if (_busy && i == state.agentMessages.length) {
-                        return const Padding(
-                          padding: EdgeInsets.all(10),
+                        return Padding(
+                          padding: const EdgeInsets.all(10),
                           child: Row(
                             children: [
-                              SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                              SizedBox(width: 10),
-                              Text('thinking…', style: TextStyle(fontSize: 12, color: Colors.white54)),
+                              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                              const SizedBox(width: 10),
+                              Text(_busyHint, style: const TextStyle(fontSize: 12, color: Colors.white54)),
                             ],
                           ),
                         );

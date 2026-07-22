@@ -3,7 +3,6 @@ package sshx
 import (
 	"bytes"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
@@ -29,6 +28,9 @@ type ExecResult struct {
 	DurationMs int64 `json:"durationMs"`
 }
 
+// DefaultPool is used by Exec/SFTP when Pool field is not set on params.
+var DefaultPool = NewPool()
+
 func Exec(p ConnectParams, command string) (ExecResult, error) {
 	start := time.Now()
 	if p.Port == 0 {
@@ -37,19 +39,22 @@ func Exec(p ConnectParams, command string) (ExecResult, error) {
 	if p.Timeout == 0 {
 		p.Timeout = 20 * time.Second
 	}
-	cfg, err := clientConfig(p)
-	if err != nil {
-		return ExecResult{}, err
-	}
-	addr := net.JoinHostPort(p.Host, fmt.Sprintf("%d", p.Port))
-	conn, err := ssh.Dial("tcp", addr, cfg)
+
+	pool := DefaultPool
+	key := poolKey(p)
+	cli, pooled, err := pool.DialPooled(p)
 	if err != nil {
 		return ExecResult{}, fmt.Errorf("ssh dial: %w", err)
 	}
-	defer conn.Close()
+	if !pooled {
+		defer cli.Close()
+	}
 
-	sess, err := conn.NewSession()
+	sess, err := cli.NewSession()
 	if err != nil {
+		if pooled {
+			pool.invalidate(key)
+		}
 		return ExecResult{}, err
 	}
 	defer sess.Close()
@@ -68,6 +73,10 @@ func Exec(p ConnectParams, command string) (ExecResult, error) {
 		if ee, ok := runErr.(*ssh.ExitError); ok {
 			res.ExitCode = ee.ExitStatus()
 			return res, nil
+		}
+		// transport error — drop pooled client
+		if pooled {
+			pool.invalidate(key)
 		}
 		return res, runErr
 	}

@@ -3,13 +3,11 @@ package sshx
 import (
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"path"
 	"time"
 
 	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
 )
 
 type FileEntry struct {
@@ -21,37 +19,35 @@ type FileEntry struct {
 	ModTime time.Time `json:"modTime"`
 }
 
-func dialSSH(p ConnectParams) (*ssh.Client, error) {
+func withSFTP(p ConnectParams, fn func(*sftp.Client) error) error {
 	if p.Port == 0 {
 		p.Port = 22
 	}
 	if p.Timeout == 0 {
 		p.Timeout = 20 * time.Second
 	}
-	cfg, err := clientConfig(p)
-	if err != nil {
-		return nil, err
-	}
-	addr := netJoin(p.Host, p.Port)
-	return ssh.Dial("tcp", addr, cfg)
-}
-
-func netJoin(host string, port int) string {
-	return net.JoinHostPort(host, fmt.Sprintf("%d", port))
-}
-
-func withSFTP(p ConnectParams, fn func(*sftp.Client) error) error {
-	cli, err := dialSSH(p)
+	pool := DefaultPool
+	key := poolKey(p)
+	cli, pooled, err := pool.DialPooled(p)
 	if err != nil {
 		return fmt.Errorf("ssh dial: %w", err)
 	}
-	defer cli.Close()
+	if !pooled {
+		defer cli.Close()
+	}
 	sc, err := sftp.NewClient(cli)
 	if err != nil {
+		if pooled {
+			pool.invalidate(key)
+		}
 		return fmt.Errorf("sftp: %w", err)
 	}
 	defer sc.Close()
-	return fn(sc)
+	if err := fn(sc); err != nil {
+		// don't always drop pool; only on channel death handled by next DialPooled
+		return err
+	}
+	return nil
 }
 
 func ListDir(p ConnectParams, remote string) ([]FileEntry, error) {

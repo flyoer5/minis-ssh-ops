@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.2
+
+- SSH 连接池：探针/Agent/SFTP 复用连接降延迟
+- 设置：管理 HostKey（查看指纹/删除重信）
+- 终端：粘贴按钮
+- Agent：处理中提示更清晰
+
 ## 1.1.1
 
 - 自查修复：HTTP 超时补齐；known-hosts 删除改 query；文件默认家目录；HOSTKEY 友好提示；health version 对齐
