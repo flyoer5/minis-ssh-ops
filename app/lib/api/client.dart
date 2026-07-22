@@ -192,4 +192,33 @@ class ApiException implements Exception {
   ApiException(this.status, this.message, {this.body});
   @override
   String toString() => 'ApiException($status): $message';
+
+  Future<Map<String, dynamic>> fsList(String hostId, String path) async {
+    final r = await http.post(_u('/v1/hosts/$hostId/fs/list'), headers: _headers, body: jsonEncode({'path': path})).timeout(const Duration(seconds: 30));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> fsRead(String hostId, String path) async {
+    final r = await http.post(_u('/v1/hosts/$hostId/fs/read'), headers: _headers, body: jsonEncode({'path': path})).timeout(const Duration(seconds: 60));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> fsWrite(String hostId, String path, String content, {bool confirmed = false}) async {
+    final r = await http.post(_u('/v1/hosts/$hostId/fs/write'), headers: _headers, body: jsonEncode({'path': path, 'content': content, 'confirmed': confirmed})).timeout(const Duration(seconds: 60));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> listKnownHosts() async {
+    final r = await http.get(_u('/v1/known-hosts'), headers: _headers).timeout(const Duration(seconds: 10));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<void> deleteKnownHost(String host, int port) async {
+    final r = await http.delete(_u('/v1/known-hosts'), headers: _headers, body: jsonEncode({'host': host, 'port': port})).timeout(const Duration(seconds: 10));
+    _ensureOk(r);
+  }
 }
