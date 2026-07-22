@@ -1,8 +1,13 @@
 package com.sshai.agent.ssh_ai_agent
 
+import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -24,10 +29,11 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        // Kick backend as early as possible (also done in Application).
+        // Kick backend + FGS as early as possible
         executor.execute {
             try {
                 BackendRuntime.ensureStarted(applicationContext)
+                BackendService.start(applicationContext)
             } catch (e: Exception) {
                 Log.e(TAG, "early start failed", e)
             }
@@ -39,6 +45,10 @@ class MainActivity : FlutterActivity() {
                         executor.execute {
                             try {
                                 val info = BackendRuntime.ensureStarted(applicationContext)
+                                try {
+                                    BackendService.start(applicationContext)
+                                } catch (_: Exception) {
+                                }
                                 mainHandler.post { result.success(info) }
                             } catch (e: Exception) {
                                 Log.e(TAG, "ensureStarted failed", e)
@@ -67,9 +77,67 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                     }
+                    "isIgnoringBatteryOptimizations" -> {
+                        result.success(isIgnoringBattery())
+                    }
+                    "requestIgnoreBatteryOptimizations" -> {
+                        try {
+                            requestIgnoreBattery()
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("BATTERY", e.message, null)
+                        }
+                    }
+                    "openBatterySettings" -> {
+                        try {
+                            openBatterySettings()
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("BATTERY", e.message, null)
+                        }
+                    }
+                    "exportBackendLog" -> {
+                        executor.execute {
+                            try {
+                                val dataDir = File(applicationContext.filesDir, "backend-data")
+                                val log = File(dataDir, "backend.log")
+                                val text = if (log.exists()) log.readText() else ""
+                                mainHandler.post { result.success(text) }
+                            } catch (e: Exception) {
+                                mainHandler.post { result.error("LOG", e.message, null) }
+                            }
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun isIgnoringBattery(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+        val pm = getSystemService(PowerManager::class.java) ?: return true
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun requestIgnoreBattery() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        if (isIgnoringBattery()) return
+        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        startActivity(intent)
+    }
+
+    private fun openBatterySettings() {
+        try {
+            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+            startActivity(intent)
+        } catch (_: Exception) {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+            startActivity(intent)
+        }
     }
 
     companion object {

@@ -17,4 +17,33 @@ class NativeBackend {
     }
     return null;
   }
+
+  static Future<Map<String, dynamic>?> status() async {
+    if (!isAndroidNative) return null;
+    final raw = await _channel.invokeMethod<dynamic>('status');
+    if (raw is Map) return raw.map((k, v) => MapEntry(k.toString(), v));
+    return null;
+  }
+
+  static Future<bool> isIgnoringBatteryOptimizations() async {
+    if (!isAndroidNative) return true;
+    final v = await _channel.invokeMethod<dynamic>('isIgnoringBatteryOptimizations');
+    return v == true;
+  }
+
+  static Future<void> requestIgnoreBatteryOptimizations() async {
+    if (!isAndroidNative) return;
+    await _channel.invokeMethod('requestIgnoreBatteryOptimizations');
+  }
+
+  static Future<void> openBatterySettings() async {
+    if (!isAndroidNative) return;
+    await _channel.invokeMethod('openBatterySettings');
+  }
+
+  static Future<String> exportBackendLog() async {
+    if (!isAndroidNative) return '';
+    final v = await _channel.invokeMethod<dynamic>('exportBackendLog');
+    return v?.toString() ?? '';
+  }
 }

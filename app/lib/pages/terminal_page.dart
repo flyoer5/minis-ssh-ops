@@ -71,6 +71,7 @@ class _TerminalPageState extends State<TerminalPage>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final state = context.watch<AppState>();
+    final fontSize = state.termFontSize;
     final id = state.selectedHostId;
     if (id != null && id != _hostId && state.backendOk) {
       _hostId = id;
@@ -186,6 +187,19 @@ class _TerminalPageState extends State<TerminalPage>
     final ch = _ch;
     if (ch == null || !_connected) return;
     ch.sink.add(jsonEncode({'type': 'input', 'data': data}));
+  }
+
+  void _sendResize() {
+    final ch = _ch;
+    if (ch == null || !_connected) return;
+    // approximate cols from width / char width ~ fontSize*0.6
+    final mq = MediaQuery.of(context);
+    final w = mq.size.width - 16;
+    final h = mq.size.height - mq.viewInsets.bottom - 160;
+    final fs = context.read<AppState>().termFontSize;
+    final cols = (w / (fs * 0.6)).floor().clamp(40, 200);
+    final rows = (h / (fs * 1.3)).floor().clamp(10, 80);
+    ch.sink.add(jsonEncode({'type': 'resize', 'cols': cols, 'rows': rows}));
   }
 
   /// Diff EditableText → PTY. System IME owns show/hide.
@@ -328,6 +342,7 @@ class _TerminalPageState extends State<TerminalPage>
   Widget build(BuildContext context) {
     super.build(context);
     final state = context.watch<AppState>();
+    final fontSize = state.termFontSize;
     if (state.selectedHostId == null) {
       return const Scaffold(body: Center(child: Text('先选主机')));
     }

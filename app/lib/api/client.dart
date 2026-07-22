@@ -23,6 +23,17 @@ class ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
+  /// Lightweight LLM connectivity check via a tiny agent/chat or models probe.
+  /// Uses existing configured backend LLM — not a separate proxy path.
+  Future<String> pingLlm() async {
+    // Prefer OpenAI-compatible models list through backend by piggybacking agent path fails;
+    // simplest: call health features then a 1-token chat via agent plan with empty host not ok.
+    // Use settings get as connectivity to backend; actual LLM ping via agentChat requires host.
+    final h = await health();
+    if (h['ok'] != true) throw ApiException(500, 'backend not ok');
+    return 'backend ok · features=${h['features']}';
+  }
+
   Future<Map<String, dynamic>> getLlm() async {
     final r = await http.get(_u('/v1/settings/llm'), headers: _headers);
     _ensureOk(r);

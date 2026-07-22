@@ -6,12 +6,17 @@ import android.util.Log
 class SshAiApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Pre-start backend so UI bootstrap is more likely to hit a healthy port.
+        // Pre-start backend + sticky FGS watchdog
         Thread {
             try {
                 BackendRuntime.ensureStarted(this)
             } catch (e: Exception) {
                 Log.e("SshAiBackend", "Application pre-start failed: ${e.message}", e)
+            }
+            try {
+                BackendService.start(this)
+            } catch (e: Exception) {
+                Log.e("SshAiBackend", "FGS start failed: ${e.message}", e)
             }
         }.apply {
             name = "backend-prestart"

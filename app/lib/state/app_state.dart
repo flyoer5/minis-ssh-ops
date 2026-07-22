@@ -65,6 +65,13 @@ class AppState extends ChangeNotifier {
 
   List<dynamic> audit = [];
 
+  // --- Probe cache (hostId -> summary json + epoch ms) ---
+  final Map<String, Map<String, dynamic>> probeCache = {};
+  // --- UI prefs ---
+  double termFontSize = 13;
+  bool confirmWrites = false; // reserved; agent auto-runs non-blocked
+  bool batteryIgnored = true;
+
   Future<void> bootstrap() async {
     startingBackend = true;
     backendError = null;
@@ -73,6 +80,8 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     api.baseUrl = prefs.getString('baseUrl') ?? api.baseUrl;
     api.localToken = prefs.getString('localToken') ?? api.localToken;
+    termFontSize = prefs.getDouble('termFontSize') ?? 13;
+    selectedHostId = prefs.getString('selectedHostId') ?? selectedHostId;
 
     if (NativeBackend.isAndroidNative) {
       Object? lastErr;
@@ -113,10 +122,14 @@ class AppState extends ChangeNotifier {
       try {
         await refreshHosts();
         await refreshLlm();
+        await refreshAudit();
       } catch (e) {
         backendError = '加载数据失败: $e';
       }
     }
+    try {
+      batteryIgnored = await NativeBackend.isIgnoringBatteryOptimizations();
+    } catch (_) {}
     notifyListeners();
   }
 
@@ -177,6 +190,71 @@ class AppState extends ChangeNotifier {
   void selectHost(String? id) {
     selectedHostId = id;
     notifyListeners();
+    SharedPreferences.getInstance().then((p) {
+      if (id == null) {
+        p.remove('selectedHostId');
+      } else {
+        p.setString('selectedHostId', id);
+      }
+    });
+  }
+
+  Future<void> setTermFontSize(double v) async {
+    termFontSize = v.clamp(10, 22);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('termFontSize', termFontSize);
+    notifyListeners();
+  }
+
+  Future<void> requestBatteryExempt() async {
+    await NativeBackend.requestIgnoreBatteryOptimizations();
+    batteryIgnored = await NativeBackend.isIgnoringBatteryOptimizations();
+    notifyListeners();
+  }
+
+  Future<void> openBatterySettings() async {
+    await NativeBackend.openBatterySettings();
+  }
+
+  Future<String> exportBackendLog() => NativeBackend.exportBackendLog();
+
+  void putProbeCache(String hostId, ProbeSummary s) {
+    probeCache[hostId] = {
+      'ok': s.ok,
+      'oneLine': s.oneLine,
+      'detail': s.detail,
+      'lines': [for (final l in s.lines) {'label': l.label, 'value': l.value}],
+      'at': DateTime.now().millisecondsSinceEpoch,
+    };
+    notifyListeners();
+  }
+
+  ProbeSummary? getProbeCache(String hostId, {Duration maxAge = const Duration(minutes: 2)}) {
+    final m = probeCache[hostId];
+    if (m == null) return null;
+    final at = m['at'] as int? ?? 0;
+    if (DateTime.now().millisecondsSinceEpoch - at > maxAge.inMilliseconds) return null;
+    final lines = <ProbeLine>[];
+    final rawLines = m['lines'];
+    if (rawLines is List) {
+      for (final e in rawLines) {
+        if (e is Map) {
+          lines.add(ProbeLine(e['label']?.toString() ?? '', e['value']?.toString() ?? ''));
+        }
+      }
+    }
+    return ProbeSummary(
+      ok: m['ok'] == true,
+      oneLine: m['oneLine']?.toString() ?? '',
+      lines: lines,
+      detail: m['detail']?.toString() ?? '',
+    );
+  }
+
+  DateTime? probeCacheTime(String hostId) {
+    final at = probeCache[hostId]?['at'] as int?;
+    if (at == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(at);
   }
 
   void setLastExecOutput(String text) {
@@ -374,6 +452,25 @@ class AppState extends ChangeNotifier {
     // rssh-style: never auto-run; user presses 运行 on each card.
   }
 
+  Future<String> testHostSsh([String? hostId]) async {
+    final id = hostId ?? selectedHostId;
+    if (id == null) throw StateError('无主机');
+    final res = await api.exec(id, 'echo OK && uname -s', confirmed: false);
+    final out = '${res['stdout'] ?? ''}'.trim();
+    if ((res['exitCode'] ?? 1) != 0) {
+      throw ApiException(502, out.isEmpty ? 'ssh failed' : out);
+    }
+    return out;
+  }
+
+  Future<String> testLlmReachable() async {
+    // minimal: ensure LLM configured and do a 1-token style agent chat requires host
+    final id = selectedHostId;
+    if (id == null) throw StateError('先选主机再测模型');
+    final res = await api.agentChat(hostId: id, message: '只回复ok两个字母', sessionId: 'ping-${DateTime.now().millisecondsSinceEpoch}');
+    return res.toString().length > 20 ? '模型可达' : res.toString();
+  }
+
   Future<void> runExec(String command, {bool confirmed = false}) async {
     final id = selectedHostId;
     if (id == null) {
@@ -404,15 +501,22 @@ class AppState extends ChangeNotifier {
   }
 
   /// Human-readable probe for host list UI.
-  Future<ProbeSummary> runProbeSummary([String? hostId]) async {
+  Future<ProbeSummary> runProbeSummary([String? hostId, bool force = false]) async {
     final id = hostId ?? selectedHostId;
     if (id == null) {
       throw StateError('请先选择主机');
     }
+    if (!force) {
+      final cached = getProbeCache(id);
+      if (cached != null) return cached;
+    }
     try {
       final res = await api.probe(id);
       final summary = ProbeSummary.fromProbeJson(res);
-      lastExecOutput = summary.detail.isEmpty ? summary.oneLine : '${summary.oneLine}\n\n${summary.detail}';
+      putProbeCache(id, summary);
+      lastExecOutput = summary.detail.isEmpty ? summary.oneLine : '${summary.oneLine}
+
+${summary.detail}';
       notifyListeners();
       return summary;
     } catch (e) {

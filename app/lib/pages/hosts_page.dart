@@ -34,11 +34,18 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     }
   }
 
-  Future<void> _refreshProbe(AppState state, String id) async {
+  Future<void> _refreshProbe(AppState state, String id, {bool force = false}) async {
     if (_loading.contains(id)) return;
+    if (!force) {
+      final c = state.getProbeCache(id);
+      if (c != null) {
+        setState(() => _summary[id] = c);
+        return;
+      }
+    }
     setState(() => _loading.add(id));
     try {
-      final s = await state.runProbeSummary(id);
+      final s = await state.runProbeSummary(id, force);
       if (mounted) setState(() => _summary[id] = s);
     } catch (_) {
       if (mounted) {
@@ -106,7 +113,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                         loading: _loading.contains(id),
                         summary: _summary[id],
                         onSelect: () => state.selectHost(id),
-                        onRefresh: () => _refreshProbe(state, id),
+                        onRefresh: () => _refreshProbe(state, id, force: true),
                         onDelete: () async {
                           final ok = await showDialog<bool>(
                             context: context,
