@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
-/// Plain SSH-tool terminal (JuiceSSH / Termius style).
+/// Real interactive SSH terminal via backend PTY WebSocket + xterm.js.
 class TerminalPage extends StatefulWidget {
   const TerminalPage({super.key});
 
@@ -13,279 +12,229 @@ class TerminalPage extends StatefulWidget {
 }
 
 class _TerminalPageState extends State<TerminalPage> {
-  final _input = TextEditingController();
-  final _scroll = ScrollController();
-  final _focus = FocusNode();
-  bool _busy = false;
-  int _histIdx = -1;
-
-  static const _bg = Color(0xFF000000);
-  static const _fg = Color(0xFFE0E0E0);
-  static const _green = Color(0xFF00C853);
-  static const _muted = Color(0xFF9E9E9E);
+  WebViewController? _controller;
+  String? _loadedForHost;
+  bool _loading = true;
+  String? _error;
 
   @override
-  void dispose() {
-    _input.dispose();
-    _scroll.dispose();
-    _focus.dispose();
-    super.dispose();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final state = context.watch<AppState>();
+    _ensureTerminal(state);
   }
 
-  void _scrollEnd() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
-      _scroll.jumpTo(_scroll.position.maxScrollExtent);
-    });
-  }
-
-  Future<void> _run(AppState state) async {
-    final cmd = _input.text;
-    final trimmed = cmd.trimRight();
-    if (trimmed.isEmpty || _busy) return;
-
+  Future<void> _ensureTerminal(AppState state) async {
     if (!state.backendOk) {
-      _snack('后端未连接');
+      setState(() {
+        _error = '后端未连接';
+        _loading = false;
+      });
       return;
     }
-    if (state.selectedHostId == null) {
-      _snack('请先选择主机');
+    final hostId = state.selectedHostId;
+    if (hostId == null) {
+      setState(() {
+        _error = '请先在「主机」页选择一台机器';
+        _loading = false;
+        _controller = null;
+        _loadedForHost = null;
+      });
+      return;
+    }
+    if (_loadedForHost == hostId && _controller != null && _error == null) {
       return;
     }
 
-    final line = trimmed.trim();
-    if (line == 'clear' || line == 'cls') {
-      state.clearTerminal();
-      _input.clear();
-      return;
-    }
-    if (line == 'exit' || line == 'logout') {
-      state.appendTerminal('${state.terminalPrompt}$line\nConnection closed.\n\n');
-      _input.clear();
-      _scrollEnd();
-      return;
-    }
-
-    setState(() => _busy = true);
-    try {
-      await state.runTerminal(line, confirmed: false);
-      _input.clear();
-      _histIdx = -1;
-      _scrollEnd();
-    } on ApiException catch (e) {
-      if (e.status == 409) {
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (c) => AlertDialog(
-            title: const Text('确认执行'),
-            content: Text('该命令可能修改系统：\n\n$line'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('执行')),
-            ],
-          ),
-        );
-        if (ok == true) {
-          try {
-            await state.runTerminal(line, confirmed: true);
-            _input.clear();
-            _histIdx = -1;
-            _scrollEnd();
-          } catch (e2) {
-            _snack('$e2');
-          }
-        } else {
-          // still show the typed line was cancelled
-          state.appendTerminal('${state.terminalPrompt}$line\n');
-          state.appendTerminal('(cancelled)\n\n');
-          _input.clear();
-          _scrollEnd();
-        }
-      } else if (e.status == 403) {
-        state.appendTerminal('${state.terminalPrompt}$line\n');
-        state.appendTerminal('bash: $line: Operation not permitted\n\n');
-        _input.clear();
-        _scrollEnd();
-      } else {
-        state.appendTerminal('${state.terminalPrompt}$line\n');
-        state.appendTerminal('$e\n\n');
-        _scrollEnd();
-      }
-    } catch (e) {
-      state.appendTerminal('$e\n\n');
-      _scrollEnd();
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-        _focus.requestFocus();
-      }
-    }
-  }
-
-  void _hist(AppState state, int d) {
-    final h = state.terminalHistory;
-    if (h.isEmpty) return;
-    var i = _histIdx < 0 ? h.length : _histIdx;
-    i += d;
-    if (i < 0) i = 0;
-    if (i >= h.length) {
-      _histIdx = -1;
-      _input.clear();
-      return;
-    }
-    _histIdx = i;
-    _input.text = h[i];
-    _input.selection = TextSelection.collapsed(offset: _input.text.length);
-  }
-
-  void _snack(String s) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(s), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2)),
+    final token = state.api.localToken;
+    final base = state.api.baseUrl;
+    final label = Uri.encodeComponent(state.hostLabel);
+    final uri = Uri.parse(
+      'file:///android_asset/flutter_assets/assets/terminal/index.html'
+      '?token=${Uri.encodeComponent(token)}'
+      '&hostId=${Uri.encodeComponent(hostId)}'
+      '&base=${Uri.encodeComponent(base)}'
+      '&label=$label',
     );
+
+    // Prefer asset path via loadFlutterAsset for reliability
+    final c = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0xFF000000))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (_) {
+            if (mounted) setState(() => _loading = false);
+          },
+          onWebResourceError: (e) {
+            if (mounted) {
+              setState(() {
+                _error = e.description;
+                _loading = false;
+              });
+            }
+          },
+        ),
+      );
+
+    setState(() {
+      _controller = c;
+      _loadedForHost = hostId;
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      await c.loadFlutterAsset('assets/terminal/index.html');
+      // inject query params after load because loadFlutterAsset can't take query
+      await c.runJavaScript('''
+        (function(){
+          const q = new URLSearchParams({
+            token: ${jsStr(token)},
+            hostId: ${jsStr(hostId)},
+            base: ${jsStr(base)},
+            label: ${jsStr(state.hostLabel)}
+          });
+          // if page already read empty params, force reconnect with injected globals
+          window.__SSH = {
+            token: ${jsStr(token)},
+            hostId: ${jsStr(hostId)},
+            base: ${jsStr(base)},
+            label: ${jsStr(state.hostLabel)}
+          };
+          if (typeof connect === 'function') {
+            // patch params from __SSH
+            try {
+              const title = document.getElementById('title');
+              if (title) title.textContent = window.__SSH.label;
+            } catch(e){}
+          }
+        })();
+      ''');
+      // Hard reload with query via data is messy; instead rewrite page connect using injected values.
+      await c.runJavaScript(_injectConnectJs(token, hostId, base, state.hostLabel));
+    } catch (e) {
+      // fallback: try loadRequest with file uri (may fail on some WebViews)
+      try {
+        await c.loadRequest(uri);
+      } catch (e2) {
+        if (mounted) {
+          setState(() {
+            _error = '终端页加载失败: $e';
+            _loading = false;
+          });
+        }
+      }
+    }
+  }
+
+  static String jsStr(String s) => "'${s.replaceAll(r'\', r'\\').replaceAll("'", r"\'")}'";
+
+  /// Override connect() to use injected credentials (asset load has no query string).
+  static String _injectConnectJs(String token, String hostId, String base, String label) {
+    return '''
+(function(){
+  const token = ${jsStr(token)};
+  const hostId = ${jsStr(hostId)};
+  const base = ${jsStr(base)};
+  const label = ${jsStr(label)};
+  try { document.getElementById('title').textContent = label; } catch(e){}
+  function wsURL() {
+    const u = new URL(base);
+    const proto = u.protocol === 'https:' ? 'wss:' : 'ws:';
+    const cols = (typeof term !== 'undefined' && term.cols) ? term.cols : 80;
+    const rows = (typeof term !== 'undefined' && term.rows) ? term.rows : 24;
+    return proto + '//' + u.host + '/v1/pty?token=' + encodeURIComponent(token)
+      + '&hostId=' + encodeURIComponent(hostId)
+      + '&cols=' + cols + '&rows=' + rows;
+  }
+  if (typeof connect === 'function') {
+    const old = connect;
+    window.connect = function() {
+      if (typeof ws !== 'undefined' && ws) { try { ws.close(); } catch(e){} }
+      if (typeof term !== 'undefined') term.writeln('\\r\\n\\x1b[90mconnecting…\\x1b[0m');
+      if (typeof setDot === 'function') setDot(false);
+      ws = new WebSocket(wsURL());
+      ws.binaryType = 'arraybuffer';
+      ws.onopen = function() {
+        if (typeof setDot === 'function') setDot(true);
+        if (typeof fit !== 'undefined') fit.fit();
+        if (typeof sendResize === 'function') sendResize();
+      };
+      ws.onmessage = function(ev) {
+        if (typeof ev.data === 'string') {
+          try {
+            const msg = JSON.parse(ev.data);
+            if (msg.type === 'error') term.writeln('\\r\\n\\x1b[31m' + (msg.data||'error') + '\\x1b[0m');
+            else if (msg.type === 'exit') { term.writeln('\\r\\n\\x1b[33m[session closed]\\x1b[0m'); setDot(false); }
+          } catch(_) { term.write(ev.data); }
+          return;
+        }
+        term.write(new Uint8Array(ev.data));
+      };
+      ws.onclose = function(){ setDot(false); term.writeln('\\r\\n\\x1b[90mdisconnected\\x1b[0m'); };
+      ws.onerror = function(){ setDot(false); };
+    };
+    // rebind button
+    try { document.getElementById('btnReconnect').onclick = window.connect; } catch(e){}
+    window.connect();
+  }
+})();
+''';
   }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final connected = state.backendOk && state.selectedHostId != null;
+    // rebuild when host changes
+    if (state.selectedHostId != _loadedForHost) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _ensureTerminal(state));
+    }
+
+    if (state.selectedHostId == null) {
+      return const Scaffold(
+        body: Center(child: Text('请先在「主机」页选择一台机器')),
+      );
+    }
+    if (_error != null && _controller == null) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                FilledButton(onPressed: () => _ensureTerminal(state), child: const Text('重试')),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: Colors.black,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // session bar
-            Material(
-              color: const Color(0xFF121212),
-              child: ListTile(
-                dense: true,
-                leading: Icon(
-                  connected ? Icons.circle : Icons.circle_outlined,
-                  size: 12,
-                  color: connected ? _green : Colors.redAccent,
-                ),
-                title: Text(
-                  state.selectedHostId == null ? '终端' : state.hostLabel,
-                  style: const TextStyle(color: _fg, fontSize: 14, fontWeight: FontWeight.w500),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  connected ? 'SSH' : (state.backendOk ? '未选择主机' : '未连接'),
-                  style: const TextStyle(color: _muted, fontSize: 11),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: '清屏',
-                      onPressed: () => state.clearTerminal(),
-                      icon: const Icon(Icons.backspace_outlined, color: _muted, size: 18),
-                    ),
-                    IconButton(
-                      tooltip: '复制',
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: state.terminalBuffer));
-                        _snack('已复制');
-                      },
-                      icon: const Icon(Icons.copy, color: _muted, size: 18),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // screen
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _focus.requestFocus(),
-                child: Container(
-                  width: double.infinity,
-                  color: _bg,
-                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-                  child: SingleChildScrollView(
-                    controller: _scroll,
-                    child: SelectableText(
-                      state.terminalBuffer.isEmpty
-                          ? (connected
-                              ? 'Connected to ${state.hostLabel}.\n'
-                              : 'Select a host on 主机 tab, then type commands here.\n')
-                          : state.terminalBuffer,
-                      style: const TextStyle(
-                        color: _fg,
-                        fontFamily: 'monospace',
-                        fontSize: 13,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            // input — single line like real ssh apps
-            Container(
-              color: const Color(0xFF121212),
-              padding: EdgeInsets.only(
+            if (_controller != null) WebViewWidget(controller: _controller!),
+            if (_loading) const Center(child: CircularProgressIndicator()),
+            if (_error != null)
+              Positioned(
                 left: 8,
-                right: 4,
-                top: 4,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 4,
+                right: 8,
+                bottom: 8,
+                child: Material(
+                  color: Colors.red.shade900,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(_error!, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  ),
+                ),
               ),
-              child: Row(
-                children: [
-                  Text(
-                    connected ? state.terminalPrompt : '> ',
-                    style: TextStyle(
-                      color: connected ? _green : _muted,
-                      fontFamily: 'monospace',
-                      fontSize: 13,
-                    ),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _input,
-                      focusNode: _focus,
-                      enabled: connected && !_busy,
-                      style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 13),
-                      cursorColor: _green,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _run(state),
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 8),
-                      ),
-                      // capture up/down if possible via shortcuts
-                      onTap: () => _focus.requestFocus(),
-                    ),
-                  ),
-                  // history buttons for mobile (no physical arrows)
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: connected ? () => _hist(state, -1) : null,
-                    icon: const Icon(Icons.keyboard_arrow_up, color: _muted, size: 20),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: connected ? () => _hist(state, 1) : null,
-                    icon: const Icon(Icons.keyboard_arrow_down, color: _muted, size: 20),
-                  ),
-                  if (_busy)
-                    const Padding(
-                      padding: EdgeInsets.all(10),
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: _green),
-                      ),
-                    )
-                  else
-                    IconButton(
-                      onPressed: connected ? () => _run(state) : null,
-                      icon: Icon(Icons.keyboard_return, color: connected ? _green : _muted, size: 20),
-                    ),
-                ],
-              ),
-            ),
           ],
         ),
       ),

@@ -46,11 +46,27 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/agent/plan", s.handleAgentPlan)
 	s.mux.HandleFunc("POST /v1/agent/exec-step", s.handleAgentExecStep)
 	s.mux.HandleFunc("GET /v1/audit", s.handleAudit)
+	// Interactive PTY (auth handled inside; needed for WS upgrade path)
+	s.mux.HandleFunc("/v1/hosts/{id}/pty", s.handlePtyWSHost)
+	s.mux.HandleFunc("/v1/pty", s.handlePtyWS)
+}
+
+func (s *Server) handlePtyWSHost(w http.ResponseWriter, r *http.Request) {
+	// normalize host id into query for shared handler
+	id := r.PathValue("id")
+	q := r.URL.Query()
+	if q.Get("hostId") == "" && id != "" {
+		q.Set("hostId", id)
+		r.URL.RawQuery = q.Encode()
+	}
+	s.handlePtyWS(w, r)
 }
 
 func (s *Server) withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/health" {
+		path := r.URL.Path
+		// health + websocket PTY self-authenticate
+		if path == "/v1/health" || path == "/v1/pty" || strings.HasSuffix(path, "/pty") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -68,14 +84,8 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 
 func (s *Server) withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Flutter web on localhost
-		origin := r.Header.Get("Origin")
-		if origin == "" || strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1") {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			if origin == "" {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
-			}
-		}
+		// Allow local WebView / file / localhost
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Local-Token")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		if r.Method == http.MethodOptions {
@@ -86,13 +96,15 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 	})
 }
 
+
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"service":   "ssh-ai-agent-backend",
-		"version":   "0.1.0",
+		"version":   "0.4.0",
 		"startedAt": s.StartedAt.Format(time.RFC3339),
 		"listenHint": "127.0.0.1 only",
+		"features":  []string{"exec","probe","agent","audit","pty"},
 	})
 }
 

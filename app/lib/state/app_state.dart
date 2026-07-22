@@ -307,6 +307,35 @@ class AppState extends ChangeNotifier {
         agentMessages.add(planMsg);
         _lastPlanMsgIndex = agentMessages.length - 1;
         notifyListeners();
+
+        // CLI-like: auto-run read-only steps and stream results into chat.
+        final readSteps = steps.where((s) => s is Map && (s['risk']?.toString() ?? 'read') == 'read').toList();
+        if (readSteps.isNotEmpty) {
+          _pushMsg(ChatMessage(
+            role: 'assistant',
+            content: '我先跑一下只读检查…',
+            kind: ChatKind.status,
+          ));
+          for (final raw in readSteps) {
+            final st = Map<String, dynamic>.from(raw as Map);
+            final sid = st['id'];
+            final stepId = sid is int ? sid : int.tryParse('$sid') ?? 0;
+            final cmd = st['command']?.toString() ?? '';
+            if (cmd.isEmpty) continue;
+            try {
+              await runAgentStep(stepId: stepId, command: cmd, confirmed: false);
+            } catch (_) {}
+          }
+          // After reads, if write steps remain, remind user
+          final writes = steps.where((s) => s is Map && (s['risk']?.toString() == 'write' || s['risk']?.toString() == 'destructive')).length;
+          if (writes > 0) {
+            _pushMsg(ChatMessage(
+              role: 'assistant',
+              content: '上面是检查结果。还有 $writes 步会改系统，需要你点「确认执行」。',
+              kind: ChatKind.text,
+            ));
+          }
+        }
       }
     } catch (e) {
       _pushMsg(ChatMessage(role: 'assistant', content: '出错了：$e', kind: ChatKind.error));

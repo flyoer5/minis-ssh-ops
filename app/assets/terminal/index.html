@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>SSH Terminal</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+  <style>
+    html, body { margin:0; height:100%; background:#000; overflow:hidden; }
+    #bar {
+      height:36px; display:flex; align-items:center; gap:8px;
+      padding:0 10px; background:#121212; color:#ddd; font:12px/1.2 system-ui,sans-serif;
+    }
+    #bar .dot { width:8px; height:8px; border-radius:50%; background:#666; }
+    #bar .dot.on { background:#00c853; }
+    #bar .title { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #bar button {
+      background:#222; color:#ccc; border:1px solid #333; border-radius:6px;
+      padding:4px 8px; font-size:11px;
+    }
+    #term { height:calc(100% - 36px); padding:4px; box-sizing:border-box; }
+    .xterm { height:100%; }
+    .xterm-viewport { overflow-y:auto !important; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <span class="dot" id="dot"></span>
+    <span class="title" id="title">SSH</span>
+    <button id="btnReconnect">重连</button>
+    <button id="btnClear">清屏</button>
+  </div>
+  <div id="term"></div>
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token') || '';
+    const hostId = params.get('hostId') || '';
+    const label = params.get('label') || hostId;
+    const base = params.get('base') || 'http://127.0.0.1:17890';
+    document.getElementById('title').textContent = label || 'SSH';
+
+    const term = new Terminal({
+      cursorBlink: true,
+      fontSize: 13,
+      fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
+      theme: { background: '#000000', foreground: '#e0e0e0', cursor: '#00c853' },
+      scrollback: 5000,
+      allowProposedApi: true,
+    });
+    const fit = new FitAddon.FitAddon();
+    term.loadAddon(fit);
+    term.open(document.getElementById('term'));
+    fit.fit();
+
+    let ws = null;
+    let connected = false;
+
+    function setDot(on) {
+      document.getElementById('dot').className = 'dot' + (on ? ' on' : '');
+      connected = on;
+    }
+
+    function wsURL() {
+      const u = new URL(base);
+      const proto = u.protocol === 'https:' ? 'wss:' : 'ws:';
+      const cols = term.cols || 80;
+      const rows = term.rows || 24;
+      return `${proto}//${u.host}/v1/pty?token=${encodeURIComponent(token)}&hostId=${encodeURIComponent(hostId)}&cols=${cols}&rows=${rows}`;
+    }
+
+    function connect() {
+      if (!token || !hostId) {
+        term.writeln('\r\n\x1b[31mmissing token/hostId\x1b[0m');
+        return;
+      }
+      if (ws) { try { ws.close(); } catch(e){} }
+      term.writeln('\r\n\x1b[90mconnecting…\x1b[0m');
+      setDot(false);
+      ws = new WebSocket(wsURL());
+      ws.binaryType = 'arraybuffer';
+      ws.onopen = () => {
+        setDot(true);
+        fit.fit();
+        sendResize();
+      };
+      ws.onmessage = (ev) => {
+        if (typeof ev.data === 'string') {
+          try {
+            const msg = JSON.parse(ev.data);
+            if (msg.type === 'ready') {
+              // no-op, shell banner will arrive as binary
+            } else if (msg.type === 'error') {
+              term.writeln('\r\n\x1b[31m' + (msg.data || 'error') + '\x1b[0m');
+            } else if (msg.type === 'exit') {
+              term.writeln('\r\n\x1b[33m[session closed]\x1b[0m');
+              setDot(false);
+            }
+          } catch (_) {
+            term.write(ev.data);
+          }
+          return;
+        }
+        term.write(new Uint8Array(ev.data));
+      };
+      ws.onclose = () => {
+        setDot(false);
+        term.writeln('\r\n\x1b[90mdisconnected\x1b[0m');
+      };
+      ws.onerror = () => {
+        setDot(false);
+      };
+    }
+
+    function sendResize() {
+      if (!ws || ws.readyState !== 1) return;
+      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    }
+
+    term.onData((data) => {
+      if (!ws || ws.readyState !== 1) return;
+      ws.send(JSON.stringify({ type: 'input', data }));
+    });
+
+    window.addEventListener('resize', () => { fit.fit(); sendResize(); });
+    document.getElementById('btnReconnect').onclick = connect;
+    document.getElementById('btnClear').onclick = () => term.clear();
+
+    // auto connect
+    setTimeout(connect, 100);
+    // notify flutter channel if present
+    if (window.TerminalBridge && window.TerminalBridge.postMessage) {
+      window.TerminalBridge.postMessage(JSON.stringify({ type: 'ready' }));
+    }
+  </script>
+</body>
+</html>
