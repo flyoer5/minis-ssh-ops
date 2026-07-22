@@ -280,24 +280,22 @@ class AppState extends ChangeNotifier {
       final notes = plan?['notes']?.toString().trim() ?? '';
       final steps = (plan?['steps'] as List?) ?? [];
 
-      // Natural reply bubble first
-      final reply = StringBuffer();
-      if (summary.isNotEmpty) {
-        reply.writeln(summary);
-      } else {
-        reply.writeln('好的，我看一下。');
-      }
-      if (notes.isNotEmpty) {
-        reply.writeln();
-        reply.write(notes);
-      }
-      if (steps.isEmpty && reply.isEmpty) {
-        reply.write(planRaw?.toString() ?? '（没有可执行步骤）');
-      }
-      _pushMsg(ChatMessage(role: 'assistant', content: reply.toString().trim(), kind: ChatKind.text));
+      // Acknowledge like a normal chat
+      _pushMsg(ChatMessage(
+        role: 'assistant',
+        content: summary.isNotEmpty ? summary : '好的，我这边看一下。',
+        kind: ChatKind.text,
+      ));
 
-      // Optional actionable steps card (still chat-native)
-      if (steps.isNotEmpty && plan != null) {
+      if (steps.isEmpty) {
+        if (notes.isNotEmpty) {
+          _pushMsg(ChatMessage(role: 'assistant', content: notes, kind: ChatKind.text));
+        }
+        return;
+      }
+
+      // Keep plan meta only for write confirms; do not show "plan form" as main UX
+      if (plan != null) {
         final planMsg = ChatMessage(
           role: 'assistant',
           content: summary,
@@ -307,40 +305,84 @@ class AppState extends ChangeNotifier {
         agentMessages.add(planMsg);
         _lastPlanMsgIndex = agentMessages.length - 1;
         notifyListeners();
+      }
 
-        // CLI-like: auto-run read-only steps and stream results into chat.
-        final readSteps = steps.where((s) => s is Map && (s['risk']?.toString() ?? 'read') == 'read').toList();
-        if (readSteps.isNotEmpty) {
-          _pushMsg(ChatMessage(
-            role: 'assistant',
-            content: '我先跑一下只读检查…',
-            kind: ChatKind.status,
-          ));
-          for (final raw in readSteps) {
-            final st = Map<String, dynamic>.from(raw as Map);
-            final sid = st['id'];
-            final stepId = sid is int ? sid : int.tryParse('$sid') ?? 0;
-            final cmd = st['command']?.toString() ?? '';
-            if (cmd.isEmpty) continue;
-            try {
-              await runAgentStep(stepId: stepId, command: cmd, confirmed: false);
-            } catch (_) {}
-          }
-          // After reads, if write steps remain, remind user
-          final writes = steps.where((s) => s is Map && (s['risk']?.toString() == 'write' || s['risk']?.toString() == 'destructive')).length;
-          if (writes > 0) {
+      final readSteps = steps.where((s) => s is Map && (s['risk']?.toString() ?? 'read') == 'read').toList();
+      final writeSteps = steps.where((s) {
+        if (s is! Map) return false;
+        final r = s['risk']?.toString() ?? '';
+        return r == 'write' || r == 'destructive';
+      }).toList();
+
+      final collected = StringBuffer();
+      if (readSteps.isNotEmpty) {
+        _pushMsg(ChatMessage(role: 'assistant', content: '正在检查…', kind: ChatKind.status));
+        for (final raw in readSteps) {
+          final st = Map<String, dynamic>.from(raw as Map);
+          final sid = st['id'];
+          final stepId = sid is int ? sid : int.tryParse('$sid') ?? 0;
+          final cmd = st['command']?.toString() ?? '';
+          final title = st['title']?.toString() ?? cmd;
+          if (cmd.isEmpty) continue;
+          try {
+            final res = await api.agentExecStep(
+              hostId: id,
+              command: cmd,
+              confirmed: false,
+              sessionId: agentSessionId ?? 'agent',
+              stepId: stepId,
+            );
+            final out = '${res['stdout'] ?? ''}${res['stderr'] ?? ''}'.trim();
+            final block = out.isEmpty ? '(no output, exit ${res['exitCode']})' : out;
+            // tool output in transcript
             _pushMsg(ChatMessage(
-              role: 'assistant',
-              content: '上面是检查结果。还有 $writes 步会改系统，需要你点「确认执行」。',
-              kind: ChatKind.text,
+              role: 'tool',
+              content: '\$ $cmd\n$block',
+              kind: ChatKind.stepResult,
+              meta: {'command': cmd, 'exitCode': res['exitCode'], 'risk': res['risk']},
             ));
+            collected.writeln('## $title');
+            collected.writeln('\$ $cmd');
+            collected.writeln(block);
+            collected.writeln();
+          } catch (e) {
+            _pushMsg(ChatMessage(role: 'tool', content: '\$ $cmd\n$e', kind: ChatKind.stepResult));
           }
         }
+
+        // Final natural summary from collected outputs
+        final finalText = _summarizeLocally(userText, collected.toString(), notes);
+        _pushMsg(ChatMessage(role: 'assistant', content: finalText, kind: ChatKind.text));
+      }
+
+      if (writeSteps.isNotEmpty) {
+        _pushMsg(ChatMessage(
+          role: 'assistant',
+          content: '如果要继续改系统，请点下面需要确认的步骤。',
+          kind: ChatKind.text,
+        ));
       }
     } catch (e) {
       _pushMsg(ChatMessage(role: 'assistant', content: '出错了：$e', kind: ChatKind.error));
       rethrow;
     }
+  }
+
+  String _summarizeLocally(String question, String evidence, String notes) {
+    // Lightweight local summary so chat feels complete even without second LLM call.
+    final lines = evidence.split('\n').where((l) => l.trim().isNotEmpty).take(12).join('\n');
+    final b = StringBuffer();
+    if (notes.isNotEmpty) {
+      b.writeln(notes);
+      b.writeln();
+    }
+    if (lines.isNotEmpty) {
+      b.writeln('根据刚才在机器上查到的结果：');
+      b.writeln(lines);
+    } else {
+      b.write('检查跑完了，但没有抓到有效输出。你可以再问细一点。');
+    }
+    return b.toString().trim();
   }
 
   Future<void> runAgentPlan(String goal) => agentChat(goal);
