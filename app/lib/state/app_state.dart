@@ -555,7 +555,7 @@ class ProbeSummary {
       diskHint = '使用 ${useMatch.group(1)}%';
       // try root line
       for (final line in disk.split('\n')) {
-        if (line.trim().endsWith(' /') || line.contains(' /$')) {
+        if (line.trim().endsWith(' /') || line.contains(r' /$')) {
           final m = RegExp(r'(\d+)%').firstMatch(line);
           if (m != null) {
             diskHint = '根分区 ${m.group(1)}%';
