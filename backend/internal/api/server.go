@@ -44,6 +44,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/hosts/{id}/exec", s.handleExecV2)
 	s.mux.HandleFunc("POST /v1/hosts/{id}/probe", s.handleProbe)
 	s.mux.HandleFunc("POST /v1/agent/plan", s.handleAgentPlan)
+	s.mux.HandleFunc("POST /v1/agent/chat", s.handleAgentChat)
 	s.mux.HandleFunc("POST /v1/agent/exec-step", s.handleAgentExecStep)
 	s.mux.HandleFunc("GET /v1/audit", s.handleAudit)
 	// Interactive PTY (auth handled inside; needed for WS upgrade path)

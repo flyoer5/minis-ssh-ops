@@ -266,45 +266,30 @@ class AppState extends ChangeNotifier {
     }
     _pushMsg(ChatMessage(role: 'user', content: userText));
     try {
-      final res = await api.agentPlan(hostId: id, goal: userText, sessionId: agentSessionId);
+      final res = await api.agentChat(hostId: id, message: userText, sessionId: agentSessionId);
       agentSessionId = res['sessionId'] as String? ?? agentSessionId;
-      final planRaw = res['plan'];
-      Map<String, dynamic>? plan;
-      if (planRaw is Map) {
-        plan = Map<String, dynamic>.from(planRaw);
-        lastPlan = plan;
-      }
-      stepOutputs.clear();
-
-      final reply = (plan?['reply'] ?? plan?['summary'] ?? '').toString().trim();
-      final notes = plan?['notes']?.toString().trim() ?? '';
-      final steps = (plan?['steps'] as List?) ?? (plan?['commands'] as List?) ?? [];
-
-      // Natural language reply only (rssh-like triage text)
-      if (reply.isNotEmpty) {
-        _pushMsg(ChatMessage(role: 'assistant', content: reply, kind: ChatKind.text));
-      } else if (notes.isNotEmpty) {
-        _pushMsg(ChatMessage(role: 'assistant', content: notes, kind: ChatKind.text));
-      } else if (steps.isEmpty) {
-        final raw = planRaw?.toString() ?? '';
-        if (raw.isNotEmpty) {
-          _pushMsg(ChatMessage(role: 'assistant', content: raw, kind: ChatKind.text));
+      final events = (res['events'] as List?) ?? [];
+      for (final raw in events) {
+        if (raw is! Map) continue;
+        final type = raw['type']?.toString() ?? '';
+        final content = (raw['content'] ?? '').toString();
+        final name = (raw['name'] ?? '').toString();
+        final command = (raw['command'] ?? '').toString();
+        if (type == 'assistant' && content.isNotEmpty) {
+          _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.text));
+        } else if (type == 'tool') {
+          final label = command.isNotEmpty ? (r'$ ' + command) : name;
+          _pushMsg(ChatMessage(role: 'tool', content: label, kind: ChatKind.status, meta: {'name': name, 'command': command}));
+        } else if (type == 'tool_result') {
+          final head = command.isNotEmpty ? (r'$ ' + command + '\n') : (name.isNotEmpty ? '$name\n' : '');
+          _pushMsg(ChatMessage(role: 'tool', content: head + content, kind: ChatKind.stepResult, meta: {'name': name, 'command': command}));
+        } else if (type == 'final' && content.isNotEmpty) {
+          _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.text));
+        } else if (type == 'error' && content.isNotEmpty) {
+          _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.error));
         }
       }
-
-      // Command cards: user must press 运行 (no auto-exec)
-      if (steps.isNotEmpty && plan != null) {
-        // ensure steps key for UI
-        plan['steps'] = steps;
-        agentMessages.add(ChatMessage(
-          role: 'assistant',
-          content: reply,
-          kind: ChatKind.plan,
-          meta: {'plan': plan, 'outputs': <String, String>{}},
-        ));
-        _lastPlanMsgIndex = agentMessages.length - 1;
-        notifyListeners();
-      }
+      notifyListeners();
     } catch (e) {
       _pushMsg(ChatMessage(role: 'assistant', content: _friendlyErr(e), kind: ChatKind.error));
       rethrow;

@@ -47,15 +47,24 @@ class _TerminalPageState extends State<TerminalPage>
   @override
   bool get wantKeepAlive => true;
 
+  /// User intentionally opened IME via tap / keyboard icon.
+  /// When false, we must not re-show after system IME dismiss.
+  bool _imeWanted = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _focus.addListener(() {
       if (_focus.hasFocus) {
-        _attachIme();
+        if (_imeWanted) {
+          _attachIme();
+        }
       } else {
+        // System keyboard dismiss (back/swipe/IME hide) clears focus → close connection.
+        _imeWanted = false;
         _detachIme();
+        if (mounted) setState(() {});
       }
     });
   }
@@ -73,7 +82,8 @@ class _TerminalPageState extends State<TerminalPage>
 
   @override
   void didChangeMetrics() {
-    // Keep IME only if user still wants focus; never re-open after hide.
+    // Never re-show after user/system dismissed IME.
+    if (!_imeWanted) return;
     if (_connected && _focus.hasFocus && (_conn?.attached ?? false)) {
       _conn?.show();
     }
@@ -207,13 +217,16 @@ class _TerminalPageState extends State<TerminalPage>
 
   void _openKb() {
     if (!mounted) return;
+    _imeWanted = true;
     FocusScope.of(context).requestFocus(_focus);
     _attachIme();
     SystemChannels.textInput.invokeMethod('TextInput.show');
+    setState(() {});
   }
 
   void _closeKb() {
     if (!mounted) return;
+    _imeWanted = false;
     _detachIme();
     _focus.unfocus();
     FocusManager.instance.primaryFocus?.unfocus();
@@ -222,7 +235,7 @@ class _TerminalPageState extends State<TerminalPage>
   }
 
   void _toggleKb() {
-    if (_imeOpen || _focus.hasFocus) {
+    if (_imeWanted || _focus.hasFocus || _imeOpen) {
       _closeKb();
     } else {
       _openKb();
@@ -304,7 +317,13 @@ class _TerminalPageState extends State<TerminalPage>
 
   @override
   void connectionClosed() {
+    // Fired when system IME closes itself (back gesture / hide keyboard).
     _conn = null;
+    _imeWanted = false;
+    if (_focus.hasFocus) {
+      _focus.unfocus();
+    }
+    if (mounted) setState(() {});
   }
 
   @override

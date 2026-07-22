@@ -108,6 +108,27 @@ class ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
+  /// OpenClaw-style multi-turn tool loop.
+  Future<Map<String, dynamic>> agentChat({
+    required String hostId,
+    required String message,
+    String? sessionId,
+  }) async {
+    final r = await http
+        .post(
+          _u('/v1/agent/chat'),
+          headers: _headers,
+          body: jsonEncode({
+            'hostId': hostId,
+            'message': message,
+            if (sessionId != null) 'sessionId': sessionId,
+          }),
+        )
+        .timeout(const Duration(seconds: 180));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> agentExecStep({
     required String hostId,
     required String command,
