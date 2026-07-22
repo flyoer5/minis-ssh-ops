@@ -261,7 +261,7 @@ class AppState extends ChangeNotifier {
   Future<void> agentChat(String userText) async {
     final id = selectedHostId;
     if (id == null) {
-      _pushMsg(ChatMessage(role: 'assistant', content: '先选一台主机再聊。', kind: ChatKind.error));
+      _pushMsg(ChatMessage(role: 'assistant', content: '先选主机', kind: ChatKind.error));
       return;
     }
     _pushMsg(ChatMessage(role: 'user', content: userText));
@@ -276,109 +276,39 @@ class AppState extends ChangeNotifier {
       }
       stepOutputs.clear();
 
-      final summary = plan?['summary']?.toString().trim() ?? '';
+      final reply = (plan?['reply'] ?? plan?['summary'] ?? '').toString().trim();
       final notes = plan?['notes']?.toString().trim() ?? '';
-      final steps = (plan?['steps'] as List?) ?? [];
+      final steps = (plan?['steps'] as List?) ?? (plan?['commands'] as List?) ?? [];
 
-      // Minimal: show model summary if any, then run reads, show outputs; no filler copy.
-      if (summary.isNotEmpty) {
-        _pushMsg(ChatMessage(role: 'assistant', content: summary, kind: ChatKind.text));
-      }
-
-      if (steps.isEmpty) {
-        if (notes.isNotEmpty) {
-          _pushMsg(ChatMessage(role: 'assistant', content: notes, kind: ChatKind.text));
-        } else if (summary.isEmpty) {
-          final raw = planRaw?.toString() ?? '';
-          if (raw.isNotEmpty) {
-            _pushMsg(ChatMessage(role: 'assistant', content: raw, kind: ChatKind.text));
-          }
+      // Natural language reply only (rssh-like triage text)
+      if (reply.isNotEmpty) {
+        _pushMsg(ChatMessage(role: 'assistant', content: reply, kind: ChatKind.text));
+      } else if (notes.isNotEmpty) {
+        _pushMsg(ChatMessage(role: 'assistant', content: notes, kind: ChatKind.text));
+      } else if (steps.isEmpty) {
+        final raw = planRaw?.toString() ?? '';
+        if (raw.isNotEmpty) {
+          _pushMsg(ChatMessage(role: 'assistant', content: raw, kind: ChatKind.text));
         }
-        return;
       }
 
-      if (plan != null) {
-        final planMsg = ChatMessage(
+      // Command cards: user must press 运行 (no auto-exec)
+      if (steps.isNotEmpty && plan != null) {
+        // ensure steps key for UI
+        plan['steps'] = steps;
+        agentMessages.add(ChatMessage(
           role: 'assistant',
-          content: summary,
+          content: reply,
           kind: ChatKind.plan,
           meta: {'plan': plan, 'outputs': <String, String>{}},
-        );
-        agentMessages.add(planMsg);
+        ));
         _lastPlanMsgIndex = agentMessages.length - 1;
         notifyListeners();
-      }
-
-      final readSteps = steps.where((s) => s is Map && (s['risk']?.toString() ?? 'read') == 'read').toList();
-      final writeSteps = steps.where((s) {
-        if (s is! Map) return false;
-        final r = s['risk']?.toString() ?? '';
-        return r == 'write' || r == 'destructive';
-      }).toList();
-
-      for (final raw in readSteps) {
-        final st = Map<String, dynamic>.from(raw as Map);
-        final sid = st['id'];
-        final stepId = sid is int ? sid : int.tryParse('$sid') ?? 0;
-        final cmd = st['command']?.toString() ?? '';
-        if (cmd.isEmpty) continue;
-        try {
-          final res = await api.agentExecStep(
-            hostId: id,
-            command: cmd,
-            confirmed: false,
-            sessionId: agentSessionId ?? 'agent',
-            stepId: stepId,
-          );
-          final out = '${res['stdout'] ?? ''}${res['stderr'] ?? ''}'.trim();
-          final block = out.isEmpty ? '(exit ${res['exitCode']})' : out;
-          _pushMsg(ChatMessage(
-            role: 'tool',
-            content: r'$ ' + cmd + '\n' + block,
-            kind: ChatKind.stepResult,
-            meta: {'command': cmd, 'exitCode': res['exitCode'], 'risk': res['risk']},
-          ));
-        } catch (e) {
-          _pushMsg(ChatMessage(
-            role: 'tool',
-            content: r'$ ' + cmd + '\n' + e.toString(),
-            kind: ChatKind.stepResult,
-          ));
-        }
-      }
-
-      if (notes.isNotEmpty && readSteps.isNotEmpty) {
-        _pushMsg(ChatMessage(role: 'assistant', content: notes, kind: ChatKind.text));
-      }
-      // writeSteps kept only in plan card for confirm buttons (no extra prompt text)
-      if (writeSteps.isEmpty) {
-        // nothing
       }
     } catch (e) {
       _pushMsg(ChatMessage(role: 'assistant', content: _friendlyErr(e), kind: ChatKind.error));
       rethrow;
     }
-  }
-
-  String _friendlyErr(Object e) {
-    final s = e.toString();
-    final low = s.toLowerCase();
-    if (low.contains('connection abort') || low.contains('connection reset') || low.contains('broken pipe')) {
-      return '模型网关连接中断，点重发即可';
-    }
-    if (low.contains('timeout') || low.contains('timed out')) {
-      return '模型请求超时，请重试';
-    }
-    if (low.contains('401') || low.contains('403') || low.contains('鉴权')) {
-      return '模型鉴权失败，请检查设置里的 Base URL / API Key';
-    }
-    if (low.contains('llm not configured') || low.contains('未配置')) {
-      return '未配置模型，请到设置页填写';
-    }
-    // strip ApiException wrapper noise
-    final m = RegExp(r'ApiException\(\d+\):\s*(.*)').firstMatch(s);
-    if (m != null) return m.group(1)!;
-    return s;
   }
 
   Future<void> runAgentPlan(String goal) => agentChat(goal);
@@ -394,52 +324,51 @@ class AppState extends ChangeNotifier {
       final res = await api.agentExecStep(
         hostId: id,
         command: command,
-        confirmed: confirmed,
+        confirmed: true, // explicit UI Run always confirms
         sessionId: agentSessionId ?? 'agent',
         stepId: stepId,
       );
-      final text =
-          'risk=${res['risk']} exit=${res['exitCode']} (${res['durationMs']}ms)\n'
-          '${res['stdout'] ?? ''}${res['stderr'] ?? ''}';
-      stepOutputs['step_$stepId'] = text;
-
-      // attach to plan message outputs
+      final out = '${res['stdout'] ?? ''}${res['stderr'] ?? ''}'.trim();
+      final block = out.isEmpty ? '(exit ${res['exitCode']})' : out;
+      stepOutputs['step_$stepId'] = block;
+      // attach to last plan message outputs map for rssh-style cards
       final idx = _lastPlanMsgIndex;
       if (idx != null && idx >= 0 && idx < agentMessages.length) {
-        final old = agentMessages[idx];
-        final meta = Map<String, dynamic>.from(old.meta ?? {});
-        final outs = Map<String, dynamic>.from(meta['outputs'] as Map? ?? {});
-        outs['step_$stepId'] = text;
-        meta['outputs'] = outs;
+        final m = agentMessages[idx];
+        final meta = Map<String, dynamic>.from(m.meta ?? {});
+        final outputs = Map<String, String>.from(
+          (meta['outputs'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
+        );
+        outputs['step_$stepId'] = block;
+        meta['outputs'] = outputs;
         agentMessages[idx] = ChatMessage(
-          role: old.role,
-          content: old.content,
-          kind: old.kind,
+          role: m.role,
+          content: m.content,
+          kind: m.kind,
           meta: meta,
-          at: old.at,
+          at: m.at,
         );
       }
-
-      _pushMsg(ChatMessage(
-        role: 'tool',
-        content: text,
-        kind: ChatKind.stepResult,
-        meta: {
-          'stepId': stepId,
-          'command': command,
-          'exitCode': res['exitCode'],
-          'risk': res['risk'],
-        },
-      ));
+      notifyListeners();
     } on ApiException catch (e) {
-      if (e.status == 409) {
-        final msg = '需要确认（risk=${e.body?['risk']}）：$command';
-        stepOutputs['step_$stepId'] = msg;
-        _pushMsg(ChatMessage(role: 'system', content: msg, kind: ChatKind.status));
-      } else if (e.status == 403) {
-        _pushMsg(ChatMessage(role: 'system', content: 'blocked: ${e.message}', kind: ChatKind.error));
-      } else {
-        _pushMsg(ChatMessage(role: 'system', content: '$e', kind: ChatKind.error));
+      final msg = e.status == 403 ? 'blocked' : e.message;
+      stepOutputs['step_$stepId'] = msg;
+      final idx = _lastPlanMsgIndex;
+      if (idx != null && idx >= 0 && idx < agentMessages.length) {
+        final m = agentMessages[idx];
+        final meta = Map<String, dynamic>.from(m.meta ?? {});
+        final outputs = Map<String, String>.from(
+          (meta['outputs'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
+        );
+        outputs['step_$stepId'] = msg;
+        meta['outputs'] = outputs;
+        agentMessages[idx] = ChatMessage(
+          role: m.role,
+          content: m.content,
+          kind: m.kind,
+          meta: meta,
+          at: m.at,
+        );
       }
       notifyListeners();
       rethrow;
@@ -447,23 +376,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> runAllReadSteps() async {
-    final plan = lastPlan;
-    if (plan == null) return;
-    final steps = (plan['steps'] as List?) ?? [];
-    for (final raw in steps) {
-      if (raw is! Map) continue;
-      final risk = raw['risk']?.toString() ?? 'read';
-      if (risk != 'read') continue;
-      final id = raw['id'];
-      final stepId = id is int ? id : int.tryParse('$id') ?? 0;
-      final cmd = raw['command']?.toString() ?? '';
-      if (cmd.isEmpty) continue;
-      try {
-        await runAgentStep(stepId: stepId, command: cmd, confirmed: false);
-      } catch (_) {
-        // continue others
-      }
-    }
+    // rssh-style: never auto-run; user presses 运行 on each card.
   }
 
   Future<void> runExec(String command, {bool confirmed = false}) async {

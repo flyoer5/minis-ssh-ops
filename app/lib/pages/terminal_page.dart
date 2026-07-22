@@ -220,45 +220,20 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
     SystemChannels.textInput.invokeMethod('TextInput.show');
   }
 
-  /// Diff TextField content → PTY keystrokes (JuiceSSH-like).
+  /// Line-buffered soft keyboard input (reliable on Android IME).
+  /// Characters stay in the field until Enter; then whole line + CR is sent.
   void _onInputChanged() {
-    if (!_connected) {
-      _prevInput = _input.text;
-      return;
-    }
-    final cur = _input.text;
-    final prev = _prevInput;
+    // no-op for live diff; Enter handled in onSubmitted
+    _prevInput = _input.text;
+  }
 
-    if (cur == prev) return;
-
-    if (cur.length > prev.length && cur.startsWith(prev)) {
-      final added = cur.substring(prev.length);
-      // Map newline from IME to CR for shells
-      _send(added.replaceAll('\n', '\r'));
-    } else if (cur.length < prev.length && prev.startsWith(cur)) {
-      final n = prev.length - cur.length;
-      for (var i = 0; i < n; i++) {
-        _send('\x7f');
-      }
-    } else {
-      // complex edit: send backspaces then new text
-      for (var i = 0; i < prev.length; i++) {
-        _send('\x7f');
-      }
-      if (cur.isNotEmpty) {
-        _send(cur.replaceAll('\n', '\r'));
-      }
-    }
-
-    // Keep field short so IME stays light
-    if (cur.length > 200) {
-      _input.removeListener(_onInputChanged);
-      _input.clear();
-      _prevInput = '';
-      _input.addListener(_onInputChanged);
-    } else {
-      _prevInput = cur;
-    }
+  void _submitLine() {
+    if (!_connected) return;
+    final line = _input.text;
+    _send(line.replaceAll('\n', '') + '\r');
+    _input.clear();
+    _prevInput = '';
+    _openKeyboard();
   }
 
   void _extra(String name) {
@@ -496,14 +471,15 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
                       focusNode: _focus,
                       enabled: _connected,
                       autofocus: false,
-                      keyboardType: TextInputType.visiblePassword, // avoid suggestions lag
-                      textInputAction: TextInputAction.newline,
+                      keyboardType: TextInputType.text,
+                      textInputAction: TextInputAction.send,
                       enableSuggestions: false,
                       autocorrect: false,
                       smartDashesType: SmartDashesType.disabled,
                       smartQuotesType: SmartQuotesType.disabled,
                       style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 14),
                       cursorColor: _green,
+                      showCursor: true,
                       decoration: const InputDecoration(
                         isDense: true,
                         border: InputBorder.none,
@@ -511,12 +487,7 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
                         hintStyle: TextStyle(color: Color(0xFF555555), fontSize: 13),
                       ),
                       onTap: _openKeyboard,
-                      onSubmitted: (_) {
-                        // some IMEs send submit instead of newline char
-                        _send('\r');
-                        _input.clear();
-                        _prevInput = '';
-                      },
+                      onSubmitted: (_) => _submitLine(),
                     ),
                   ),
                   if (_ctrl)
