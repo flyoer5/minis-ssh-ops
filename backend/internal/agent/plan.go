@@ -8,9 +8,8 @@ import (
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/risk"
 )
 
-const SystemPrompt = `SSH ops helper. Reply JSON only (no markdown):
-{"summary":"brief","steps":[{"id":1,"title":"t","command":"one-line shell","reason":"why"}],"notes":""}
-Prefer read-only; max 6 steps. Never suggest rm -rf /, mkfs, dd of=/dev, curl|sh.`
+// Keep system prompt minimal — just the JSON shape the server needs.
+const SystemPrompt = `JSON only: {"summary":"","steps":[{"id":1,"title":"","command":"","reason":""}],"notes":""}`
 
 type Step struct {
 	ID      int        `json:"id"`

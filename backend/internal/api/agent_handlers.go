@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -131,11 +130,10 @@ func (s *Server) handleAgentPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
-	user := fmt.Sprintf("%s@%s:%d\n%s", h.Username, h.Host, h.Port, body.Goal)
 	_ = s.Store.AddChat(body.SessionID, "user", body.Goal)
 	raw, err := cli.Chat([]agent.Msg{
 		{Role: "system", Content: agent.SystemPrompt},
-		{Role: "user", Content: user},
+		{Role: "user", Content: body.Goal + "\n[" + h.Username + "@" + h.Host + "]"},
 	})
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
