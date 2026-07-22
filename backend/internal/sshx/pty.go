@@ -33,6 +33,7 @@ func StartPty(p ConnectParams, cols, rows int) (*PtySession, error) {
 	if rows <= 0 {
 		rows = 24
 	}
+	// clientConfig honors p.HostKeys TOFU when set
 	cfg, err := clientConfig(p)
 	if err != nil {
 		return nil, err

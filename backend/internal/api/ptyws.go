@@ -70,6 +70,7 @@ func (s *Server) handlePtyWS(w http.ResponseWriter, r *http.Request) {
 		Password:      sec.Password,
 		PrivateKeyPEM: sec.PrivateKeyPEM,
 		Passphrase:    sec.Passphrase,
+		HostKeys:      s.HostKeys,
 	}, cols, rows)
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, "pty: "+err.Error())

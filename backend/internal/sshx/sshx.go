@@ -18,6 +18,8 @@ type ConnectParams struct {
 	PrivateKeyPEM string
 	Passphrase    string
 	Timeout       time.Duration
+	// HostKeys optional TOFU store; if nil, falls back to insecure ignore (not recommended).
+	HostKeys *HostKeyStore
 }
 
 type ExecResult struct {
@@ -87,10 +89,14 @@ func clientConfig(p ConnectParams) (*ssh.ClientConfig, error) {
 	if len(auths) == 0 {
 		return nil, fmt.Errorf("need password or private key")
 	}
+	hkcb := ssh.InsecureIgnoreHostKey()
+	if p.HostKeys != nil {
+		hkcb = p.HostKeys.Callback(p.Host, p.Port)
+	}
 	return &ssh.ClientConfig{
 		User:            p.Username,
 		Auth:            auths,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // MVP; known_hosts later
+		HostKeyCallback: hkcb,
 		Timeout:         p.Timeout,
 	}, nil
 }

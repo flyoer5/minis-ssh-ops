@@ -36,6 +36,13 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       llmBase.text = (llm['baseUrl'] as String?) ?? '';
       llmModel.text = (llm['model'] as String?) ?? 'grok-4.5';
     }
+    // Soft prompt once if battery not ignored
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      if (!s.batteryIgnored) {
+        // non-blocking: user can act in 保活 section
+      }
+    });
   }
 
   @override

@@ -10,6 +10,7 @@ import (
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/api"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/config"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/crypto"
+	"github.com/flyoer5/ssh-ai-agent/backend/internal/sshx"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/store"
 )
 
@@ -37,7 +38,11 @@ func main() {
 	}
 	defer st.Close()
 
-	srv := api.New(st, cfg.LocalToken)
+	hk, err := sshx.NewHostKeyStore(cfg.DataDir)
+	if err != nil {
+		log.Fatalf("known_hosts: %v", err)
+	}
+	srv := api.New(st, cfg.LocalToken, hk)
 	log.Printf("ssh-ai-agent backend listening on http://%s", cfg.ListenAddr)
 	log.Printf("data dir: %s", cfg.DataDir)
 	log.Printf("auth: header X-Local-Token (also written to %s/local.token)", cfg.DataDir)

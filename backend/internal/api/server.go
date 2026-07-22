@@ -16,12 +16,13 @@ import (
 type Server struct {
 	Store      *store.Store
 	LocalToken string
+	HostKeys  *sshx.HostKeyStore
 	StartedAt  time.Time
 	mux        *http.ServeMux
 }
 
-func New(st *store.Store, localToken string) *Server {
-	s := &Server{Store: st, LocalToken: localToken, StartedAt: time.Now().UTC()}
+func New(st *store.Store, localToken string, hostKeys *sshx.HostKeyStore) *Server {
+	s := &Server{Store: st, LocalToken: localToken, HostKeys: hostKeys, StartedAt: time.Now().UTC()}
 	s.mux = http.NewServeMux()
 	s.routes()
 	return s
@@ -47,6 +48,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/agent/chat", s.handleAgentChat)
 	s.mux.HandleFunc("POST /v1/agent/exec-step", s.handleAgentExecStep)
 	s.mux.HandleFunc("GET /v1/audit", s.handleAudit)
+	s.mux.HandleFunc("GET /v1/known-hosts", s.handleListKnownHosts)
+	s.mux.HandleFunc("DELETE /v1/known-hosts", s.handleDeleteKnownHost)
+	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/list", s.handleFSList)
+	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/read", s.handleFSRead)
+	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/write", s.handleFSWrite)
 	// Interactive PTY (auth handled inside; needed for WS upgrade path)
 	s.mux.HandleFunc("/v1/hosts/{id}/pty", s.handlePtyWSHost)
 	s.mux.HandleFunc("/v1/pty", s.handlePtyWS)
@@ -102,10 +108,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"service":   "ssh-ai-agent-backend",
-		"version":   "0.4.0",
+		"version":   "1.0.0",
 		"startedAt": s.StartedAt.Format(time.RFC3339),
 		"listenHint": "127.0.0.1 only",
-		"features":  []string{"exec","probe","agent","audit","pty"},
+		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu"},
 	})
 }
 
@@ -242,6 +248,7 @@ func (s *Server) handleExec(w http.ResponseWriter, r *http.Request) {
 		Password:      sec.Password,
 		PrivateKeyPEM: sec.PrivateKeyPEM,
 		Passphrase:    sec.Passphrase,
+		HostKeys:      s.HostKeys,
 	}, body.Command)
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())

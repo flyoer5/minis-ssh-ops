@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/pages/agent_page.dart';
+import 'package:ssh_ai_agent/pages/files_page.dart';
 import 'package:ssh_ai_agent/pages/hosts_page.dart';
 import 'package:ssh_ai_agent/pages/records_page.dart';
 import 'package:ssh_ai_agent/pages/settings_page.dart';
@@ -48,6 +49,7 @@ class _HomeShellState extends State<HomeShell> {
     HostsPage(),
     AgentPage(),
     TerminalPage(),
+    FilesPage(),
     RecordsPage(),
     SettingsPage(),
   ];
@@ -90,6 +92,7 @@ class _HomeShellState extends State<HomeShell> {
           NavigationDestination(icon: Icon(Icons.dns_outlined), label: '主机'),
           NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: 'Agent'),
           NavigationDestination(icon: Icon(Icons.terminal), label: '终端'),
+          NavigationDestination(icon: Icon(Icons.folder_outlined), label: '文件'),
           NavigationDestination(icon: Icon(Icons.history), label: '记录'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), label: '设置'),
         ],

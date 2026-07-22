@@ -90,6 +90,7 @@ func (s *Server) runSSH(hostID, command string) (sshx.ExecResult, error) {
 		Password:      sec.Password,
 		PrivateKeyPEM: sec.PrivateKeyPEM,
 		Passphrase:    sec.Passphrase,
+		HostKeys:      s.HostKeys,
 	}, command)
 }
 
