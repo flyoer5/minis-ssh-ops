@@ -12,3 +12,8 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Keep stable personal keystore for upgrade-compatible CI builds
+!key.properties
+!keystore/
+!keystore/sshai-upload.jks

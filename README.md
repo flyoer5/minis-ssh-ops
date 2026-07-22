@@ -50,3 +50,11 @@ cd app && flutter pub get && flutter build apk --debug --target-platform android
 - `X-Local-Token` 鉴权
 - 主机密钥 / API Key AES 加密入库
 - 高危命令拦截；变更类需 `confirmed: true`
+
+
+## 签名与升级
+
+- 固定 keystore：`app/android/keystore/sshai-upload.jks`（密码见 `app/android/key.properties`）
+- debug/release 共用该签名 → 可覆盖安装不丢本地数据
+- 首次启动：初始配置向导（可跳过）；设置里可重置
+- 变更见 [CHANGELOG.md](CHANGELOG.md)
