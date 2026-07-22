@@ -334,19 +334,23 @@ class AppState extends ChangeNotifier {
             );
             final out = '${res['stdout'] ?? ''}${res['stderr'] ?? ''}'.trim();
             final block = out.isEmpty ? '(no output, exit ${res['exitCode']})' : out;
-            // tool output in transcript
+            final toolLine = r'$ ' + cmd + '\n' + block;
             _pushMsg(ChatMessage(
               role: 'tool',
-              content: '\$ $cmd\n$block',
+              content: toolLine,
               kind: ChatKind.stepResult,
               meta: {'command': cmd, 'exitCode': res['exitCode'], 'risk': res['risk']},
             ));
             collected.writeln('## $title');
-            collected.writeln('\$ $cmd');
+            collected.writeln(r'$ ' + cmd);
             collected.writeln(block);
             collected.writeln();
           } catch (e) {
-            _pushMsg(ChatMessage(role: 'tool', content: '\$ $cmd\n$e', kind: ChatKind.stepResult));
+            _pushMsg(ChatMessage(
+              role: 'tool',
+              content: r'$ ' + cmd + '\n' + e.toString(),
+              kind: ChatKind.stepResult,
+            ));
           }
         }
 

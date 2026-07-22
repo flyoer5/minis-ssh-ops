@@ -9,7 +9,7 @@ import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// Real interactive SSH terminal (WebSocket PTY), no WebView/CDN.
+/// Interactive SSH terminal (WebSocket PTY).
 class TerminalPage extends StatefulWidget {
   const TerminalPage({super.key});
 
@@ -28,11 +28,15 @@ class _TerminalPageState extends State<TerminalPage> {
   bool _connected = false;
   bool _connecting = false;
   String? _status;
+  bool _ctrl = false;
 
-  static const _bg = Color(0xFF0A0A0A);
-  static const _fg = Color(0xFFE8E8E8);
-  static const _green = Color(0xFF3DDC84);
-  static const _muted = Color(0xFF888888);
+  static const _bg = Color(0xFF000000);
+  static const _panel = Color(0xFF121212);
+  static const _fg = Color(0xFFE6E6E6);
+  static const _green = Color(0xFF4CD964);
+  static const _muted = Color(0xFF8E8E93);
+  static const _keyBg = Color(0xFF2C2C2E);
+  static const _keyBgActive = Color(0xFF3A3A3C);
 
   @override
   void dispose() {
@@ -57,31 +61,26 @@ class _TerminalPageState extends State<TerminalPage> {
 
   void _append(String s) {
     _buf.write(s);
-    // keep last ~80k chars
     final t = _buf.toString();
-    if (t.length > 80000) {
+    if (t.length > 100000) {
       _buf
         ..clear()
-        ..write(t.substring(t.length - 40000));
+        ..write(t.substring(t.length - 50000));
     }
-    if (mounted) {
-      setState(() {});
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scroll.hasClients) {
-          _scroll.jumpTo(_scroll.position.maxScrollExtent);
-        }
-      });
-    }
+    if (!mounted) return;
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
+    });
   }
 
-  /// Strip common CSI/OSC for plain Text display (good enough for shell use).
   String _stripAnsi(String s) {
     return s
         .replaceAll(RegExp(r'\x1B\][^\x07]*\x07'), '')
         .replaceAll(RegExp(r'\x1B\[[0-9;?]*[A-Za-z]'), '')
-        .replaceAll(RegExp(r'\x1B[>=()]'), '')
+        .replaceAll(RegExp(r'\x1B.'), '')
         .replaceAll('\r\n', '\n')
-        .replaceAll('\r', '\n');
+        .replaceAll('\r', '');
   }
 
   Future<void> _connect(AppState state) async {
@@ -93,12 +92,12 @@ class _TerminalPageState extends State<TerminalPage> {
     await _disconnect(silent: true);
     setState(() {
       _connecting = true;
-      _status = '连接中…';
       _connected = false;
+      _status = '连接中…';
       _buf.clear();
     });
 
-    final base = state.api.baseUrl; // http://127.0.0.1:17890
+    final base = state.api.baseUrl;
     final token = state.api.localToken;
     final uri = Uri.parse(base);
     final wsUri = Uri(
@@ -109,8 +108,8 @@ class _TerminalPageState extends State<TerminalPage> {
       queryParameters: {
         'token': token,
         'hostId': hostId,
-        'cols': '80',
-        'rows': '24',
+        'cols': '100',
+        'rows': '30',
       },
     );
 
@@ -130,9 +129,9 @@ class _TerminalPageState extends State<TerminalPage> {
                   _status = '已连接';
                 });
               } else if (type == 'error') {
-                _append('\n[error] ${msg['data']}\n');
+                _append('\n${msg['data']}\n');
               } else if (type == 'exit') {
-                _append('\n[session closed]\n');
+                _append('\n[断开]\n');
                 setState(() {
                   _connected = false;
                   _status = '已断开';
@@ -150,14 +149,15 @@ class _TerminalPageState extends State<TerminalPage> {
           }
         },
         onError: (e) {
-          _append('\n[ws error] $e\n');
           setState(() {
             _connected = false;
             _connecting = false;
-            _status = '连接错误';
+            _status = '错误';
           });
+          _append('\n连接错误: $e\n');
         },
         onDone: () {
+          if (!mounted) return;
           setState(() {
             _connected = false;
             _connecting = false;
@@ -165,8 +165,7 @@ class _TerminalPageState extends State<TerminalPage> {
           });
         },
       );
-      // also mark connecting until ready; some servers only send binary
-      Future.delayed(const Duration(milliseconds: 800), () {
+      Future.delayed(const Duration(milliseconds: 600), () {
         if (mounted && _connecting) {
           setState(() {
             _connecting = false;
@@ -179,9 +178,9 @@ class _TerminalPageState extends State<TerminalPage> {
       setState(() {
         _connecting = false;
         _connected = false;
-        _status = '连接失败: $e';
+        _status = '连接失败';
       });
-      _append('\n连接失败: $e\n');
+      _append('连接失败: $e\n');
     }
   }
 
@@ -200,22 +199,104 @@ class _TerminalPageState extends State<TerminalPage> {
     }
   }
 
-  void _sendInput(String data) {
+  void _sendRaw(String data) {
     final ch = _ch;
-    if (ch == null) return;
+    if (ch == null || !_connected) return;
     ch.sink.add(jsonEncode({'type': 'input', 'data': data}));
   }
 
-  void _onSubmit() {
-    final text = _input.text;
-    if (text.isEmpty) {
-      _sendInput('\n');
-      return;
+  void _tapKey(String label) {
+    if (!_connected) return;
+    switch (label) {
+      case 'Tab':
+        _sendRaw('\t');
+        break;
+      case 'Esc':
+        _sendRaw('\x1b');
+        break;
+      case 'Ctrl':
+        setState(() => _ctrl = !_ctrl);
+        return;
+      case '↑':
+        _sendRaw('\x1b[A');
+        break;
+      case '↓':
+        _sendRaw('\x1b[B');
+        break;
+      case '←':
+        _sendRaw('\x1b[D');
+        break;
+      case '→':
+        _sendRaw('\x1b[C');
+        break;
+      case 'Home':
+        _sendRaw('\x1b[H');
+        break;
+      case 'End':
+        _sendRaw('\x1b[F');
+        break;
+      case 'PgUp':
+        _sendRaw('\x1b[5~');
+        break;
+      case 'PgDn':
+        _sendRaw('\x1b[6~');
+        break;
+      case '—':
+        // spacer
+        break;
+      default:
+        // Ctrl + letter chips: C D L Z
+        if (_ctrl && label.length == 1) {
+          final c = label.toUpperCase().codeUnitAt(0);
+          if (c >= 65 && c <= 90) {
+            _sendRaw(String.fromCharCode(c - 64));
+            setState(() => _ctrl = false);
+            return;
+          }
+        }
+        _sendRaw(label);
     }
-    // Send line + newline to shell (normal terminal behavior when using line editor UI)
-    _sendInput('$text\n');
-    _input.clear();
+  }
+
+  void _submit() {
+    final text = _input.text;
+    if (!_connected) return;
+    if (text.isEmpty) {
+      _sendRaw('\n');
+    } else {
+      _sendRaw('$text\n');
+      _input.clear();
+    }
     _focus.requestFocus();
+  }
+
+  Widget _key(String label, {double width = 40, bool wide = false}) {
+    final active = label == 'Ctrl' && _ctrl;
+    return Padding(
+      padding: const EdgeInsets.all(2),
+      child: SizedBox(
+        width: wide ? 72 : width,
+        height: 36,
+        child: Material(
+          color: active ? _keyBgActive : _keyBg,
+          borderRadius: BorderRadius.circular(6),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: () => _tapKey(label),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: active ? _green : _fg,
+                  fontSize: 12,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -228,55 +309,65 @@ class _TerminalPageState extends State<TerminalPage> {
       body: SafeArea(
         child: Column(
           children: [
-            Material(
-              color: const Color(0xFF141414),
-              child: ListTile(
-                dense: true,
-                leading: Icon(
-                  Icons.circle,
-                  size: 10,
-                  color: _connected
-                      ? _green
-                      : _connecting
-                          ? Colors.amber
-                          : Colors.redAccent,
-                ),
-                title: Text(
-                  state.selectedHostId == null ? '终端' : state.hostLabel,
-                  style: const TextStyle(color: _fg, fontSize: 14),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  _status ?? (canUse ? 'SSH' : '未就绪'),
-                  style: const TextStyle(color: _muted, fontSize: 11),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: '重连',
-                      onPressed: canUse ? () => _connect(state) : null,
-                      icon: const Icon(Icons.refresh, color: _muted, size: 20),
+            // top bar
+            Container(
+              height: 44,
+              color: _panel,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _connected
+                          ? _green
+                          : _connecting
+                              ? Colors.amber
+                              : Colors.redAccent,
                     ),
-                    IconButton(
-                      tooltip: '清屏',
-                      onPressed: () => setState(() => _buf.clear()),
-                      icon: const Icon(Icons.cleaning_services_outlined, color: _muted, size: 18),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      state.selectedHostId == null ? '终端' : state.hostLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: _fg, fontSize: 13, fontWeight: FontWeight.w600),
                     ),
-                    IconButton(
-                      tooltip: '复制',
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: _buf.toString()));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
-                        );
-                      },
-                      icon: const Icon(Icons.copy, color: _muted, size: 18),
-                    ),
-                  ],
-                ),
+                  ),
+                  Text(
+                    _status ?? '',
+                    style: const TextStyle(color: _muted, fontSize: 11),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: '重连',
+                    onPressed: canUse ? () => _connect(state) : null,
+                    icon: const Icon(Icons.refresh, color: _muted, size: 18),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: '清屏',
+                    onPressed: () => setState(() => _buf.clear()),
+                    icon: const Icon(Icons.delete_outline, color: _muted, size: 18),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: '复制',
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: _buf.toString()));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating),
+                      );
+                    },
+                    icon: const Icon(Icons.copy_all_outlined, color: _muted, size: 18),
+                  ),
+                ],
               ),
             ),
+            // terminal screen
             Expanded(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -284,78 +375,89 @@ class _TerminalPageState extends State<TerminalPage> {
                 child: Container(
                   width: double.infinity,
                   color: _bg,
-                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
                   child: SingleChildScrollView(
                     controller: _scroll,
                     child: SelectableText(
                       _buf.isEmpty
-                          ? (canUse ? '正在连接远程 shell…\n' : '请先在主机页选择服务器\n')
+                          ? (canUse ? '' : '请先在「主机」选择服务器\n')
                           : _buf.toString(),
                       style: const TextStyle(
                         color: _fg,
                         fontFamily: 'monospace',
-                        fontSize: 13,
-                        height: 1.3,
+                        fontSize: 12.5,
+                        height: 1.28,
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-            // quick keys row
+            // special keyboard
             Container(
-              color: const Color(0xFF141414),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _KeyChip(label: 'Tab', onTap: () => _sendInput('\t')),
-                    _KeyChip(label: 'Ctrl-C', onTap: () => _sendInput('\x03')),
-                    _KeyChip(label: 'Ctrl-D', onTap: () => _sendInput('\x04')),
-                    _KeyChip(label: 'Ctrl-L', onTap: () => _sendInput('\x0c')),
-                    _KeyChip(label: 'Esc', onTap: () => _sendInput('\x1b')),
-                    _KeyChip(label: '↑', onTap: () => _sendInput('\x1b[A')),
-                    _KeyChip(label: '↓', onTap: () => _sendInput('\x1b[B')),
-                    _KeyChip(label: '←', onTap: () => _sendInput('\x1b[D')),
-                    _KeyChip(label: '→', onTap: () => _sendInput('\x1b[C')),
-                  ],
-                ),
+              color: _panel,
+              padding: const EdgeInsets.fromLTRB(4, 4, 4, 2),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      _key('Esc', width: 44),
+                      _key('Tab', width: 44),
+                      _key('Ctrl', width: 48),
+                      _key('C', width: 34),
+                      _key('D', width: 34),
+                      _key('L', width: 34),
+                      _key('Z', width: 34),
+                      const Spacer(),
+                      _key('↑', width: 40),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      _key('Home', width: 48),
+                      _key('End', width: 44),
+                      _key('PgUp', width: 48),
+                      _key('PgDn', width: 48),
+                      const Spacer(),
+                      _key('←', width: 40),
+                      _key('↓', width: 40),
+                      _key('→', width: 40),
+                    ],
+                  ),
+                ],
               ),
             ),
+            // input
             Container(
-              color: const Color(0xFF141414),
+              color: _panel,
               padding: EdgeInsets.only(
                 left: 8,
                 right: 4,
                 top: 4,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 4,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 6,
               ),
               child: Row(
                 children: [
-                  const Text(
-                    '\$ ',
-                    style: TextStyle(color: _green, fontFamily: 'monospace', fontSize: 13),
-                  ),
+                  const Text('❯ ', style: TextStyle(color: _green, fontFamily: 'monospace', fontSize: 14)),
                   Expanded(
                     child: TextField(
                       controller: _input,
                       focusNode: _focus,
                       enabled: _connected,
-                      style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 13),
+                      style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 13.5),
                       cursorColor: _green,
                       textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _onSubmit(),
+                      onSubmitted: (_) => _submit(),
                       decoration: const InputDecoration(
                         isDense: true,
                         border: InputBorder.none,
-                        hintText: '输入命令…',
-                        hintStyle: TextStyle(color: Color(0xFF555555), fontFamily: 'monospace'),
+                        hintText: '输入后回车发送到远程 shell',
+                        hintStyle: TextStyle(color: Color(0xFF555555), fontSize: 12),
                       ),
                     ),
                   ),
                   IconButton(
-                    onPressed: _connected ? _onSubmit : null,
+                    onPressed: _connected ? _submit : null,
                     icon: Icon(Icons.keyboard_return, color: _connected ? _green : _muted),
                   ),
                 ],
@@ -363,26 +465,6 @@ class _TerminalPageState extends State<TerminalPage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _KeyChip extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _KeyChip({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: ActionChip(
-        visualDensity: VisualDensity.compact,
-        label: Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFFCCCCCC))),
-        backgroundColor: const Color(0xFF222222),
-        side: BorderSide.none,
-        onPressed: onTap,
       ),
     );
   }
