@@ -8,11 +8,8 @@ import (
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/risk"
 )
 
-// Minimal: model proposes commands; app requires explicit Run (rssh-style).
-const SystemPrompt = `You help operate a Linux host over SSH.
-Reply JSON only, no markdown:
-{"reply":"short natural language","commands":[{"title":"","command":"single-line shell","side_effect":"none|read|write|destructive"}]}
-Prefer read-only diagnostics. Max 5 commands. Never suggest rm -rf /, mkfs, dd of=/dev, curl|sh.`
+// Keep prompt tiny. UI is Minis-like: assistant text + tool cards user must run.
+const SystemPrompt = `JSON only: {"reply":"","commands":[{"title":"","command":"","side_effect":"read|write|destructive"}]}`
 
 type Step struct {
 	ID         int        `json:"id"`
@@ -25,11 +22,9 @@ type Step struct {
 }
 
 type Plan struct {
-	// reply: natural chat text (preferred)
-	Reply   string `json:"reply"`
-	Summary string `json:"summary"` // legacy alias
-	Steps   []Step `json:"steps"`
-	// commands: rssh-style alias for steps
+	Reply    string `json:"reply"`
+	Summary  string `json:"summary"`
+	Steps    []Step `json:"steps"`
 	Commands []Step `json:"commands"`
 	Notes    string `json:"notes"`
 	Raw      string `json:"raw,omitempty"`
@@ -56,7 +51,6 @@ func ParsePlan(raw string) (*Plan, error) {
 	if err := json.Unmarshal([]byte(s), &p); err != nil {
 		return nil, err
 	}
-	// normalize commands -> steps
 	if len(p.Steps) == 0 && len(p.Commands) > 0 {
 		p.Steps = p.Commands
 	}
@@ -70,20 +64,16 @@ func ParsePlan(raw string) (*Plan, error) {
 		if p.Steps[i].ID == 0 {
 			p.Steps[i].ID = i + 1
 		}
-		// map side_effect to risk if provided
-		se := strings.ToLower(p.Steps[i].SideEffect)
 		r := risk.Classify(p.Steps[i].Command)
-		switch se {
+		switch strings.ToLower(p.Steps[i].SideEffect) {
 		case "destructive":
-			if riskRank(r) < riskRank(risk.Destructive) {
+			if r != risk.Blocked {
 				r = risk.Destructive
 			}
 		case "write":
-			if riskRank(r) < riskRank(risk.Write) {
+			if r == risk.Read {
 				r = risk.Write
 			}
-		case "none", "read":
-			// keep server classify as floor
 		}
 		p.Steps[i].Risk = r
 		p.Steps[i].Status = "pending"
@@ -91,24 +81,9 @@ func ParsePlan(raw string) (*Plan, error) {
 			p.Steps[i].Status = "blocked"
 		}
 		if p.Steps[i].Title == "" {
-			p.Steps[i].Title = p.Steps[i].Command
+			p.Steps[i].Title = "shell"
 		}
 	}
 	p.Raw = raw
 	return &p, nil
-}
-
-func riskRank(r risk.Level) int {
-	switch r {
-	case risk.Read:
-		return 1
-	case risk.Write:
-		return 2
-	case risk.Destructive:
-		return 3
-	case risk.Blocked:
-		return 4
-	default:
-		return 0
-	}
 }
