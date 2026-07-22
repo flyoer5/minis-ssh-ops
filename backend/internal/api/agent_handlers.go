@@ -156,53 +156,36 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 
 	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 
-	run := func(name string, args map[string]any) (string, bool, error) {
+	run := func(name string, args map[string]any) (string, error) {
 		switch name {
 		case "probe_host":
 			res, err := s.runSSH(body.HostID, probeScript)
 			if err != nil {
-				return "", false, err
+				return "", err
 			}
 			_ = s.Store.AddAudit(&store.AuditEntry{
 				HostID: body.HostID, SessionID: body.SessionID, Command: "probe_host",
 				Risk: "read", Confirmed: true, ExitCode: res.ExitCode, Stdout: truncate(res.Stdout, 8000),
 			})
-			return res.Stdout, false, nil
+			return res.Stdout, nil
 		case "run_command":
 			cmd, _ := args["command"].(string)
 			cmd = strings.TrimSpace(cmd)
 			if cmd == "" {
-				return "", false, fmt.Errorf("empty command")
-			}
-			// reject interactive spam shapes (rssh shape wall, light)
-			if isSpamShape(cmd) {
-				return "", false, fmt.Errorf("rejected interactive/spam shape; use batch flags + sample count")
+				return "", fmt.Errorf("empty command")
 			}
 			lvl := risk.Classify(cmd)
-			// model-declared side_effect can raise floor
-			if se, _ := args["side_effect"].(string); se == "destructive" && lvl != risk.Blocked {
-				lvl = risk.Destructive
-			} else if se, _ := args["side_effect"].(string); se == "write" && lvl == risk.Read {
-				lvl = risk.Write
-			}
+			// Keep only hard blacklist (app safety), not rssh confirm walls.
 			if lvl == risk.Blocked {
 				_ = s.Store.AddAudit(&store.AuditEntry{
 					HostID: body.HostID, SessionID: body.SessionID, Command: cmd,
 					Risk: string(lvl), Confirmed: false, ExitCode: -1, Stderr: "blocked",
 				})
-				return "", false, fmt.Errorf("blocked by policy: %s", cmd)
-			}
-			// rssh wall: write/destructive need explicit user confirm (UI Run)
-			if lvl == risk.Write || lvl == risk.Destructive {
-				_ = s.Store.AddAudit(&store.AuditEntry{
-					HostID: body.HostID, SessionID: body.SessionID, Command: cmd,
-					Risk: string(lvl), Confirmed: false, ExitCode: -1, Stderr: "needs_confirm",
-				})
-				return "", true, nil
+				return "", fmt.Errorf("blocked by policy: %s", cmd)
 			}
 			res, err := s.runSSH(body.HostID, cmd)
 			if err != nil {
-				return "", false, err
+				return "", err
 			}
 			_ = s.Store.AddAudit(&store.AuditEntry{
 				HostID: body.HostID, SessionID: body.SessionID, Command: cmd,
@@ -213,9 +196,9 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 			if res.Stderr != "" {
 				out = out + "\n" + res.Stderr
 			}
-			return strings.TrimSpace(out), false, nil
+			return strings.TrimSpace(out), nil
 		default:
-			return "", false, fmt.Errorf("unknown tool %s", name)
+			return "", fmt.Errorf("unknown tool %s", name)
 		}
 	}
 
@@ -426,21 +409,3 @@ func truncate(s string, n int) string {
 	return s[:n] + "\n...[truncated]"
 }
 
-// Light rssh-style shape checks (not OS-specific).
-func isSpamShape(cmd string) bool {
-	c := strings.TrimSpace(cmd)
-	low := strings.ToLower(c)
-	// bare interactive monitors
-	if low == "top" || low == "htop" || low == "iotop" || strings.HasPrefix(low, "watch ") {
-		return true
-	}
-	// vmstat/iostat without sample count (very rough)
-	fields := strings.Fields(low)
-	if len(fields) >= 2 && (fields[0] == "vmstat" || fields[0] == "iostat") {
-		// vmstat 1  → spam; vmstat 1 5 → ok
-		if len(fields) == 2 {
-			return true
-		}
-	}
-	return false
-}
