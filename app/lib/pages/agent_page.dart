@@ -66,7 +66,12 @@ class _AgentPageState extends State<AgentPage> {
         children: [
           Expanded(
             child: state.agentMessages.isEmpty
-                ? const SizedBox.shrink()
+                ? Center(
+                    child: Text(
+                      state.selectedHostId == null ? '先选主机' : '',
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
+                  )
                 : ListView.builder(
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
@@ -21,10 +23,11 @@ class _HostsPageState extends State<HostsPage> {
     final state = context.watch<AppState>();
     if (!_autoStarted && state.backendOk && state.hosts.isNotEmpty) {
       _autoStarted = true;
-      // probe all hosts once when page becomes ready
+      // probe hosts concurrently (each is now a single SSH round-trip)
       for (final h in state.hosts) {
         if (h is Map && h['id'] is String) {
-          _refreshProbe(state, h['id'] as String);
+          // fire-and-forget
+          unawaited(_refreshProbe(state, h['id'] as String));
         }
       }
     }
@@ -54,11 +57,13 @@ class _HostsPageState extends State<HostsPage> {
 
   Future<void> _refreshAll(AppState state) async {
     await state.refreshHosts();
+    final futures = <Future>[];
     for (final h in state.hosts) {
       if (h is Map && h['id'] is String) {
-        await _refreshProbe(state, h['id'] as String);
+        futures.add(_refreshProbe(state, h['id'] as String));
       }
     }
+    await Future.wait(futures);
   }
 
   @override

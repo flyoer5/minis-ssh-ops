@@ -9,7 +9,7 @@ import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// Interactive PTY terminal. Keys send raw bytes immediately (SSH client style).
+/// PTY terminal: system soft keyboard via TextField (JuiceSSH-style) + compact extra bar.
 class TerminalPage extends StatefulWidget {
   const TerminalPage({super.key});
 
@@ -17,8 +17,9 @@ class TerminalPage extends StatefulWidget {
   State<TerminalPage> createState() => _TerminalPageState();
 }
 
-class _TerminalPageState extends State<TerminalPage> {
+class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver {
   final _scroll = ScrollController();
+  final _input = TextEditingController();
   final _focus = FocusNode();
   final _buf = StringBuffer();
   WebSocketChannel? _ch;
@@ -28,6 +29,7 @@ class _TerminalPageState extends State<TerminalPage> {
   bool _connecting = false;
   String _status = '';
   bool _ctrl = false;
+  String _prevInput = '';
 
   static const _bg = Color(0xFF000000);
   static const _panel = Color(0xFF1C1C1E);
@@ -37,12 +39,30 @@ class _TerminalPageState extends State<TerminalPage> {
   static const _key = Color(0xFF2C2C2E);
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _input.addListener(_onInputChanged);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _input.removeListener(_onInputChanged);
     _sub?.cancel();
     _ch?.sink.close();
     _scroll.dispose();
+    _input.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    // keep focus when keyboard opens/closes
+    if (_connected && mounted) {
+      _focus.requestFocus();
+    }
   }
 
   @override
@@ -89,6 +109,8 @@ class _TerminalPageState extends State<TerminalPage> {
       _connected = false;
       _status = '连接中';
       _buf.clear();
+      _prevInput = '';
+      _input.clear();
     });
 
     final uri = Uri.parse(state.api.baseUrl);
@@ -120,6 +142,7 @@ class _TerminalPageState extends State<TerminalPage> {
                   _connecting = false;
                   _status = '已连接';
                 });
+                _openKeyboard();
               } else if (type == 'error') {
                 _append('\n${msg['data']}\n');
               } else if (type == 'exit') {
@@ -139,7 +162,7 @@ class _TerminalPageState extends State<TerminalPage> {
             _append(_stripAnsi(utf8.decode(event.asUint8List(), allowMalformed: true)));
           }
         },
-        onError: (e) {
+        onError: (_) {
           setState(() {
             _connected = false;
             _connecting = false;
@@ -155,13 +178,14 @@ class _TerminalPageState extends State<TerminalPage> {
           });
         },
       );
-      Future.delayed(const Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 400), () {
         if (mounted && _connecting) {
           setState(() {
             _connecting = false;
             _connected = true;
             _status = '已连接';
           });
+          _openKeyboard();
         }
       });
     } catch (e) {
@@ -185,65 +209,56 @@ class _TerminalPageState extends State<TerminalPage> {
 
   void _send(String data) {
     final ch = _ch;
-    if (ch == null) return;
+    if (ch == null || !_connected) return;
     ch.sink.add(jsonEncode({'type': 'input', 'data': data}));
   }
 
-  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (!_connected || event is! KeyDownEvent) return KeyEventResult.ignored;
-    final key = event.logicalKey;
+  void _openKeyboard() {
+    if (!mounted) return;
+    _focus.requestFocus();
+    // Force soft keyboard on Android
+    SystemChannels.textInput.invokeMethod('TextInput.show');
+  }
 
-    if (HardwareKeyboard.instance.isControlPressed || _ctrl) {
-      final label = key.keyLabel;
-      if (label.length == 1) {
-        final c = label.toUpperCase().codeUnitAt(0);
-        if (c >= 65 && c <= 90) {
-          _send(String.fromCharCode(c - 64));
-          if (_ctrl) setState(() => _ctrl = false);
-          return KeyEventResult.handled;
-        }
+  /// Diff TextField content → PTY keystrokes (JuiceSSH-like).
+  void _onInputChanged() {
+    if (!_connected) {
+      _prevInput = _input.text;
+      return;
+    }
+    final cur = _input.text;
+    final prev = _prevInput;
+
+    if (cur == prev) return;
+
+    if (cur.length > prev.length && cur.startsWith(prev)) {
+      final added = cur.substring(prev.length);
+      // Map newline from IME to CR for shells
+      _send(added.replaceAll('\n', '\r'));
+    } else if (cur.length < prev.length && prev.startsWith(cur)) {
+      final n = prev.length - cur.length;
+      for (var i = 0; i < n; i++) {
+        _send('\x7f');
+      }
+    } else {
+      // complex edit: send backspaces then new text
+      for (var i = 0; i < prev.length; i++) {
+        _send('\x7f');
+      }
+      if (cur.isNotEmpty) {
+        _send(cur.replaceAll('\n', '\r'));
       }
     }
 
-    if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) {
-      _send('\r');
-      return KeyEventResult.handled;
+    // Keep field short so IME stays light
+    if (cur.length > 200) {
+      _input.removeListener(_onInputChanged);
+      _input.clear();
+      _prevInput = '';
+      _input.addListener(_onInputChanged);
+    } else {
+      _prevInput = cur;
     }
-    if (key == LogicalKeyboardKey.backspace) {
-      _send('\x7f');
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.tab) {
-      _send('\t');
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.escape) {
-      _send('\x1b');
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowUp) {
-      _send('\x1b[A');
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      _send('\x1b[B');
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      _send('\x1b[C');
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      _send('\x1b[D');
-      return KeyEventResult.handled;
-    }
-
-    final ch = event.character;
-    if (ch != null && ch.isNotEmpty) {
-      _send(ch);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
   }
 
   void _extra(String name) {
@@ -251,45 +266,73 @@ class _TerminalPageState extends State<TerminalPage> {
     switch (name) {
       case 'TAB':
         _send('\t');
+        break;
       case 'ESC':
         _send('\x1b');
+        break;
       case 'CTRL':
         setState(() => _ctrl = !_ctrl);
-      case 'C':
-        _send(_ctrl ? '\x03' : 'c');
-        if (_ctrl) setState(() => _ctrl = false);
-      case 'D':
-        _send(_ctrl ? '\x04' : 'd');
-        if (_ctrl) setState(() => _ctrl = false);
-      case 'L':
-        _send(_ctrl ? '\x0c' : 'l');
-        if (_ctrl) setState(() => _ctrl = false);
-      case 'Z':
-        _send(_ctrl ? '\x1a' : 'z');
-        if (_ctrl) setState(() => _ctrl = false);
+        break;
+      case 'Ctrl-C':
+        _send('\x03');
+        setState(() => _ctrl = false);
+        break;
+      case 'Ctrl-D':
+        _send('\x04');
+        setState(() => _ctrl = false);
+        break;
+      case 'Ctrl-L':
+        _send('\x0c');
+        setState(() => _ctrl = false);
+        break;
+      case 'Ctrl-Z':
+        _send('\x1a');
+        setState(() => _ctrl = false);
+        break;
       case '↑':
         _send('\x1b[A');
+        break;
       case '↓':
         _send('\x1b[B');
+        break;
       case '←':
         _send('\x1b[D');
+        break;
       case '→':
         _send('\x1b[C');
+        break;
+      case 'Home':
+        _send('\x1b[H');
+        break;
+      case 'End':
+        _send('\x1b[F');
+        break;
       case '⌫':
         _send('\x7f');
+        break;
       case '↵':
         _send('\r');
+        break;
+      default:
+        if (_ctrl && name.length == 1) {
+          final c = name.toUpperCase().codeUnitAt(0);
+          if (c >= 65 && c <= 90) {
+            _send(String.fromCharCode(c - 64));
+            setState(() => _ctrl = false);
+          }
+        }
     }
+    _openKeyboard();
   }
 
-  Widget _kb(String label, {bool highlight = false}) {
+  Widget _key(String label, {bool on = false}) {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(3),
+        padding: const EdgeInsets.all(2.5),
         child: SizedBox(
-          height: 40,
+          height: 38,
           child: Material(
-            color: highlight ? const Color(0xFF3A3A3C) : _key,
+            color: on ? const Color(0xFF3A3A3C) : _key,
             borderRadius: BorderRadius.circular(8),
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
@@ -298,8 +341,8 @@ class _TerminalPageState extends State<TerminalPage> {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: highlight ? _green : _fg,
-                    fontSize: 13,
+                    color: on ? _green : _fg,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -318,13 +361,14 @@ class _TerminalPageState extends State<TerminalPage> {
 
     return Scaffold(
       backgroundColor: _bg,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Column(
           children: [
             Container(
               height: 42,
               color: _panel,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Row(
                 children: [
                   Icon(Icons.circle, size: 9, color: _connected ? _green : (_connecting ? Colors.amber : Colors.redAccent)),
@@ -338,7 +382,6 @@ class _TerminalPageState extends State<TerminalPage> {
                     ),
                   ),
                   Text(_status, style: const TextStyle(color: _muted, fontSize: 11)),
-                  const SizedBox(width: 4),
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     onPressed: ready ? () => _connect(state) : null,
@@ -346,69 +389,142 @@ class _TerminalPageState extends State<TerminalPage> {
                   ),
                   IconButton(
                     visualDensity: VisualDensity.compact,
-                    onPressed: () => setState(() => _buf.clear()),
+                    onPressed: () {
+                      setState(() => _buf.clear());
+                      _openKeyboard();
+                    },
                     icon: const Icon(Icons.cleaning_services_outlined, color: _muted, size: 18),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: _buf.toString()));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating),
+                      );
+                    },
+                    icon: const Icon(Icons.copy_all_outlined, color: _muted, size: 18),
                   ),
                 ],
               ),
             ),
             Expanded(
-              child: Focus(
-                focusNode: _focus,
-                autofocus: true,
-                onKeyEvent: _onKey,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _focus.requestFocus(),
-                  child: Container(
-                    width: double.infinity,
-                    color: _bg,
-                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-                    child: SingleChildScrollView(
-                      controller: _scroll,
-                      child: SelectableText(
-                        _buf.isEmpty ? (ready ? '' : '选择主机后自动连接\n') : _buf.toString(),
-                        style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 13, height: 1.3),
-                      ),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _openKeyboard,
+                child: Container(
+                  width: double.infinity,
+                  color: _bg,
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+                  child: SingleChildScrollView(
+                    controller: _scroll,
+                    child: SelectableText(
+                      _buf.isEmpty ? (ready ? '' : '选择主机后自动连接\n') : _buf.toString(),
+                      style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 13, height: 1.3),
                     ),
                   ),
                 ),
               ),
             ),
-            // virtual extras — compact, fixed layout, no Spacer chaos
+            // special keys
             Container(
               color: _panel,
-              padding: const EdgeInsets.fromLTRB(4, 6, 4, 4),
+              padding: const EdgeInsets.fromLTRB(4, 4, 4, 2),
               child: Column(
                 children: [
                   Row(children: [
-                    _kb('ESC'),
-                    _kb('TAB'),
-                    _kb('CTRL', highlight: _ctrl),
-                    _kb('C'),
-                    _kb('D'),
-                    _kb('L'),
-                    _kb('Z'),
+                    _key('ESC'),
+                    _key('TAB'),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(2.5),
+                        child: SizedBox(
+                          height: 38,
+                          child: Material(
+                            color: _ctrl ? const Color(0xFF3A3A3C) : _key,
+                            borderRadius: BorderRadius.circular(8),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () => _extra('CTRL'),
+                              child: Center(
+                                child: Text(
+                                  'CTRL',
+                                  style: TextStyle(
+                                    color: _ctrl ? _green : _fg,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    _key('Ctrl-C'),
+                    _key('Ctrl-D'),
+                    _key('Ctrl-L'),
                   ]),
                   Row(children: [
-                    _kb('↑'),
-                    _kb('↓'),
-                    _kb('←'),
-                    _kb('→'),
-                    _kb('⌫'),
-                    _kb('↵'),
+                    _key('↑'),
+                    _key('↓'),
+                    _key('←'),
+                    _key('→'),
+                    _key('Home'),
+                    _key('End'),
+                    _key('⌫'),
+                    _key('↵'),
                   ]),
                 ],
               ),
             ),
-            // soft hint: type with system keyboard; characters go to PTY via Focus
+            // system keyboard host — always present so IME can attach
             Container(
-              width: double.infinity,
               color: _panel,
-              padding: EdgeInsets.only(left: 12, right: 12, bottom: MediaQuery.of(context).viewInsets.bottom + 8, top: 4),
-              child: Text(
-                _connected ? '点屏幕后用系统键盘输入；上方为特殊键' : '未连接',
-                style: const TextStyle(color: _muted, fontSize: 11),
+              padding: EdgeInsets.only(
+                left: 10,
+                right: 8,
+                top: 4,
+                bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 4 : 8,
+              ),
+              child: Row(
+                children: [
+                  const Text('❯ ', style: TextStyle(color: _green, fontFamily: 'monospace')),
+                  Expanded(
+                    child: TextField(
+                      controller: _input,
+                      focusNode: _focus,
+                      enabled: _connected,
+                      autofocus: false,
+                      keyboardType: TextInputType.visiblePassword, // avoid suggestions lag
+                      textInputAction: TextInputAction.newline,
+                      enableSuggestions: false,
+                      autocorrect: false,
+                      smartDashesType: SmartDashesType.disabled,
+                      smartQuotesType: SmartQuotesType.disabled,
+                      style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 14),
+                      cursorColor: _green,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        hintText: '点此输入',
+                        hintStyle: TextStyle(color: Color(0xFF555555), fontSize: 13),
+                      ),
+                      onTap: _openKeyboard,
+                      onSubmitted: (_) {
+                        // some IMEs send submit instead of newline char
+                        _send('\r');
+                        _input.clear();
+                        _prevInput = '';
+                      },
+                    ),
+                  ),
+                  if (_ctrl)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Text('CTRL', style: TextStyle(color: _green, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                ],
               ),
             ),
           ],

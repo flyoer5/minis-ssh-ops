@@ -227,23 +227,55 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	cmds := map[string]string{
-		"uname":  "uname -a",
-		"uptime": "uptime",
-		"disk":   "df -h",
-		"memory": "free -h 2>/dev/null || head -5 /proc/meminfo",
-		"load":   "cat /proc/loadavg",
+	// One SSH session / one compound command — much faster than 5 sequential dials.
+	const script = `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	res, err := s.runSSH(id, script)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"uname":  map[string]any{"error": err.Error()},
+			"uptime": map[string]any{"error": err.Error()},
+			"load":   map[string]any{"error": err.Error()},
+			"disk":   map[string]any{"error": err.Error()},
+			"memory": map[string]any{"error": err.Error()},
+		})
+		return
 	}
-	out := map[string]any{}
-	for k, cmd := range cmds {
-		res, err := s.runSSH(id, cmd)
-		if err != nil {
-			out[k] = map[string]any{"error": err.Error()}
+	parts := splitProbe(res.Stdout)
+	mk := func(s string) map[string]any {
+		return map[string]any{"exitCode": res.ExitCode, "stdout": strings.TrimSpace(s), "stderr": ""}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"uname":  mk(parts["U"]),
+		"uptime": mk(parts["T"]),
+		"load":   mk(parts["L"]),
+		"disk":   mk(parts["D"]),
+		"memory": mk(parts["M"]),
+		"durationMs": res.DurationMs,
+	})
+}
+
+func splitProbe(stdout string) map[string]string {
+	out := map[string]string{"U": "", "T": "", "L": "", "D": "", "M": ""}
+	cur := ""
+	for _, line := range strings.Split(stdout, "\n") {
+		if strings.HasPrefix(line, "___") && strings.HasSuffix(line, "___") && len(line) >= 7 {
+			// ___X___
+			tag := strings.Trim(line, "_")
+			if len(tag) == 1 {
+				cur = tag
+				continue
+			}
+		}
+		if cur == "" {
 			continue
 		}
-		out[k] = map[string]any{"exitCode": res.ExitCode, "stdout": strings.TrimSpace(res.Stdout), "stderr": strings.TrimSpace(res.Stderr)}
+		if out[cur] == "" {
+			out[cur] = line
+		} else {
+			out[cur] += "\n" + line
+		}
 	}
-	writeJSON(w, http.StatusOK, out)
+	return out
 }
 
 func truncate(s string, n int) string {
