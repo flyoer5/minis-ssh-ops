@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
-/// Pure chat with agent — no "goal/plan form" language.
+/// Pure chat with agent.
 class AgentPage extends StatefulWidget {
   const AgentPage({super.key});
 
@@ -93,12 +93,7 @@ class _AgentPageState extends State<AgentPage> {
         children: [
           Expanded(
             child: state.agentMessages.isEmpty
-                ? _Empty(
-                    onPick: (s) {
-                      _input.text = s;
-                      _focus.requestFocus();
-                    },
-                  )
+                ? const _Empty()
                 : ListView.builder(
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
@@ -176,38 +171,17 @@ class _AgentPageState extends State<AgentPage> {
 }
 
 class _Empty extends StatelessWidget {
-  final ValueChanged<String> onPick;
-  const _Empty({required this.onPick});
+  const _Empty();
 
   @override
   Widget build(BuildContext context) {
-    final tips = ['帮我看看这台机器现在状态', '磁盘还有多少空间？', '内存吃紧吗？'];
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        const SizedBox(height: 40),
-        Icon(Icons.forum_outlined, size: 44, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(height: 12),
-        Text('对话', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        Text(
-          '像聊天一样说你的需求。\n只读检查会自动执行；改系统会先问你。',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-        const SizedBox(height: 24),
-        ...tips.map(
-          (t) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: OutlinedButton(
-              onPressed: () => onPick(t),
-              child: Align(alignment: Alignment.centerLeft, child: Text(t)),
+    return Center(
+      child: Text(
+        '发消息开始',
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -252,19 +226,15 @@ class _Bubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('需要你确认的操作', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
             ...writes.map((raw) {
               final st = Map<String, dynamic>.from(raw as Map);
               final id = st['id'];
               final stepId = id is int ? id : int.tryParse('$id') ?? 0;
-              final title = st['title']?.toString() ?? '';
               final cmd = st['command']?.toString() ?? '';
               return ListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: Text(title),
-                subtitle: Text(cmd, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                title: Text(cmd, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
                 trailing: FilledButton(
                   onPressed: busy ? null : () => onConfirm(stepId, cmd),
                   child: const Text('确认'),

@@ -8,14 +8,9 @@ import (
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/risk"
 )
 
-const SystemPrompt = `你是手机端本地运维 Agent，通过 SSH 协助用户运维 Linux。
-规则：
-1. 只输出 JSON，不要 Markdown 代码围栏。
-2. 优先只读诊断；变更拆小步。
-3. 禁止：rm -rf /、mkfs、dd 写盘、curl|sh、关机重启（除非用户明确且标 destructive）。
-4. schema:
-{"summary":"...","steps":[{"id":1,"title":"...","command":"单行shell","reason":"..."}],"notes":"..."}
-5. steps 最多 8 步。`
+const SystemPrompt = `SSH ops helper. Reply JSON only (no markdown):
+{"summary":"brief","steps":[{"id":1,"title":"t","command":"one-line shell","reason":"why"}],"notes":""}
+Prefer read-only; max 6 steps. Never suggest rm -rf /, mkfs, dd of=/dev, curl|sh.`
 
 type Step struct {
 	ID      int        `json:"id"`

@@ -131,8 +131,7 @@ func (s *Server) handleAgentPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
-	user := fmt.Sprintf("主机: %s (%s@%s:%d)\n运维目标: %s\n请给出诊断/处理计划 JSON。",
-		h.Name, h.Username, h.Host, h.Port, body.Goal)
+	user := fmt.Sprintf("%s@%s:%d\n%s", h.Username, h.Host, h.Port, body.Goal)
 	_ = s.Store.AddChat(body.SessionID, "user", body.Goal)
 	raw, err := cli.Chat([]agent.Msg{
 		{Role: "system", Content: agent.SystemPrompt},

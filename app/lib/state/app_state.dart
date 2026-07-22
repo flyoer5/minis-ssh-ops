@@ -280,21 +280,23 @@ class AppState extends ChangeNotifier {
       final notes = plan?['notes']?.toString().trim() ?? '';
       final steps = (plan?['steps'] as List?) ?? [];
 
-      // Acknowledge like a normal chat
-      _pushMsg(ChatMessage(
-        role: 'assistant',
-        content: summary.isNotEmpty ? summary : '好的，我这边看一下。',
-        kind: ChatKind.text,
-      ));
+      // Minimal: show model summary if any, then run reads, show outputs; no filler copy.
+      if (summary.isNotEmpty) {
+        _pushMsg(ChatMessage(role: 'assistant', content: summary, kind: ChatKind.text));
+      }
 
       if (steps.isEmpty) {
         if (notes.isNotEmpty) {
           _pushMsg(ChatMessage(role: 'assistant', content: notes, kind: ChatKind.text));
+        } else if (summary.isEmpty) {
+          final raw = planRaw?.toString() ?? '';
+          if (raw.isNotEmpty) {
+            _pushMsg(ChatMessage(role: 'assistant', content: raw, kind: ChatKind.text));
+          }
         }
         return;
       }
 
-      // Keep plan meta only for write confirms; do not show "plan form" as main UX
       if (plan != null) {
         final planMsg = ChatMessage(
           role: 'assistant',
@@ -314,79 +316,48 @@ class AppState extends ChangeNotifier {
         return r == 'write' || r == 'destructive';
       }).toList();
 
-      final collected = StringBuffer();
-      if (readSteps.isNotEmpty) {
-        _pushMsg(ChatMessage(role: 'assistant', content: '正在检查…', kind: ChatKind.status));
-        for (final raw in readSteps) {
-          final st = Map<String, dynamic>.from(raw as Map);
-          final sid = st['id'];
-          final stepId = sid is int ? sid : int.tryParse('$sid') ?? 0;
-          final cmd = st['command']?.toString() ?? '';
-          final title = st['title']?.toString() ?? cmd;
-          if (cmd.isEmpty) continue;
-          try {
-            final res = await api.agentExecStep(
-              hostId: id,
-              command: cmd,
-              confirmed: false,
-              sessionId: agentSessionId ?? 'agent',
-              stepId: stepId,
-            );
-            final out = '${res['stdout'] ?? ''}${res['stderr'] ?? ''}'.trim();
-            final block = out.isEmpty ? '(no output, exit ${res['exitCode']})' : out;
-            final toolLine = r'$ ' + cmd + '\n' + block;
-            _pushMsg(ChatMessage(
-              role: 'tool',
-              content: toolLine,
-              kind: ChatKind.stepResult,
-              meta: {'command': cmd, 'exitCode': res['exitCode'], 'risk': res['risk']},
-            ));
-            collected.writeln('## $title');
-            collected.writeln(r'$ ' + cmd);
-            collected.writeln(block);
-            collected.writeln();
-          } catch (e) {
-            _pushMsg(ChatMessage(
-              role: 'tool',
-              content: r'$ ' + cmd + '\n' + e.toString(),
-              kind: ChatKind.stepResult,
-            ));
-          }
+      for (final raw in readSteps) {
+        final st = Map<String, dynamic>.from(raw as Map);
+        final sid = st['id'];
+        final stepId = sid is int ? sid : int.tryParse('$sid') ?? 0;
+        final cmd = st['command']?.toString() ?? '';
+        if (cmd.isEmpty) continue;
+        try {
+          final res = await api.agentExecStep(
+            hostId: id,
+            command: cmd,
+            confirmed: false,
+            sessionId: agentSessionId ?? 'agent',
+            stepId: stepId,
+          );
+          final out = '${res['stdout'] ?? ''}${res['stderr'] ?? ''}'.trim();
+          final block = out.isEmpty ? '(exit ${res['exitCode']})' : out;
+          _pushMsg(ChatMessage(
+            role: 'tool',
+            content: r'$ ' + cmd + '\n' + block,
+            kind: ChatKind.stepResult,
+            meta: {'command': cmd, 'exitCode': res['exitCode'], 'risk': res['risk']},
+          ));
+        } catch (e) {
+          _pushMsg(ChatMessage(
+            role: 'tool',
+            content: r'$ ' + cmd + '\n' + e.toString(),
+            kind: ChatKind.stepResult,
+          ));
         }
-
-        // Final natural summary from collected outputs
-        final finalText = _summarizeLocally(userText, collected.toString(), notes);
-        _pushMsg(ChatMessage(role: 'assistant', content: finalText, kind: ChatKind.text));
       }
 
-      if (writeSteps.isNotEmpty) {
-        _pushMsg(ChatMessage(
-          role: 'assistant',
-          content: '如果要继续改系统，请点下面需要确认的步骤。',
-          kind: ChatKind.text,
-        ));
+      if (notes.isNotEmpty && readSteps.isNotEmpty) {
+        _pushMsg(ChatMessage(role: 'assistant', content: notes, kind: ChatKind.text));
+      }
+      // writeSteps kept only in plan card for confirm buttons (no extra prompt text)
+      if (writeSteps.isEmpty) {
+        // nothing
       }
     } catch (e) {
-      _pushMsg(ChatMessage(role: 'assistant', content: '出错了：$e', kind: ChatKind.error));
+      _pushMsg(ChatMessage(role: 'assistant', content: e.toString(), kind: ChatKind.error));
       rethrow;
     }
-  }
-
-  String _summarizeLocally(String question, String evidence, String notes) {
-    // Lightweight local summary so chat feels complete even without second LLM call.
-    final lines = evidence.split('\n').where((l) => l.trim().isNotEmpty).take(12).join('\n');
-    final b = StringBuffer();
-    if (notes.isNotEmpty) {
-      b.writeln(notes);
-      b.writeln();
-    }
-    if (lines.isNotEmpty) {
-      b.writeln('根据刚才在机器上查到的结果：');
-      b.writeln(lines);
-    } else {
-      b.write('检查跑完了，但没有抓到有效输出。你可以再问细一点。');
-    }
-    return b.toString().trim();
   }
 
   Future<void> runAgentPlan(String goal) => agentChat(goal);
