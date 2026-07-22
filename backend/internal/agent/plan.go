@@ -8,7 +8,7 @@ import (
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/risk"
 )
 
-// Keep prompt tiny. UI is Minis-like: assistant text + tool cards user must run.
+// Legacy plan path: keep tiny; primary chat uses loopSystem + tools.
 const SystemPrompt = `JSON only: {"reply":"","commands":[{"title":"","command":"","side_effect":"read|write|destructive"}]}`
 
 type Step struct {
