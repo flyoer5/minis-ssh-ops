@@ -36,7 +36,7 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
   static const _fg = Color(0xFFE5E5EA);
   static const _green = Color(0xFF30D158);
   static const _muted = Color(0xFF8E8E93);
-  static const _key = Color(0xFF2C2C2E);
+  static const _keyBg = Color(0xFF2C2C2E);
 
   @override
   void initState() {
@@ -332,7 +332,7 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
         child: SizedBox(
           height: 38,
           child: Material(
-            color: on ? const Color(0xFF3A3A3C) : _key,
+            color: on ? const Color(0xFF3A3A3C) : _keyBg,
             borderRadius: BorderRadius.circular(8),
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
@@ -441,7 +441,7 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
                         child: SizedBox(
                           height: 38,
                           child: Material(
-                            color: _ctrl ? const Color(0xFF3A3A3C) : _key,
+                            color: _ctrl ? const Color(0xFF3A3A3C) : _keyBg,
                             borderRadius: BorderRadius.circular(8),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(8),
