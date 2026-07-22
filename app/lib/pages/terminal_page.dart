@@ -9,11 +9,10 @@ import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// Termux/JuiceSSH style terminal:
-/// - Full-screen scrollback (tap opens system keyboard)
-/// - No permanent text box
-/// - Extra key bar only
-/// - KeepAlive so tab switch does not drop session
+/// Termux/JuiceSSH style PTY terminal.
+/// - Tap screen: open system IME
+/// - IME hide button / back: system dismiss works (EditableText owns focus)
+/// - Extra key bar only; no permanent command box; no copy button
 class TerminalPage extends StatefulWidget {
   const TerminalPage({super.key});
 
@@ -22,10 +21,10 @@ class TerminalPage extends StatefulWidget {
 }
 
 class _TerminalPageState extends State<TerminalPage>
-    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin
-    implements TextInputClient {
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   final _scroll = ScrollController();
   final _focus = FocusNode();
+  final _input = TextEditingController();
   final _buf = StringBuffer();
   WebSocketChannel? _ch;
   StreamSubscription? _sub;
@@ -34,8 +33,7 @@ class _TerminalPageState extends State<TerminalPage>
   bool _connecting = false;
   bool _ctrl = false;
   String _status = '';
-  TextInputConnection? _conn;
-  TextEditingValue _value = TextEditingValue.empty;
+  String _prev = '';
 
   static const _bg = Color(0xFF000000);
   static const _fg = Color(0xFFE6EDF3);
@@ -47,46 +45,26 @@ class _TerminalPageState extends State<TerminalPage>
   @override
   bool get wantKeepAlive => true;
 
-  /// User intentionally opened IME via tap / keyboard icon.
-  /// When false, we must not re-show after system IME dismiss.
-  bool _imeWanted = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _input.addListener(_onChanged);
     _focus.addListener(() {
-      if (_focus.hasFocus) {
-        if (_imeWanted) {
-          _attachIme();
-        }
-      } else {
-        // System keyboard dismiss (back/swipe/IME hide) clears focus → close connection.
-        _imeWanted = false;
-        _detachIme();
-        if (mounted) setState(() {});
-      }
+      if (mounted) setState(() {});
     });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _detachIme();
+    _input.removeListener(_onChanged);
     _sub?.cancel();
     _ch?.sink.close();
     _scroll.dispose();
+    _input.dispose();
     _focus.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeMetrics() {
-    // Never re-show after user/system dismissed IME.
-    if (!_imeWanted) return;
-    if (_connected && _focus.hasFocus && (_conn?.attached ?? false)) {
-      _conn?.show();
-    }
   }
 
   @override
@@ -133,7 +111,6 @@ class _TerminalPageState extends State<TerminalPage>
       _status = '连接中…';
       _buf.clear();
     });
-
     final base = Uri.parse(state.api.baseUrl);
     final ws = Uri(
       scheme: base.scheme == 'https' ? 'wss' : 'ws',
@@ -147,7 +124,6 @@ class _TerminalPageState extends State<TerminalPage>
         'rows': '28',
       },
     );
-
     try {
       final ch = IOWebSocketChannel.connect(ws);
       _ch = ch;
@@ -163,7 +139,6 @@ class _TerminalPageState extends State<TerminalPage>
                   _connecting = false;
                   _status = '已连接 · 点屏幕输入';
                 });
-                // Do NOT auto-open IME; user taps to show, keyboard button toggles.
               } else if (t == 'error') {
                 _append('\n${m['data']}\n');
               } else if (t == 'exit') {
@@ -213,21 +188,47 @@ class _TerminalPageState extends State<TerminalPage>
     ch.sink.add(jsonEncode({'type': 'input', 'data': data}));
   }
 
-  bool get _imeOpen => _focus.hasFocus && (_conn?.attached ?? false);
+  /// Diff EditableText → PTY. System IME owns show/hide.
+  void _onChanged() {
+    if (!_connected) {
+      _prev = _input.text;
+      return;
+    }
+    final cur = _input.text;
+    final prev = _prev;
+    if (cur == prev) return;
+    if (cur.length > prev.length && cur.startsWith(prev)) {
+      _send(cur.substring(prev.length).replaceAll('\n', '\r'));
+    } else if (cur.length < prev.length && prev.startsWith(cur)) {
+      for (var i = 0; i < prev.length - cur.length; i++) {
+        _send('\x7f');
+      }
+    } else {
+      for (var i = 0; i < prev.length; i++) {
+        _send('\x7f');
+      }
+      if (cur.isNotEmpty) _send(cur.replaceAll('\n', '\r'));
+    }
+    if (cur.length > 64) {
+      _input.removeListener(_onChanged);
+      _input.clear();
+      _prev = '';
+      _input.addListener(_onChanged);
+    } else {
+      _prev = cur;
+    }
+  }
 
   void _openKb() {
-    if (!mounted) return;
-    _imeWanted = true;
+    if (!mounted || !_connected) return;
     FocusScope.of(context).requestFocus(_focus);
-    _attachIme();
+    // EditableText will show IME when focused; also nudge Android.
     SystemChannels.textInput.invokeMethod('TextInput.show');
     setState(() {});
   }
 
   void _closeKb() {
     if (!mounted) return;
-    _imeWanted = false;
-    _detachIme();
     _focus.unfocus();
     FocusManager.instance.primaryFocus?.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
@@ -235,124 +236,10 @@ class _TerminalPageState extends State<TerminalPage>
   }
 
   void _toggleKb() {
-    if (_imeWanted || _focus.hasFocus || _imeOpen) {
+    if (_focus.hasFocus) {
       _closeKb();
     } else {
       _openKb();
-    }
-  }
-
-  void _attachIme() {
-    if (_conn == null || !(_conn?.attached ?? false)) {
-      _conn = TextInput.attach(
-        this,
-        const TextInputConfiguration(
-          inputType: TextInputType.text,
-          obscureText: false,
-          autocorrect: false,
-          enableSuggestions: false,
-          inputAction: TextInputAction.newline,
-          keyboardAppearance: Brightness.dark,
-        ),
-      );
-    }
-    _conn?.setEditingState(_value);
-    _conn?.show();
-  }
-
-  void _detachIme() {
-    try {
-      _conn?.close();
-    } catch (_) {}
-    _conn = null;
-  }
-
-  @override
-  TextEditingValue get currentTextEditingValue => _value;
-
-  @override
-  AutofillScope? get currentAutofillScope => null;
-
-  @override
-  void updateEditingValue(TextEditingValue value) {
-    final old = _value.text;
-    final cur = value.text;
-    _value = value;
-    if (!_connected) return;
-    if (cur == old) return;
-    if (cur.length > old.length && cur.startsWith(old)) {
-      _send(cur.substring(old.length).replaceAll('\n', '\r'));
-    } else if (cur.length < old.length && old.startsWith(cur)) {
-      for (var i = 0; i < old.length - cur.length; i++) {
-        _send('\x7f');
-      }
-    } else {
-      for (var i = 0; i < old.length; i++) {
-        _send('\x7f');
-      }
-      if (cur.isNotEmpty) _send(cur.replaceAll('\n', '\r'));
-    }
-    if (cur.length > 80) {
-      _value = TextEditingValue.empty;
-      _conn?.setEditingState(_value);
-    }
-  }
-
-  @override
-  void performAction(TextInputAction action) {
-    if (action == TextInputAction.newline ||
-        action == TextInputAction.send ||
-        action == TextInputAction.done) {
-      _send('\r');
-      _value = TextEditingValue.empty;
-      _conn?.setEditingState(_value);
-    }
-  }
-
-  @override
-  void updateFloatingCursor(RawFloatingCursorPoint point) {}
-
-  @override
-  void showAutocorrectionPromptRect(int start, int end) {}
-
-  @override
-  void connectionClosed() {
-    // Fired when system IME closes itself (back gesture / hide keyboard).
-    _conn = null;
-    _imeWanted = false;
-    if (_focus.hasFocus) {
-      _focus.unfocus();
-    }
-    if (mounted) setState(() {});
-  }
-
-  @override
-  bool onFocusReceived() => false;
-
-  @override
-  void performSelector(String selectorName) {}
-
-
-  @override
-  void performPrivateCommand(String action, Map<String, dynamic> data) {}
-
-  @override
-  void insertTextPlaceholder(Size size) {}
-
-  @override
-  void removeTextPlaceholder() {}
-
-  @override
-  void showToolbar() {}
-
-  @override
-  void didChangeInputControl(TextInputControl? oldControl, TextInputControl? newControl) {}
-
-  @override
-  void insertContent(KeyboardInsertedContent content) {
-    final d = content.data;
-    if (d != null && d.isNotEmpty) {
-      _send(String.fromCharCodes(d));
     }
   }
 
@@ -391,7 +278,7 @@ class _TerminalPageState extends State<TerminalPage>
       case '→':
         _send('\x1b[C');
         break;
-      case '-':
+      case '—':
         _send('-');
         break;
       case '/':
@@ -410,7 +297,6 @@ class _TerminalPageState extends State<TerminalPage>
         _send('\r');
         break;
     }
-    // Keep keyboard as-is; don't force re-open after user hid it.
   }
 
   Widget _k(String label, {bool on = false}) {
@@ -456,7 +342,12 @@ class _TerminalPageState extends State<TerminalPage>
               child: ListTile(
                 dense: true,
                 leading: Icon(Icons.circle, size: 10, color: _connected ? _green : Colors.redAccent),
-                title: Text(state.hostLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                title: Text(
+                  state.hostLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13),
+                ),
                 subtitle: Text(_status, style: const TextStyle(fontSize: 11, color: _muted)),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -469,36 +360,72 @@ class _TerminalPageState extends State<TerminalPage>
                       ),
                       onPressed: _toggleKb,
                     ),
-                    IconButton(icon: const Icon(Icons.refresh, size: 20), onPressed: () => _connect(state)),
                     IconButton(
-                      icon: const Icon(Icons.copy_all, size: 18),
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: _buf.toString()));
-                      },
+                      icon: const Icon(Icons.refresh, size: 20),
+                      onPressed: () => _connect(state),
                     ),
                   ],
                 ),
               ),
             ),
             Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _openKb,
-                child: Container(
-                  width: double.infinity,
-                  color: _bg,
-                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-                  child: SingleChildScrollView(
-                    controller: _scroll,
-                    child: SelectableText(
-                      _buf.isEmpty ? (_connecting ? 'connecting…\n' : 'tap screen for keyboard\n') : _buf.toString(),
-                      style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 13, height: 1.28),
+              child: Stack(
+                children: [
+                  // Terminal surface: tap opens IME
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _openKb,
+                      child: Container(
+                        color: _bg,
+                        padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+                        child: SingleChildScrollView(
+                          controller: _scroll,
+                          child: Text(
+                            _buf.isEmpty
+                                ? (_connecting ? 'connecting…\n' : 'tap to type\n')
+                                : _buf.toString(),
+                            style: const TextStyle(
+                              color: _fg,
+                              fontFamily: 'monospace',
+                              fontSize: 13,
+                              height: 1.28,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  // Off-screen EditableText owns IME so system hide works.
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 1,
+                    child: Opacity(
+                      opacity: 0.01,
+                      child: EditableText(
+                        controller: _input,
+                        focusNode: _focus,
+                        style: const TextStyle(color: Colors.transparent, fontSize: 1),
+                        cursorColor: Colors.transparent,
+                        backgroundCursorColor: Colors.transparent,
+                        keyboardType: TextInputType.text,
+                        textInputAction: TextInputAction.newline,
+                        autofocus: false,
+                        enableSuggestions: false,
+                        autocorrect: false,
+                        onSubmitted: (_) {
+                          _send('\r');
+                          _input.clear();
+                          _prev = '';
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            SizedBox(width: 1, height: 1, child: Focus(focusNode: _focus, child: const SizedBox.shrink())),
             Container(
               color: _bar,
               padding: EdgeInsets.only(
@@ -516,7 +443,7 @@ class _TerminalPageState extends State<TerminalPage>
                     _k('C'),
                     _k('D'),
                     _k('L'),
-                    _k('-'),
+                    _k('—'),
                     _k('/'),
                     _k('|'),
                   ]),
