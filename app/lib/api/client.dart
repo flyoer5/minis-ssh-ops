@@ -23,12 +23,7 @@ class ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
-  /// Lightweight LLM connectivity check via a tiny agent/chat or models probe.
-  /// Uses existing configured backend LLM — not a separate proxy path.
   Future<String> pingLlm() async {
-    // Prefer OpenAI-compatible models list through backend by piggybacking agent path fails;
-    // simplest: call health features then a 1-token chat via agent plan with empty host not ok.
-    // Use settings get as connectivity to backend; actual LLM ping via agentChat requires host.
     final h = await health();
     if (h['ok'] != true) throw ApiException(500, 'backend not ok');
     return 'backend ok · features=${h['features']}';
@@ -106,20 +101,21 @@ class ApiClient {
     required String goal,
     String? sessionId,
   }) async {
-    final r = await http.post(
-      _u('/v1/agent/plan'),
-      headers: _headers,
-      body: jsonEncode({
-        'hostId': hostId,
-        'goal': goal,
-        if (sessionId != null) 'sessionId': sessionId,
-      }),
-    ).timeout(const Duration(seconds: 120));
+    final r = await http
+        .post(
+          _u('/v1/agent/plan'),
+          headers: _headers,
+          body: jsonEncode({
+            'hostId': hostId,
+            'goal': goal,
+            if (sessionId != null) 'sessionId': sessionId,
+          }),
+        )
+        .timeout(const Duration(seconds: 120));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
-  /// OpenClaw-style multi-turn tool loop.
   Future<Map<String, dynamic>> agentChat({
     required String hostId,
     required String message,
@@ -173,6 +169,68 @@ class ApiClient {
     return (m['entries'] as List<dynamic>? ?? []);
   }
 
+  Future<Map<String, dynamic>> fsList(String hostId, String path) async {
+    final r = await http
+        .post(
+          _u('/v1/hosts/$hostId/fs/list'),
+          headers: _headers,
+          body: jsonEncode({'path': path}),
+        )
+        .timeout(const Duration(seconds: 30));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> fsRead(String hostId, String path) async {
+    final r = await http
+        .post(
+          _u('/v1/hosts/$hostId/fs/read'),
+          headers: _headers,
+          body: jsonEncode({'path': path}),
+        )
+        .timeout(const Duration(seconds: 60));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> fsWrite(
+    String hostId,
+    String path,
+    String content, {
+    bool confirmed = false,
+  }) async {
+    final r = await http
+        .post(
+          _u('/v1/hosts/$hostId/fs/write'),
+          headers: _headers,
+          body: jsonEncode({
+            'path': path,
+            'content': content,
+            'confirmed': confirmed,
+          }),
+        )
+        .timeout(const Duration(seconds: 60));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> listKnownHosts() async {
+    final r = await http.get(_u('/v1/known-hosts'), headers: _headers).timeout(const Duration(seconds: 10));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<void> deleteKnownHost(String host, int port) async {
+    final r = await http
+        .delete(
+          _u('/v1/known-hosts'),
+          headers: _headers,
+          body: jsonEncode({'host': host, 'port': port}),
+        )
+        .timeout(const Duration(seconds: 10));
+    _ensureOk(r);
+  }
+
   void _ensureOk(http.Response r) {
     if (r.statusCode >= 200 && r.statusCode < 300) return;
     String msg = r.body;
@@ -192,33 +250,4 @@ class ApiException implements Exception {
   ApiException(this.status, this.message, {this.body});
   @override
   String toString() => 'ApiException($status): $message';
-
-  Future<Map<String, dynamic>> fsList(String hostId, String path) async {
-    final r = await http.post(_u('/v1/hosts/$hostId/fs/list'), headers: _headers, body: jsonEncode({'path': path})).timeout(const Duration(seconds: 30));
-    _ensureOk(r);
-    return jsonDecode(r.body) as Map<String, dynamic>;
-  }
-
-  Future<Map<String, dynamic>> fsRead(String hostId, String path) async {
-    final r = await http.post(_u('/v1/hosts/$hostId/fs/read'), headers: _headers, body: jsonEncode({'path': path})).timeout(const Duration(seconds: 60));
-    _ensureOk(r);
-    return jsonDecode(r.body) as Map<String, dynamic>;
-  }
-
-  Future<Map<String, dynamic>> fsWrite(String hostId, String path, String content, {bool confirmed = false}) async {
-    final r = await http.post(_u('/v1/hosts/$hostId/fs/write'), headers: _headers, body: jsonEncode({'path': path, 'content': content, 'confirmed': confirmed})).timeout(const Duration(seconds: 60));
-    _ensureOk(r);
-    return jsonDecode(r.body) as Map<String, dynamic>;
-  }
-
-  Future<Map<String, dynamic>> listKnownHosts() async {
-    final r = await http.get(_u('/v1/known-hosts'), headers: _headers).timeout(const Duration(seconds: 10));
-    _ensureOk(r);
-    return jsonDecode(r.body) as Map<String, dynamic>;
-  }
-
-  Future<void> deleteKnownHost(String host, int port) async {
-    final r = await http.delete(_u('/v1/known-hosts'), headers: _headers, body: jsonEncode({'host': host, 'port': port})).timeout(const Duration(seconds: 10));
-    _ensureOk(r);
-  }
 }
