@@ -73,7 +73,10 @@ class _TerminalPageState extends State<TerminalPage>
 
   @override
   void didChangeMetrics() {
-    if (_connected && _focus.hasFocus) _attachIme();
+    // Keep IME only if user still wants focus; never re-open after hide.
+    if (_connected && _focus.hasFocus && (_conn?.attached ?? false)) {
+      _conn?.show();
+    }
   }
 
   @override
@@ -150,7 +153,7 @@ class _TerminalPageState extends State<TerminalPage>
                   _connecting = false;
                   _status = '已连接 · 点屏幕输入';
                 });
-                _openKb();
+                // Do NOT auto-open IME; user taps to show, keyboard button toggles.
               } else if (t == 'error') {
                 _append('\n${m['data']}\n');
               } else if (t == 'exit') {
@@ -200,10 +203,30 @@ class _TerminalPageState extends State<TerminalPage>
     ch.sink.add(jsonEncode({'type': 'input', 'data': data}));
   }
 
+  bool get _imeOpen => _focus.hasFocus && (_conn?.attached ?? false);
+
   void _openKb() {
     if (!mounted) return;
     FocusScope.of(context).requestFocus(_focus);
     _attachIme();
+    SystemChannels.textInput.invokeMethod('TextInput.show');
+  }
+
+  void _closeKb() {
+    if (!mounted) return;
+    _detachIme();
+    _focus.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
+    setState(() {});
+  }
+
+  void _toggleKb() {
+    if (_imeOpen || _focus.hasFocus) {
+      _closeKb();
+    } else {
+      _openKb();
+    }
   }
 
   void _attachIme() {
@@ -225,7 +248,9 @@ class _TerminalPageState extends State<TerminalPage>
   }
 
   void _detachIme() {
-    _conn?.close();
+    try {
+      _conn?.close();
+    } catch (_) {}
     _conn = null;
   }
 
@@ -366,7 +391,7 @@ class _TerminalPageState extends State<TerminalPage>
         _send('\r');
         break;
     }
-    _openKb();
+    // Keep keyboard as-is; don't force re-open after user hid it.
   }
 
   Widget _k(String label, {bool on = false}) {
@@ -417,7 +442,14 @@ class _TerminalPageState extends State<TerminalPage>
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(icon: const Icon(Icons.keyboard, size: 20), onPressed: _openKb),
+                    IconButton(
+                      tooltip: _focus.hasFocus ? '收起键盘' : '打开键盘',
+                      icon: Icon(
+                        _focus.hasFocus ? Icons.keyboard_hide : Icons.keyboard,
+                        size: 20,
+                      ),
+                      onPressed: _toggleKb,
+                    ),
                     IconButton(icon: const Icon(Icons.refresh, size: 20), onPressed: () => _connect(state)),
                     IconButton(
                       icon: const Icon(Icons.copy_all, size: 18),
