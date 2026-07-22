@@ -281,7 +281,7 @@ class AppState extends ChangeNotifier {
           final label = command.isNotEmpty ? (r'$ ' + command) : name;
           _pushMsg(ChatMessage(role: 'tool', content: label, kind: ChatKind.status, meta: {'name': name, 'command': command}));
         } else if (type == 'tool_result') {
-          final head = command.isNotEmpty ? (r'$ ' + command + '\n') : (name.isNotEmpty ? '$name\n' : '');
+          final head = command.isNotEmpty ? (r'$ ' + command + '\n') : (name.isNotEmpty ? (name + '\n') : '');
           _pushMsg(ChatMessage(role: 'tool', content: head + content, kind: ChatKind.stepResult, meta: {'name': name, 'command': command}));
         } else if (type == 'final' && content.isNotEmpty) {
           _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.text));
