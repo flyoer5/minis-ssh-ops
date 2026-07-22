@@ -376,6 +376,17 @@ class _TerminalPageState extends State<TerminalPage>
                       onPressed: _toggleKb,
                     ),
                     IconButton(
+                      tooltip: '粘贴',
+                      icon: const Icon(Icons.content_paste, size: 18),
+                      onPressed: () async {
+                        final data = await Clipboard.getData(Clipboard.kTextPlain);
+                        final text = data?.text;
+                        if (text == null || text.isEmpty) return;
+                        _send(text.replaceAll('\n', '\r'));
+                        _openKb();
+                      },
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.refresh, size: 20),
                       onPressed: () => _connect(state),
                     ),

@@ -235,6 +235,63 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             },
             child: const Text('查看后端日志'),
           ),
+          const SizedBox(height: 8),
+          FilledButton.tonal(
+            onPressed: !state.backendOk
+                ? null
+                : () async {
+                    try {
+                      final r = await state.api.listKnownHosts();
+                      final entries = (r['entries'] as List?) ?? [];
+                      if (!context.mounted) return;
+                      await showDialog(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          title: const Text('已知主机密钥 (TOFU)'),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            height: 320,
+                            child: entries.isEmpty
+                                ? const Center(child: Text('暂无记录'))
+                                : ListView.builder(
+                                    itemCount: entries.length,
+                                    itemBuilder: (_, i) {
+                                      final e = entries[i] as Map;
+                                      final host = e['host']?.toString() ?? '';
+                                      final port = e['port'] is int
+                                          ? e['port'] as int
+                                          : int.tryParse('${e['port']}') ?? 22;
+                                      final fp = e['fingerprint']?.toString() ?? '';
+                                      return ListTile(
+                                        dense: true,
+                                        title: Text('$host:$port',
+                                            style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                                        subtitle: Text(fp,
+                                            maxLines: 2,
+                                            style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
+                                        trailing: IconButton(
+                                          icon: const Icon(Icons.delete_outline, size: 18),
+                                          onPressed: () async {
+                                            await state.api.deleteKnownHost(host, port);
+                                            if (c.mounted) Navigator.pop(c);
+                                            _toast('已删除，下次连接将重新信任');
+                                          },
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
+                          ],
+                        ),
+                      );
+                    } catch (e) {
+                      _toast('$e');
+                    }
+                  },
+            child: const Text('管理 HostKey'),
+          ),
         ],
       ),
     );
