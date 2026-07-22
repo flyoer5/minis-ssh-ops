@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1
+
+- 自查修复：HTTP 超时补齐；known-hosts 删除改 query；文件默认家目录；HOSTKEY 友好提示；health version 对齐
+- 设置页版本说明
+
 ## 1.1.0
 
 - **固定签名**：debug/release 共用 `android/keystore/sshai-upload.jks`，支持 `pm install -r` 升级不丢数据

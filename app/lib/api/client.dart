@@ -30,7 +30,7 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> getLlm() async {
-    final r = await http.get(_u('/v1/settings/llm'), headers: _headers);
+    final r = await http.get(_u('/v1/settings/llm'), headers: _headers).timeout(const Duration(seconds: 10));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -40,13 +40,13 @@ class ApiClient {
       _u('/v1/settings/llm'),
       headers: _headers,
       body: jsonEncode(body),
-    );
+    ).timeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
   Future<List<dynamic>> listHosts() async {
-    final r = await http.get(_u('/v1/hosts'), headers: _headers);
+    final r = await http.get(_u('/v1/hosts'), headers: _headers).timeout(const Duration(seconds: 10));
     _ensureOk(r);
     final m = jsonDecode(r.body) as Map<String, dynamic>;
     return (m['hosts'] as List<dynamic>? ?? []);
@@ -57,7 +57,7 @@ class ApiClient {
       _u('/v1/hosts'),
       headers: _headers,
       body: jsonEncode(body),
-    );
+    ).timeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -81,7 +81,7 @@ class ApiClient {
         'confirmed': confirmed,
         'sessionId': sessionId,
       }),
-    );
+    ).timeout(const Duration(seconds: 60));
     if (r.statusCode == 409) {
       final m = jsonDecode(r.body) as Map<String, dynamic>;
       throw ApiException(409, m['error']?.toString() ?? 'confirmation required', body: m);
@@ -91,7 +91,7 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> probe(String id) async {
-    final r = await http.post(_u('/v1/hosts/$id/probe'), headers: _headers, body: '{}');
+    final r = await http.post(_u('/v1/hosts/$id/probe'), headers: _headers, body: '{}').timeout(const Duration(seconds: 45));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -163,7 +163,7 @@ class ApiClient {
   }
 
   Future<List<dynamic>> listAudit() async {
-    final r = await http.get(_u('/v1/audit'), headers: _headers);
+    final r = await http.get(_u('/v1/audit'), headers: _headers).timeout(const Duration(seconds: 15));
     _ensureOk(r);
     final m = jsonDecode(r.body) as Map<String, dynamic>;
     return (m['entries'] as List<dynamic>? ?? []);
@@ -221,13 +221,11 @@ class ApiClient {
   }
 
   Future<void> deleteKnownHost(String host, int port) async {
-    final r = await http
-        .delete(
-          _u('/v1/known-hosts'),
-          headers: _headers,
-          body: jsonEncode({'host': host, 'port': port}),
-        )
-        .timeout(const Duration(seconds: 10));
+    final uri = Uri.parse('$baseUrl/v1/known-hosts').replace(queryParameters: {
+      'host': host,
+      'port': '$port',
+    });
+    final r = await http.delete(uri, headers: _headers).timeout(const Duration(seconds: 10));
     _ensureOk(r);
   }
 

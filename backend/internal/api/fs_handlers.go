@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/sshx"
@@ -106,11 +107,26 @@ func (s *Server) handleListKnownHosts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeleteKnownHost(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Host string `json:"host"`
-		Port int    `json:"port"`
+	// Prefer query params (DELETE body is unreliable on some clients).
+	host := r.URL.Query().Get("host")
+	port := 22
+	if p := r.URL.Query().Get("port"); p != "" {
+		if n, err := strconv.Atoi(p); err == nil && n > 0 {
+			port = n
+		}
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Host == "" {
+	if host == "" {
+		var body struct {
+			Host string `json:"host"`
+			Port int    `json:"port"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		host = body.Host
+		if body.Port > 0 {
+			port = body.Port
+		}
+	}
+	if host == "" {
 		writeErr(w, http.StatusBadRequest, "host required")
 		return
 	}
@@ -118,7 +134,7 @@ func (s *Server) handleDeleteKnownHost(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
-	if err := s.HostKeys.Delete(body.Host, body.Port); err != nil {
+	if err := s.HostKeys.Delete(host, port); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}

@@ -10,7 +10,7 @@ class FilesPage extends StatefulWidget {
 }
 
 class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixin {
-  String path = '/root';
+  String path = ''; // server Getwd when empty
   List<dynamic> entries = [];
   bool loading = false;
   String? err;
@@ -109,7 +109,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
             color: const Color(0xFF161B22),
             child: ListTile(
               dense: true,
-              title: Text(path, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+              title: Text(path.isEmpty ? '~' : path, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
               subtitle: Text(state.hostLabel, style: const TextStyle(fontSize: 11)),
             ),
           ),

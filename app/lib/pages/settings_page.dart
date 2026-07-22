@@ -69,6 +69,10 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Text('SSH AI Agent 1.1.1', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          const Text('个人向 · arm64 · 固定签名可覆盖升级', style: TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
+          const Divider(height: 28),
           Text('后端', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
           Text(
