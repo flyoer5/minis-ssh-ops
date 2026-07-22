@@ -23,7 +23,7 @@ class SshAiAgentApp extends StatelessWidget {
       child: MaterialApp(
         title: 'SSH AI Agent',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal, brightness: Brightness.dark),
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2F81F7), brightness: Brightness.dark),
           useMaterial3: true,
           scaffoldBackgroundColor: const Color(0xFF0D1117),
         ),
@@ -43,7 +43,8 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int index = 0;
 
-  static const pages = [
+  // Keep State alive across tab switches (terminal session, chat, probes).
+  final _pages = const <Widget>[
     HostsPage(),
     AgentPage(),
     TerminalPage(),
@@ -61,14 +62,12 @@ class _HomeShellState extends State<HomeShell> {
             MaterialBanner(
               content: Text(
                 state.startingBackend
-                    ? (state.backendNote ?? '正在启动本机后端…')
+                    ? (state.backendNote ?? '启动后端…')
                     : (state.backendError ?? '后端未连接'),
-                maxLines: 3,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              leading: Icon(
-                state.startingBackend ? Icons.hourglass_top : Icons.warning_amber,
-              ),
+              leading: Icon(state.startingBackend ? Icons.hourglass_top : Icons.warning_amber),
               actions: [
                 TextButton(
                   onPressed: state.startingBackend ? null : () => state.bootstrap(),
@@ -76,7 +75,12 @@ class _HomeShellState extends State<HomeShell> {
                 ),
               ],
             ),
-          Expanded(child: pages[index]),
+          Expanded(
+            child: IndexedStack(
+              index: index,
+              children: _pages,
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -84,7 +88,7 @@ class _HomeShellState extends State<HomeShell> {
         onDestinationSelected: (i) => setState(() => index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dns_outlined), label: '主机'),
-          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: '对话'),
+          NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: 'Agent'),
           NavigationDestination(icon: Icon(Icons.terminal), label: '终端'),
           NavigationDestination(icon: Icon(Icons.history), label: '记录'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), label: '设置'),

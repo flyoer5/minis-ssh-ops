@@ -12,7 +12,10 @@ class AgentPage extends StatefulWidget {
   State<AgentPage> createState() => _AgentPageState();
 }
 
-class _AgentPageState extends State<AgentPage> {
+class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final _input = TextEditingController();
   final _scroll = ScrollController();
   final _focus = FocusNode();
@@ -81,6 +84,7 @@ class _AgentPageState extends State<AgentPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final state = context.watch<AppState>();
     final cs = Theme.of(context).colorScheme;
 

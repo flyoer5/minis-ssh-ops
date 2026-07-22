@@ -9,7 +9,11 @@ import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// PTY terminal: system soft keyboard via TextField (JuiceSSH-style) + compact extra bar.
+/// Termux/JuiceSSH style terminal:
+/// - Full-screen scrollback (tap opens system keyboard)
+/// - No permanent text box
+/// - Extra key bar only
+/// - KeepAlive so tab switch does not drop session
 class TerminalPage extends StatefulWidget {
   const TerminalPage({super.key});
 
@@ -17,9 +21,10 @@ class TerminalPage extends StatefulWidget {
   State<TerminalPage> createState() => _TerminalPageState();
 }
 
-class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver {
+class _TerminalPageState extends State<TerminalPage>
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin
+    implements TextInputClient {
   final _scroll = ScrollController();
-  final _input = TextEditingController();
   final _focus = FocusNode();
   final _buf = StringBuffer();
   WebSocketChannel? _ch;
@@ -27,42 +32,48 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
   String? _hostId;
   bool _connected = false;
   bool _connecting = false;
-  String _status = '';
   bool _ctrl = false;
-  String _prevInput = '';
+  String _status = '';
+  TextInputConnection? _conn;
+  TextEditingValue _value = TextEditingValue.empty;
 
   static const _bg = Color(0xFF000000);
-  static const _panel = Color(0xFF1C1C1E);
-  static const _fg = Color(0xFFE5E5EA);
-  static const _green = Color(0xFF30D158);
-  static const _muted = Color(0xFF8E8E93);
-  static const _keyBg = Color(0xFF2C2C2E);
+  static const _fg = Color(0xFFE6EDF3);
+  static const _green = Color(0xFF3FB950);
+  static const _muted = Color(0xFF8B949E);
+  static const _keyBg = Color(0xFF21262D);
+  static const _bar = Color(0xFF0D1117);
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _input.addListener(_onInputChanged);
+    _focus.addListener(() {
+      if (_focus.hasFocus) {
+        _attachIme();
+      } else {
+        _detachIme();
+      }
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _input.removeListener(_onInputChanged);
+    _detachIme();
     _sub?.cancel();
     _ch?.sink.close();
     _scroll.dispose();
-    _input.dispose();
     _focus.dispose();
     super.dispose();
   }
 
   @override
   void didChangeMetrics() {
-    // keep focus when keyboard opens/closes
-    if (_connected && mounted) {
-      _focus.requestFocus();
-    }
+    if (_connected && _focus.hasFocus) _attachIme();
   }
 
   @override
@@ -100,111 +111,87 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
         .replaceAll('\r', '');
   }
 
-  Future<void> _connect(AppState state) async {
-    final hostId = state.selectedHostId;
-    if (hostId == null) return;
-    await _teardown();
+  void _connect(AppState state) {
+    _sub?.cancel();
+    _ch?.sink.close();
     setState(() {
       _connecting = true;
       _connected = false;
-      _status = '连接中';
+      _status = '连接中…';
       _buf.clear();
-      _prevInput = '';
-      _input.clear();
     });
 
-    final uri = Uri.parse(state.api.baseUrl);
-    final wsUri = Uri(
-      scheme: uri.scheme == 'https' ? 'wss' : 'ws',
-      host: uri.host.isEmpty ? '127.0.0.1' : uri.host,
-      port: uri.hasPort ? uri.port : 17890,
+    final base = Uri.parse(state.api.baseUrl);
+    final ws = Uri(
+      scheme: base.scheme == 'https' ? 'wss' : 'ws',
+      host: base.host.isEmpty ? '127.0.0.1' : base.host,
+      port: base.hasPort ? base.port : 17890,
       path: '/v1/pty',
       queryParameters: {
         'token': state.api.localToken,
-        'hostId': hostId,
-        'cols': '100',
+        'hostId': state.selectedHostId!,
+        'cols': '80',
         'rows': '28',
       },
     );
 
     try {
-      final ch = IOWebSocketChannel.connect(wsUri);
+      final ch = IOWebSocketChannel.connect(ws);
       _ch = ch;
       _sub = ch.stream.listen(
-        (event) {
-          if (event is String) {
+        (data) {
+          if (data is String) {
             try {
-              final msg = jsonDecode(event) as Map<String, dynamic>;
-              final type = msg['type']?.toString();
-              if (type == 'ready') {
+              final m = jsonDecode(data) as Map<String, dynamic>;
+              final t = m['type']?.toString();
+              if (t == 'ready') {
                 setState(() {
                   _connected = true;
                   _connecting = false;
-                  _status = '已连接';
+                  _status = '已连接 · 点屏幕输入';
                 });
-                _openKeyboard();
-              } else if (type == 'error') {
-                _append('\n${msg['data']}\n');
-              } else if (type == 'exit') {
+                _openKb();
+              } else if (t == 'error') {
+                _append('\n${m['data']}\n');
+              } else if (t == 'exit') {
                 setState(() {
                   _connected = false;
-                  _status = '断开';
+                  _status = '已断开';
                 });
+                _append('\n[closed]\n');
               }
             } catch (_) {
-              _append(_stripAnsi(event));
+              _append(_stripAnsi(data));
             }
-          } else if (event is List<int>) {
-            _append(_stripAnsi(utf8.decode(event, allowMalformed: true)));
-          } else if (event is Uint8List) {
-            _append(_stripAnsi(utf8.decode(event, allowMalformed: true)));
-          } else if (event is ByteBuffer) {
-            _append(_stripAnsi(utf8.decode(event.asUint8List(), allowMalformed: true)));
+          } else if (data is List<int>) {
+            _append(_stripAnsi(utf8.decode(data, allowMalformed: true)));
+          } else if (data is ByteBuffer) {
+            _append(_stripAnsi(utf8.decode(data.asUint8List(), allowMalformed: true)));
           }
         },
-        onError: (_) {
+        onError: (e) {
           setState(() {
             _connected = false;
             _connecting = false;
             _status = '错误';
           });
+          _append('\n$e\n');
         },
         onDone: () {
-          if (!mounted) return;
           setState(() {
             _connected = false;
             _connecting = false;
-            _status = '断开';
+            _status = '已断开';
           });
         },
       );
-      Future.delayed(const Duration(milliseconds: 400), () {
-        if (mounted && _connecting) {
-          setState(() {
-            _connecting = false;
-            _connected = true;
-            _status = '已连接';
-          });
-          _openKeyboard();
-        }
-      });
     } catch (e) {
       setState(() {
         _connecting = false;
-        _connected = false;
-        _status = '失败';
+        _status = '连接失败';
       });
       _append('$e\n');
     }
-  }
-
-  Future<void> _teardown() async {
-    await _sub?.cancel();
-    _sub = null;
-    try {
-      await _ch?.sink.close();
-    } catch (_) {}
-    _ch = null;
   }
 
   void _send(String data) {
@@ -213,56 +200,133 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
     ch.sink.add(jsonEncode({'type': 'input', 'data': data}));
   }
 
-  void _openKeyboard() {
+  void _openKb() {
     if (!mounted) return;
-    _focus.requestFocus();
-    // Force soft keyboard on Android
-    SystemChannels.textInput.invokeMethod('TextInput.show');
+    FocusScope.of(context).requestFocus(_focus);
+    _attachIme();
   }
 
-  /// Line-buffered soft keyboard input (reliable on Android IME).
-  /// Characters stay in the field until Enter; then whole line + CR is sent.
-  void _onInputChanged() {
-    // no-op for live diff; Enter handled in onSubmitted
-    _prevInput = _input.text;
+  void _attachIme() {
+    if (_conn == null || !(_conn?.attached ?? false)) {
+      _conn = TextInput.attach(
+        this,
+        const TextInputConfiguration(
+          inputType: TextInputType.text,
+          obscureText: false,
+          autocorrect: false,
+          enableSuggestions: false,
+          inputAction: TextInputAction.newline,
+          keyboardAppearance: Brightness.dark,
+        ),
+      );
+    }
+    _conn?.setEditingState(_value);
+    _conn?.show();
   }
 
-  void _submitLine() {
+  void _detachIme() {
+    _conn?.close();
+    _conn = null;
+  }
+
+  @override
+  TextEditingValue get currentTextEditingValue => _value;
+
+  @override
+  AutofillScope? get currentAutofillScope => null;
+
+  @override
+  void updateEditingValue(TextEditingValue value) {
+    final old = _value.text;
+    final cur = value.text;
+    _value = value;
     if (!_connected) return;
-    final line = _input.text;
-    _send(line.replaceAll('\n', '') + '\r');
-    _input.clear();
-    _prevInput = '';
-    _openKeyboard();
+    if (cur == old) return;
+    if (cur.length > old.length && cur.startsWith(old)) {
+      _send(cur.substring(old.length).replaceAll('\n', '\r'));
+    } else if (cur.length < old.length && old.startsWith(cur)) {
+      for (var i = 0; i < old.length - cur.length; i++) {
+        _send('\x7f');
+      }
+    } else {
+      for (var i = 0; i < old.length; i++) {
+        _send('\x7f');
+      }
+      if (cur.isNotEmpty) _send(cur.replaceAll('\n', '\r'));
+    }
+    if (cur.length > 80) {
+      _value = TextEditingValue.empty;
+      _conn?.setEditingState(_value);
+    }
+  }
+
+  @override
+  void performAction(TextInputAction action) {
+    if (action == TextInputAction.newline ||
+        action == TextInputAction.send ||
+        action == TextInputAction.done) {
+      _send('\r');
+      _value = TextEditingValue.empty;
+      _conn?.setEditingState(_value);
+    }
+  }
+
+  @override
+  void updateFloatingCursor(RawFloatingCursorPoint point) {}
+
+  @override
+  void showAutocorrectionPromptRect(int start, int end) {}
+
+  @override
+  void connectionClosed() {
+    _conn = null;
+  }
+
+  @override
+  void performPrivateCommand(String action, Map<String, dynamic> data) {}
+
+  @override
+  void insertTextPlaceholder(Size size) {}
+
+  @override
+  void removeTextPlaceholder() {}
+
+  @override
+  void showToolbar() {}
+
+  @override
+  void didChangeInputControl(TextInputControl? oldControl, TextInputControl? newControl) {}
+
+  @override
+  void insertContent(KeyboardInsertedContent content) {
+    final d = content.data;
+    if (d != null && d.isNotEmpty) {
+      _send(String.fromCharCodes(d));
+    }
   }
 
   void _extra(String name) {
-    if (!_connected) return;
     switch (name) {
-      case 'TAB':
-        _send('\t');
-        break;
       case 'ESC':
         _send('\x1b');
         break;
+      case 'TAB':
+        _send('\t');
+        break;
       case 'CTRL':
         setState(() => _ctrl = !_ctrl);
+        return;
+      case 'C':
+        _send(_ctrl ? '\x03' : 'c');
+        if (_ctrl) setState(() => _ctrl = false);
         break;
-      case 'Ctrl-C':
-        _send('\x03');
-        setState(() => _ctrl = false);
+      case 'D':
+        _send(_ctrl ? '\x04' : 'd');
+        if (_ctrl) setState(() => _ctrl = false);
         break;
-      case 'Ctrl-D':
-        _send('\x04');
-        setState(() => _ctrl = false);
-        break;
-      case 'Ctrl-L':
-        _send('\x0c');
-        setState(() => _ctrl = false);
-        break;
-      case 'Ctrl-Z':
-        _send('\x1a');
-        setState(() => _ctrl = false);
+      case 'L':
+        _send(_ctrl ? '\x0c' : 'l');
+        if (_ctrl) setState(() => _ctrl = false);
         break;
       case '↑':
         _send('\x1b[A');
@@ -276,50 +340,44 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
       case '→':
         _send('\x1b[C');
         break;
-      case 'Home':
-        _send('\x1b[H');
+      case '-':
+        _send('-');
         break;
-      case 'End':
-        _send('\x1b[F');
+      case '/':
+        _send('/');
         break;
-      case '⌫':
+      case '|':
+        _send('|');
+        break;
+      case '~':
+        _send('~');
+        break;
+      case 'BS':
         _send('\x7f');
         break;
-      case '↵':
+      case 'ENT':
         _send('\r');
         break;
-      default:
-        if (_ctrl && name.length == 1) {
-          final c = name.toUpperCase().codeUnitAt(0);
-          if (c >= 65 && c <= 90) {
-            _send(String.fromCharCode(c - 64));
-            setState(() => _ctrl = false);
-          }
-        }
     }
-    _openKeyboard();
+    _openKb();
   }
 
-  Widget _key(String label, {bool on = false}) {
+  Widget _k(String label, {bool on = false}) {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.all(2.5),
+        padding: const EdgeInsets.all(2),
         child: SizedBox(
-          height: 38,
+          height: 36,
           child: Material(
-            color: on ? const Color(0xFF3A3A3C) : _keyBg,
-            borderRadius: BorderRadius.circular(8),
+            color: on ? const Color(0xFF30363D) : _keyBg,
+            borderRadius: BorderRadius.circular(6),
             child: InkWell(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
               onTap: () => _extra(label),
               child: Center(
                 child: Text(
                   label,
-                  style: TextStyle(
-                    color: on ? _green : _fg,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(color: on ? _green : _fg, fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -331,62 +389,43 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final state = context.watch<AppState>();
-    final ready = state.backendOk && state.selectedHostId != null;
+    if (state.selectedHostId == null) {
+      return const Scaffold(body: Center(child: Text('先选主机')));
+    }
 
     return Scaffold(
       backgroundColor: _bg,
-      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              height: 42,
-              color: _panel,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(
-                children: [
-                  Icon(Icons.circle, size: 9, color: _connected ? _green : (_connecting ? Colors.amber : Colors.redAccent)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      state.selectedHostId == null ? '终端' : state.hostLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: _fg, fontSize: 13, fontWeight: FontWeight.w600),
+            Material(
+              color: _bar,
+              child: ListTile(
+                dense: true,
+                leading: Icon(Icons.circle, size: 10, color: _connected ? _green : Colors.redAccent),
+                title: Text(state.hostLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                subtitle: Text(_status, style: const TextStyle(fontSize: 11, color: _muted)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(icon: const Icon(Icons.keyboard, size: 20), onPressed: _openKb),
+                    IconButton(icon: const Icon(Icons.refresh, size: 20), onPressed: () => _connect(state)),
+                    IconButton(
+                      icon: const Icon(Icons.copy_all, size: 18),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: _buf.toString()));
+                      },
                     ),
-                  ),
-                  Text(_status, style: const TextStyle(color: _muted, fontSize: 11)),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: ready ? () => _connect(state) : null,
-                    icon: const Icon(Icons.refresh, color: _muted, size: 18),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () {
-                      setState(() => _buf.clear());
-                      _openKeyboard();
-                    },
-                    icon: const Icon(Icons.cleaning_services_outlined, color: _muted, size: 18),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: _buf.toString()));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating),
-                      );
-                    },
-                    icon: const Icon(Icons.copy_all_outlined, color: _muted, size: 18),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             Expanded(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: _openKeyboard,
+                onTap: _openKb,
                 child: Container(
                   width: double.infinity,
                   color: _bg,
@@ -394,107 +433,44 @@ class _TerminalPageState extends State<TerminalPage> with WidgetsBindingObserver
                   child: SingleChildScrollView(
                     controller: _scroll,
                     child: SelectableText(
-                      _buf.isEmpty ? (ready ? '' : '选择主机后自动连接\n') : _buf.toString(),
-                      style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 13, height: 1.3),
+                      _buf.isEmpty ? (_connecting ? 'connecting…\n' : 'tap screen for keyboard\n') : _buf.toString(),
+                      style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 13, height: 1.28),
                     ),
                   ),
                 ),
               ),
             ),
-            // special keys
+            SizedBox(width: 1, height: 1, child: Focus(focusNode: _focus, child: const SizedBox.shrink())),
             Container(
-              color: _panel,
-              padding: const EdgeInsets.fromLTRB(4, 4, 4, 2),
+              color: _bar,
+              padding: EdgeInsets.only(
+                left: 4,
+                right: 4,
+                top: 4,
+                bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 4 : 6,
+              ),
               child: Column(
                 children: [
                   Row(children: [
-                    _key('ESC'),
-                    _key('TAB'),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(2.5),
-                        child: SizedBox(
-                          height: 38,
-                          child: Material(
-                            color: _ctrl ? const Color(0xFF3A3A3C) : _keyBg,
-                            borderRadius: BorderRadius.circular(8),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: () => _extra('CTRL'),
-                              child: Center(
-                                child: Text(
-                                  'CTRL',
-                                  style: TextStyle(
-                                    color: _ctrl ? _green : _fg,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    _key('Ctrl-C'),
-                    _key('Ctrl-D'),
-                    _key('Ctrl-L'),
+                    _k('ESC'),
+                    _k('TAB'),
+                    _k('CTRL', on: _ctrl),
+                    _k('C'),
+                    _k('D'),
+                    _k('L'),
+                    _k('-'),
+                    _k('/'),
+                    _k('|'),
                   ]),
                   Row(children: [
-                    _key('↑'),
-                    _key('↓'),
-                    _key('←'),
-                    _key('→'),
-                    _key('Home'),
-                    _key('End'),
-                    _key('⌫'),
-                    _key('↵'),
+                    _k('↑'),
+                    _k('↓'),
+                    _k('←'),
+                    _k('→'),
+                    _k('~'),
+                    _k('BS'),
+                    _k('ENT'),
                   ]),
-                ],
-              ),
-            ),
-            // system keyboard host — always present so IME can attach
-            Container(
-              color: _panel,
-              padding: EdgeInsets.only(
-                left: 10,
-                right: 8,
-                top: 4,
-                bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 4 : 8,
-              ),
-              child: Row(
-                children: [
-                  const Text('❯ ', style: TextStyle(color: _green, fontFamily: 'monospace')),
-                  Expanded(
-                    child: TextField(
-                      controller: _input,
-                      focusNode: _focus,
-                      enabled: _connected,
-                      autofocus: false,
-                      keyboardType: TextInputType.text,
-                      textInputAction: TextInputAction.send,
-                      enableSuggestions: false,
-                      autocorrect: false,
-                      smartDashesType: SmartDashesType.disabled,
-                      smartQuotesType: SmartQuotesType.disabled,
-                      style: const TextStyle(color: _fg, fontFamily: 'monospace', fontSize: 14),
-                      cursorColor: _green,
-                      showCursor: true,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
-                        hintText: '点此输入',
-                        hintStyle: TextStyle(color: Color(0xFF555555), fontSize: 13),
-                      ),
-                      onTap: _openKeyboard,
-                      onSubmitted: (_) => _submitLine(),
-                    ),
-                  ),
-                  if (_ctrl)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Text('CTRL', style: TextStyle(color: _green, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
                 ],
               ),
             ),
