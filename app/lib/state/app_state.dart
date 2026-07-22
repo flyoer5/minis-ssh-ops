@@ -479,6 +479,24 @@ class JsonEncoder {
   }
 }
 
+
+  String _friendlyErr(Object e) {
+    final s = e.toString();
+    final low = s.toLowerCase();
+    if (low.contains('connection abort') || low.contains('connection reset') || low.contains('broken pipe')) {
+      return '模型网关连接中断，请重试';
+    }
+    if (low.contains('timeout') || low.contains('timed out')) {
+      return '模型请求超时，请重试';
+    }
+    if (low.contains('401') || low.contains('403')) {
+      return '模型鉴权失败，请检查设置';
+    }
+    final m = RegExp(r'ApiException\(\d+\):\s*(.*)').firstMatch(s);
+    if (m != null) return m.group(1)!;
+    return s;
+  }
+
 class ProbeLine {
   final String label;
   final String value;

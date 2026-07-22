@@ -283,6 +283,13 @@ class _TerminalPageState extends State<TerminalPage>
   }
 
   @override
+  bool onFocusReceived() => false;
+
+  @override
+  void performSelector(String selectorName) {}
+
+
+  @override
   void performPrivateCommand(String action, Map<String, dynamic> data) {}
 
   @override
