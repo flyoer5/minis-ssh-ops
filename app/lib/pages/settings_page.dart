@@ -191,6 +191,16 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           ),
           const Divider(height: 28),
           Text('诊断', style: Theme.of(context).textTheme.titleMedium),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('重新走初始配置'),
+            trailing: TextButton(
+              onPressed: () async {
+                await state.resetOnboarding();
+              },
+              child: const Text('重置向导'),
+            ),
+          ),
           FilledButton.tonal(
             onPressed: () async {
               final log = await state.exportBackendLog();

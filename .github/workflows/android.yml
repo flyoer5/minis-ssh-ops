@@ -62,14 +62,30 @@ jobs:
         working-directory: app
         run: flutter build apk --release --target-platform android-arm64
 
+      - name: Package artifacts with version
+        run: |
+          VER=$(grep '^version:' app/pubspec.yaml | head -1 | awk '{print $2}' | cut -d+ -f1)
+          mkdir -p dist
+          cp app/build/app/outputs/flutter-apk/app-debug.apk "dist/ssh-ai-agent-${VER}-debug.apk"
+          cp app/build/app/outputs/flutter-apk/app-release.apk "dist/ssh-ai-agent-${VER}-release.apk"
+          cp app/build/app/outputs/flutter-apk/app-debug.apk dist/ssh-ai-agent-latest-debug.apk
+          cp app/build/app/outputs/flutter-apk/app-release.apk dist/ssh-ai-agent-latest-release.apk
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+          cat dist/SHA256SUMS.txt
+          echo "VERSION=$VER" >> "$GITHUB_ENV"
+
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: app/build/app/outputs/flutter-apk/app-debug.apk
+          path: |
+            dist/ssh-ai-agent-*-debug.apk
+            dist/SHA256SUMS.txt
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: app/build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            dist/ssh-ai-agent-*-release.apk
+            dist/SHA256SUMS.txt
           if-no-files-found: error

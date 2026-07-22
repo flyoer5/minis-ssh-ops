@@ -4,6 +4,7 @@ import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/pages/agent_page.dart';
 import 'package:ssh_ai_agent/pages/files_page.dart';
 import 'package:ssh_ai_agent/pages/hosts_page.dart';
+import 'package:ssh_ai_agent/pages/onboarding_page.dart';
 import 'package:ssh_ai_agent/pages/records_page.dart';
 import 'package:ssh_ai_agent/pages/settings_page.dart';
 import 'package:ssh_ai_agent/pages/terminal_page.dart';
@@ -28,9 +29,36 @@ class SshAiAgentApp extends StatelessWidget {
           useMaterial3: true,
           scaffoldBackgroundColor: const Color(0xFF0D1117),
         ),
-        home: const HomeShell(),
+        home: const RootGate(),
       ),
     );
+  }
+}
+
+class RootGate extends StatelessWidget {
+  const RootGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    if (!state.bootstrapped || state.startingBackend) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 12),
+              Text('启动中…'),
+            ],
+          ),
+        ),
+      );
+    }
+    if (!state.onboarded) {
+      return OnboardingPage(onDone: () {});
+    }
+    return const HomeShell();
   }
 }
 

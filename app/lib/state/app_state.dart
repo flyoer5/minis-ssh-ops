@@ -71,6 +71,8 @@ class AppState extends ChangeNotifier {
   double termFontSize = 13;
   bool confirmWrites = false; // reserved; agent auto-runs non-blocked
   bool batteryIgnored = true;
+  bool onboarded = true;
+  bool bootstrapped = false;
 
   Future<void> bootstrap() async {
     startingBackend = true;
@@ -82,6 +84,7 @@ class AppState extends ChangeNotifier {
     api.localToken = prefs.getString('localToken') ?? api.localToken;
     termFontSize = prefs.getDouble('termFontSize') ?? 13;
     selectedHostId = prefs.getString('selectedHostId') ?? selectedHostId;
+    onboarded = prefs.getBool('onboarded') ?? false;
 
     if (NativeBackend.isAndroidNative) {
       Object? lastErr;
@@ -130,6 +133,21 @@ class AppState extends ChangeNotifier {
     try {
       batteryIgnored = await NativeBackend.isIgnoringBatteryOptimizations();
     } catch (_) {}
+    bootstrapped = true;
+    notifyListeners();
+  }
+
+  Future<void> completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarded', true);
+    onboarded = true;
+    notifyListeners();
+  }
+
+  Future<void> resetOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarded', false);
+    onboarded = false;
     notifyListeners();
   }
 
