@@ -16,6 +16,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
   final llmBase = TextEditingController();
   final llmKey = TextEditingController();
   final llmModel = TextEditingController(text: 'grok-4.5');
+  String thinkingLevel = 'auto';
   bool loaded = false;
   String? pingMsg;
   bool pinging = false;
@@ -37,6 +38,8 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     if (llm != null) {
       llmBase.text = (llm['baseUrl'] as String?) ?? '';
       llmModel.text = (llm['model'] as String?) ?? 'grok-4.5';
+      thinkingLevel = (llm['thinkingLevel'] as String?)?.toString() ?? 'auto';
+      if (thinkingLevel.isEmpty) thinkingLevel = 'auto';
       final k = llm['apiKey']?.toString();
       if (k != null && k.isNotEmpty) llmKey.text = k;
     }
@@ -179,12 +182,38 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 padding: const EdgeInsets.only(top: 4, bottom: 6),
                 child: Text('共 ${_modelIds.length} 个模型', style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E))),
               ),
+            DropdownButtonFormField<String>(
+              value: const ['none', 'auto', 'low', 'medium', 'high', 'xhigh'].contains(thinkingLevel)
+                  ? thinkingLevel
+                  : 'auto',
+              decoration: const InputDecoration(
+                labelText: '思考级别',
+                helperText: 'none 关闭 · auto 开启 · low/medium/high/xhigh',
+              ),
+              items: const [
+                DropdownMenuItem(value: 'none', child: Text('none · 关闭')),
+                DropdownMenuItem(value: 'auto', child: Text('auto · 开启')),
+                DropdownMenuItem(value: 'low', child: Text('low')),
+                DropdownMenuItem(value: 'medium', child: Text('medium')),
+                DropdownMenuItem(value: 'high', child: Text('high')),
+                DropdownMenuItem(value: 'xhigh', child: Text('xhigh')),
+              ],
+              onChanged: (v) {
+                if (v != null) setState(() => thinkingLevel = v);
+              },
+            ),
+            const SizedBox(height: 8),
             FilledButton.tonal(
               onPressed: !state.backendOk
                   ? null
                   : () async {
                       try {
-                        await state.saveLlm(baseUrl: llmBase.text.trim(), model: llmModel.text.trim(), apiKey: llmKey.text);
+                        await state.saveLlm(
+                          baseUrl: llmBase.text.trim(),
+                          model: llmModel.text.trim(),
+                          apiKey: llmKey.text,
+                          thinkingLevel: thinkingLevel,
+                        );
                         await _refreshModels(state);
                         _toast('LLM 已保存');
                       } catch (e) {

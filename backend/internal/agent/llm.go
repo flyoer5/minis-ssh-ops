@@ -12,10 +12,11 @@ import (
 )
 
 type Client struct {
-	BaseURL string
-	APIKey  string
-	Model   string
-	HTTP    *http.Client
+	BaseURL       string
+	APIKey        string
+	Model         string
+	ThinkingLevel string // none|low|medium|high|xhigh|auto
+	HTTP          *http.Client
 }
 
 type Msg struct {
@@ -68,11 +69,13 @@ func (c *Client) Chat(messages []Msg) (string, error) {
 }
 
 func (c *Client) chatOnce(messages []Msg) (string, error) {
-	body, _ := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"model":       c.Model,
 		"messages":    messages,
 		"temperature": 0.2,
-	})
+	}
+	applyThinkingParams(payload, c.ThinkingLevel)
+	body, _ := json.Marshal(payload)
 	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return "", err
@@ -108,7 +111,14 @@ func (c *Client) chatOnce(messages []Msg) (string, error) {
 	if len(out.Choices) == 0 {
 		return "", fmt.Errorf("llm empty choices")
 	}
-	return out.Choices[0].Message.Content, nil
+	content := out.Choices[0].Message.Content
+	if strings.Contains(strings.ToLower(content), "<think") || strings.Contains(strings.ToLower(content), "<reasoning") {
+		c2, _ := splitThinkTags(content)
+		if c2 != "" {
+			content = c2
+		}
+	}
+	return content, nil
 }
 
 func isRetryable(err error) bool {
@@ -216,4 +226,44 @@ func ListModels(baseURL, apiKey string) ([]string, error) {
 		}
 	}
 	return ids, nil
+}
+
+// applyThinkingParams injects common gateway thinking fields (Minis-compatible).
+func applyThinkingParams(payload map[string]any, level string) {
+	lv := strings.ToLower(strings.TrimSpace(level))
+	if lv == "" {
+		lv = "auto"
+	}
+	switch lv {
+	case "none", "off", "disabled", "0", "false":
+		payload["enable_thinking"] = false
+		payload["reasoning_effort"] = "none"
+		return
+	case "auto", "enabled", "true", "on":
+		payload["enable_thinking"] = true
+		return
+	case "low", "minimal", "min":
+		payload["enable_thinking"] = true
+		payload["reasoning_effort"] = "low"
+		payload["thinking_budget"] = 1024
+	case "medium", "med", "default":
+		payload["enable_thinking"] = true
+		payload["reasoning_effort"] = "medium"
+		payload["thinking_budget"] = 4096
+	case "high":
+		payload["enable_thinking"] = true
+		payload["reasoning_effort"] = "high"
+		payload["thinking_budget"] = 8192
+	case "xhigh", "extra", "max":
+		payload["enable_thinking"] = true
+		payload["reasoning_effort"] = "high"
+		payload["thinking_budget"] = 16384
+		payload["thinkingLevel"] = "XHIGH"
+	default:
+		payload["enable_thinking"] = true
+		payload["reasoning_effort"] = lv
+	}
+	if lv != "none" && lv != "off" {
+		payload["includeThoughts"] = true
+	}
 }

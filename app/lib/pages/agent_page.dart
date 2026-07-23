@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
@@ -390,10 +391,11 @@ class _Bubble extends StatelessWidget {
     }
   }
 
-  /// Minis part types we mirror: text | toolUse | toolResult
+  /// Minis part types we mirror: text | toolUse | toolResult | reasoning
   String get _part {
     final p = msg.meta?['part']?.toString();
     if (p != null && p.isNotEmpty) return p;
+    if (msg.kind == ChatKind.reasoning) return 'reasoning';
     if (msg.kind == ChatKind.stepResult) return 'toolResult';
     if (msg.role == 'tool' || msg.kind == ChatKind.status) return 'toolUse';
     if (msg.kind == ChatKind.error) return 'error';
@@ -447,6 +449,11 @@ class _Bubble extends StatelessWidget {
       return _MinisToolBlock(msg: msg, part: part, onCopy: () => _copy(context, _copyText));
     }
 
+    // —— reasoning (Minis messages.reasoning_content) ——
+    if (msg.kind == ChatKind.reasoning || part == 'reasoning') {
+      return _ReasoningBlock(content: msg.content, onCopy: () => _copy(context, msg.content));
+    }
+
     // —— error ——
     if (msg.kind == ChatKind.error || part == 'error') {
       return Container(
@@ -458,20 +465,14 @@ class _Bubble extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: const Color(0xFF6E2A2E)),
         ),
-        child: SelectableText(
-          msg.content,
-          style: const TextStyle(height: 1.45, fontSize: 14, color: Color(0xFFFFB4A9)),
-        ),
+        child: _MdBody(data: msg.content, baseColor: const Color(0xFFFFB4A9), fontSize: 14),
       );
     }
 
-    // —— text (assistant): Minis plain prose, no avatar chrome ——
+    // —— text (assistant): Markdown ——
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, right: 4),
-      child: SelectableText(
-        msg.content,
-        style: const TextStyle(height: 1.55, fontSize: 15, color: Color(0xFFE6EDF3)),
-      ),
+      child: _MdBody(data: msg.content, baseColor: const Color(0xFFE6EDF3), fontSize: 15),
     );
   }
 
@@ -675,6 +676,140 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Minis-like deep thinking: separate from answer, collapsed by default.
+class _ReasoningBlock extends StatefulWidget {
+  final String content;
+  final VoidCallback onCopy;
+  const _ReasoningBlock({required this.content, required this.onCopy});
+
+  @override
+  State<_ReasoningBlock> createState() => _ReasoningBlockState();
+}
+
+class _ReasoningBlockState extends State<_ReasoningBlock> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = widget.content.trim().replaceAll(RegExp(r'\s+'), ' ');
+    final short = preview.length > 72 ? '${preview.substring(0, 72)}…' : preview;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF12151C),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF2A3140)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _open = !_open),
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.psychology_outlined, size: 16, color: Color(0xFFA78BFA)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('思考', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFA78BFA))),
+                        if (!_open && short.isNotEmpty)
+                          Text(short, maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF8B949E))),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: widget.onCopy,
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.copy_all, size: 14, color: Color(0xFF8B949E)),
+                    ),
+                  ),
+                  Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18, color: const Color(0xFF8B949E)),
+                ],
+              ),
+            ),
+          ),
+          if (_open)
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: Color(0xFF0D1117),
+                border: Border(top: BorderSide(color: Color(0xFF21262D))),
+              ),
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: SelectableText(
+                widget.content,
+                style: const TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF9CA3AF), fontFamily: 'monospace'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MdBody extends StatelessWidget {
+  final String data;
+  final Color baseColor;
+  final double fontSize;
+  const _MdBody({required this.data, required this.baseColor, this.fontSize = 15});
+
+  @override
+  Widget build(BuildContext context) {
+    final base = TextStyle(fontSize: fontSize, height: 1.55, color: baseColor);
+    final style = MarkdownStyleSheet(
+      p: base,
+      pPadding: const EdgeInsets.only(bottom: 6),
+      h1: base.copyWith(fontSize: fontSize + 6, fontWeight: FontWeight.w800),
+      h2: base.copyWith(fontSize: fontSize + 4, fontWeight: FontWeight.w800),
+      h3: base.copyWith(fontSize: fontSize + 2, fontWeight: FontWeight.w700),
+      strong: base.copyWith(fontWeight: FontWeight.w800),
+      em: base.copyWith(fontStyle: FontStyle.italic),
+      listBullet: base.copyWith(color: const Color(0xFF8B949E)),
+      listIndent: 20,
+      blockquote: base.copyWith(color: const Color(0xFF8B949E)),
+      blockquoteDecoration: const BoxDecoration(
+        border: Border(left: BorderSide(color: Color(0xFF30363D), width: 3)),
+      ),
+      blockquotePadding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+      code: TextStyle(
+        fontFamily: 'monospace',
+        fontSize: fontSize - 1.5,
+        color: const Color(0xFFFF7B72),
+        backgroundColor: const Color(0xFF21262D),
+      ),
+      codeblockDecoration: BoxDecoration(
+        color: const Color(0xFF0D1117),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF30363D)),
+      ),
+      codeblockPadding: const EdgeInsets.all(10),
+      a: base.copyWith(color: const Color(0xFF58A6FF), decoration: TextDecoration.underline),
+      tableHead: base.copyWith(fontWeight: FontWeight.w700),
+      tableBody: base.copyWith(fontSize: fontSize - 1),
+      tableBorder: TableBorder.all(color: const Color(0xFF30363D), width: 0.5),
+      tableCellsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      blockSpacing: 8,
+    );
+    return MarkdownBody(
+      data: data,
+      selectable: true,
+      softLineBreak: true,
+      styleSheet: style,
+      shrinkWrap: true,
+      fitContent: true,
+      onTapLink: (text, href, title) {},
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
+import 'package:ssh_ai_agent/pages/file_editor_page.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
 /// Dual-pane remote file manager (MT Manager style).
@@ -101,32 +102,18 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       final r = await s.api.fsRead(id, p);
       if (!mounted) return;
       final text = r['text']?.toString() ?? '';
-      final ctrl = TextEditingController(text: text);
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: Text(p.split('/').last, style: const TextStyle(fontSize: 14)),
-          content: SizedBox(
-            width: double.maxFinite,
-            height: 360,
-            child: TextField(
-              controller: ctrl,
-              maxLines: null,
-              expands: true,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            ),
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => FileEditorPage(
+            path: p,
+            initialText: text,
+            onSave: (body) async {
+              await s.api.fsWrite(id, p, body, confirmed: true);
+              if (mounted) await _load(active);
+            },
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('关闭')),
-            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('保存')),
-          ],
         ),
       );
-      if (ok == true) {
-        await s.api.fsWrite(id, p, ctrl.text, confirmed: true);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
-        await _load(active);
-      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
@@ -384,15 +371,6 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                   _download(p, name);
                 },
               ),
-            if (!isDir)
-              ListTile(
-                leading: const Icon(Icons.copy_all),
-                title: const Text('复制到另一栏'),
-                onTap: () {
-                  Navigator.pop(c);
-                  _copyToOther(singlePath: p);
-                },
-              ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Color(0xFFF85149)),
               title: const Text('删除', style: TextStyle(color: Color(0xFFF85149))),
@@ -452,14 +430,26 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                           const Text('~', style: TextStyle(fontSize: 13, color: Color(0xFF9E9E9E), fontFamily: 'monospace')),
                           const SizedBox(width: 4),
                           Expanded(
-                            child: Text(
-                              pane.path.isEmpty ? '/' : pane.path,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 12,
-                                color: focused ? Colors.white : const Color(0xFFBDBDBD),
+                            child: GestureDetector(
+                              onTap: () => setState(() => focus = idx),
+                              onLongPress: () async {
+                                final path = pane.path.isEmpty ? '/' : pane.path;
+                                await Clipboard.setData(ClipboardData(text: path));
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('已复制路径: $path'), duration: const Duration(seconds: 1)),
+                                  );
+                                }
+                              },
+                              child: Text(
+                                pane.path.isEmpty ? '/' : pane.path,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                  color: focused ? Colors.white : const Color(0xFFBDBDBD),
+                                ),
                               ),
                             ),
                           ),
@@ -488,22 +478,6 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                         ],
                       ),
                     ),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
-                      child: Row(
-                        children: [
-                          for (final b in const ['', '/etc', '/var/log', '/tmp', '/home', '/root'])
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: ActionChip(
-                                visualDensity: VisualDensity.compact,
-                                label: Text(b.isEmpty ? '~' : b, style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
-                                onPressed: () {
-                                  setState(() => focus = idx);
-                                  _go(pane, b);
-                                },
-                              ),
                             ),
                         ],
                       ),
@@ -645,165 +619,100 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     if (state.selectedHostId == null) {
       return const Scaffold(body: Center(child: Text('先选主机')));
     }
+    void swapPanes() {
+      setState(() {
+        final tp = _left.path;
+        final te = _left.entries;
+        final terr = _left.err;
+        _left.path = _right.path;
+        _left.entries = _right.entries;
+        _left.err = _right.err;
+        _right.path = tp;
+        _right.entries = te;
+        _right.err = terr;
+      });
+    }
+
+    final List<Widget> actions = active.selecting
+        ? [
+            IconButton(
+              tooltip: '复制到另一栏',
+              onPressed: active.selected.isEmpty ? null : () => _copyToOther(),
+              icon: const Icon(Icons.copy_all, size: 20),
+            ),
+            IconButton(
+              tooltip: '移动到另一栏',
+              onPressed: active.selected.isEmpty ? null : _moveToOther,
+              icon: const Icon(Icons.drive_file_move_outline, size: 20),
+            ),
+            IconButton(
+              tooltip: '删除',
+              onPressed: active.selected.isEmpty ? null : () => _deletePaths(active.selected, ask: true),
+              icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFF85149)),
+            ),
+            IconButton(
+              tooltip: '取消多选',
+              onPressed: () => setState(() {
+                active.selecting = false;
+                active.selected.clear();
+              }),
+              icon: const Icon(Icons.close, size: 20),
+            ),
+          ]
+        : [
+            IconButton(tooltip: '新建文件夹', onPressed: _mkdir, icon: const Icon(Icons.create_new_folder_outlined, size: 20)),
+            IconButton(tooltip: '新建文件', onPressed: _newFile, icon: const Icon(Icons.note_add_outlined, size: 20)),
+            IconButton(tooltip: '多选', onPressed: () => setState(() => active.selecting = true), icon: const Icon(Icons.checklist, size: 20)),
+            IconButton(
+              tooltip: dualPane ? '单栏' : '双栏',
+              onPressed: () => setState(() => dualPane = !dualPane),
+              icon: Icon(dualPane ? Icons.view_agenda_outlined : Icons.view_column_outlined, size: 20),
+            ),
+            IconButton(
+              tooltip: '切换焦点栏',
+              onPressed: dualPane ? () => setState(() => focus = 1 - focus) : null,
+              icon: const Icon(Icons.swap_horiz, size: 20),
+            ),
+            IconButton(
+              tooltip: '刷新当前栏',
+              onPressed: active.loading ? null : () => _load(active),
+              icon: const Icon(Icons.refresh, size: 20),
+            ),
+            IconButton(
+              tooltip: '交换左右路径',
+              onPressed: dualPane ? swapPanes : null,
+              icon: const Icon(Icons.swap_vert, size: 20),
+            ),
+            IconButton(
+              tooltip: '回到 /',
+              onPressed: () => _go(active, '/'),
+              icon: const Icon(Icons.home_outlined, size: 20),
+            ),
+          ];
+
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
+        toolbarHeight: 48,
+        titleSpacing: 8,
         title: Text(
-          active.selecting ? '已选 ${active.selected.length}' : (dualPane ? '文件 L | R' : '文件'),
-          style: const TextStyle(fontSize: 16),
+          active.selecting
+              ? '已选 ${active.selected.length}'
+              : (dualPane ? '文件 · ${focus == 0 ? "左" : "右"}' : '文件'),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
-        actions: [
-          IconButton(
-            tooltip: dualPane ? '单栏' : '双栏',
-            onPressed: () => setState(() => dualPane = !dualPane),
-            icon: Icon(dualPane ? Icons.view_agenda_outlined : Icons.view_column_outlined),
-          ),
-          PopupMenuButton<String>(
-            onSelected: (a) {
-              if (a == 'mkdir') _mkdir();
-              if (a == 'newfile') _newFile();
-              if (a == 'select') {
-                setState(() {
-                  active.selecting = true;
-                });
-              }
-              if (a == 'swap') {
-                setState(() {
-                  final tp = _left.path;
-                  final te = _left.entries;
-                  final terr = _left.err;
-                  _left.path = _right.path;
-                  _left.entries = _right.entries;
-                  _left.err = _right.err;
-                  _right.path = tp;
-                  _right.entries = te;
-                  _right.err = terr;
-                });
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'mkdir', child: Text('新建文件夹')),
-              PopupMenuItem(value: 'newfile', child: Text('新建文件')),
-              PopupMenuItem(value: 'select', child: Text('多选')),
-              PopupMenuItem(value: 'swap', child: Text('交换左右路径')),
-            ],
-          ),
-        ],
+        actions: actions,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: dualPane
-                ? Row(
-                    children: [
-                      _pane(context, _left, 0),
-                      Container(width: 1, color: const Color(0xFF2A2A2A)),
-                      _pane(context, _right, 1),
-                    ],
-                  )
-                : Row(children: [_pane(context, active, focus)]),
-          ),
-          // MT-like bottom bar operates on focused pane / cross-pane
-          Material(
-            color: const Color(0xFF1E1E1E),
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: active.selecting
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _bar(Icons.copy_all, '复制', active.selected.isEmpty ? null : () => _copyToOther()),
-                          _bar(Icons.drive_file_move_outline, '移动', active.selected.isEmpty ? null : _moveToOther),
-                          _bar(Icons.delete_outline, '删除', active.selected.isEmpty ? null : () => _deletePaths(active.selected, ask: true)),
-                          _bar(Icons.close, '取消', () {
-                            setState(() {
-                              active.selecting = false;
-                              active.selected.clear();
-                            });
-                          }),
-                        ],
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _bar(Icons.create_new_folder_outlined, '新建', () async {
-                            final a = await showModalBottomSheet<String>(
-                              context: context,
-                              backgroundColor: const Color(0xFF1E1E1E),
-                              builder: (c) => SafeArea(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ListTile(leading: const Icon(Icons.create_new_folder_outlined), title: const Text('新建文件夹'), onTap: () => Navigator.pop(c, 'dir')),
-                                    ListTile(leading: const Icon(Icons.note_add_outlined), title: const Text('新建文件'), onTap: () => Navigator.pop(c, 'file')),
-                                  ],
-                                ),
-                              ),
-                            );
-                            if (a == 'dir') await _mkdir();
-                            if (a == 'file') await _newFile();
-                          }),
-                          _bar(Icons.checklist, '多选', () => setState(() => active.selecting = true)),
-                          _bar(Icons.view_column_outlined, dualPane ? '单栏' : '双栏', () => setState(() => dualPane = !dualPane)),
-                          _bar(Icons.swap_horiz, '切栏', () => setState(() => focus = 1 - focus)),
-                          _bar(Icons.more_horiz, '更多', () async {
-                            final a = await showModalBottomSheet<String>(
-                              context: context,
-                              backgroundColor: const Color(0xFF1E1E1E),
-                              builder: (c) => SafeArea(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ListTile(leading: const Icon(Icons.refresh), title: const Text('刷新'), onTap: () => Navigator.pop(c, 'refresh')),
-                                    ListTile(leading: const Icon(Icons.swap_vert), title: const Text('交换左右路径'), onTap: () => Navigator.pop(c, 'swap')),
-                                    ListTile(leading: const Icon(Icons.home_outlined), title: const Text('回到 /'), onTap: () => Navigator.pop(c, 'root')),
-                                  ],
-                                ),
-                              ),
-                            );
-                            if (a == 'refresh') _load(active);
-                            if (a == 'root') _go(active, '/');
-                            if (a == 'swap') {
-                              setState(() {
-                                final tp = _left.path;
-                                final te = _left.entries;
-                                final terr = _left.err;
-                                _left.path = _right.path;
-                                _left.entries = _right.entries;
-                                _left.err = _right.err;
-                                _right.path = tp;
-                                _right.entries = te;
-                                _right.err = terr;
-                              });
-                            }
-                          }),
-                        ],
-                      ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _bar(IconData icon, String label, VoidCallback? onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 20, color: onTap == null ? Colors.white24 : Colors.white70),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(fontSize: 10, color: onTap == null ? Colors.white24 : Colors.white70)),
-          ],
-        ),
-      ),
+      body: dualPane
+          ? Row(
+              children: [
+                _pane(context, _left, 0),
+                Container(width: 1, color: const Color(0xFF2A2A2A)),
+                _pane(context, _right, 1),
+              ],
+            )
+          : Row(children: [_pane(context, active, focus)]),
     );
   }
 }

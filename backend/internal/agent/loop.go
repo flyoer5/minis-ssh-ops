@@ -7,9 +7,13 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
+
+// Matches <think>…</think>, <thinking>…</thinking>, <reasoning>…</reasoning>.
+var thinkTagRe = regexp.MustCompile(`(?is)<(think|thinking|reasoning)>(.*?)</\1>`)
 
 // OpenClaw-style tools (Minis-like short descriptions).
 var defaultTools = []map[string]any{
@@ -53,6 +57,8 @@ After any tools, answer concisely in the user's language.`
 type LoopMsg struct {
 	Role       string     `json:"role"`
 	Content    string     `json:"content,omitempty"`
+	// Reasoning is model thinking (Minis reasoning_content). Not resent as history content.
+	Reasoning  string     `json:"reasoning,omitempty"`
 	Name       string     `json:"name,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
@@ -68,10 +74,11 @@ type ToolCall struct {
 }
 
 type LoopEvent struct {
-	Type    string `json:"type"` // assistant | tool | tool_result | final | error
-	Content string `json:"content,omitempty"`
-	Name    string `json:"name,omitempty"`
-	Command string `json:"command,omitempty"`
+	Type      string `json:"type"` // assistant | tool | tool_result | final | error | reasoning
+	Content   string `json:"content,omitempty"`
+	Reasoning string `json:"reasoning,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Command   string `json:"command,omitempty"`
 }
 
 // ToolRunner executes a tool and returns plain text output.
@@ -112,15 +119,22 @@ func (c *Client) RunLoopStream(userText string, history []LoopMsg, run ToolRunne
 		}
 		if len(asst.ToolCalls) == 0 {
 			text := strings.TrimSpace(asst.Content)
-			if text != "" {
-				push(LoopEvent{Type: "final", Content: text})
+			reason := strings.TrimSpace(asst.Reasoning)
+			if reason != "" && text == "" {
+				push(LoopEvent{Type: "reasoning", Content: reason, Reasoning: reason})
 			}
-			msgs = append(msgs, asst)
+			if text != "" || reason != "" {
+				push(LoopEvent{Type: "final", Content: text, Reasoning: reason})
+			}
+			msgs = append(msgs, LoopMsg{Role: "assistant", Content: asst.Content, ToolCalls: asst.ToolCalls})
 			return events, msgs, nil
 		}
-		msgs = append(msgs, asst)
+		msgs = append(msgs, LoopMsg{Role: "assistant", Content: asst.Content, ToolCalls: asst.ToolCalls})
+		if strings.TrimSpace(asst.Reasoning) != "" {
+			push(LoopEvent{Type: "reasoning", Content: strings.TrimSpace(asst.Reasoning), Reasoning: strings.TrimSpace(asst.Reasoning)})
+		}
 		if strings.TrimSpace(asst.Content) != "" {
-			push(LoopEvent{Type: "assistant", Content: strings.TrimSpace(asst.Content)})
+			push(LoopEvent{Type: "assistant", Content: strings.TrimSpace(asst.Content), Reasoning: strings.TrimSpace(asst.Reasoning)})
 		}
 		for _, tc := range asst.ToolCalls {
 			args := map[string]any{}
@@ -172,13 +186,15 @@ func (c *Client) chatTools(messages []LoopMsg) (LoopMsg, error) {
 		}
 		apiMsgs = append(apiMsgs, item)
 	}
-	body, _ := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"model":       c.Model,
 		"messages":    apiMsgs,
 		"tools":       defaultTools,
 		"tool_choice": "auto",
 		"temperature": 0.2,
-	})
+	}
+	applyThinkingParams(payload, c.ThinkingLevel)
+	body, _ := json.Marshal(payload)
 
 	var last error
 	for attempt := 1; attempt <= 3; attempt++ {
@@ -225,9 +241,11 @@ func (c *Client) postChat(body []byte) (LoopMsg, error) {
 	var out struct {
 		Choices []struct {
 			Message struct {
-				Role      string     `json:"role"`
-				Content   any        `json:"content"`
-				ToolCalls []ToolCall `json:"tool_calls"`
+				Role             string     `json:"role"`
+				Content          any        `json:"content"`
+				ReasoningContent string     `json:"reasoning_content"`
+				Reasoning        any        `json:"reasoning"`
+				ToolCalls        []ToolCall `json:"tool_calls"`
 			} `json:"message"`
 		} `json:"choices"`
 		Error *struct {
@@ -254,5 +272,46 @@ func (c *Client) postChat(body []byte) (LoopMsg, error) {
 		b, _ := json.Marshal(v)
 		content = string(b)
 	}
-	return LoopMsg{Role: "assistant", Content: content, ToolCalls: m.ToolCalls}, nil
+	reason := strings.TrimSpace(m.ReasoningContent)
+	if reason == "" {
+		switch v := m.Reasoning.(type) {
+		case string:
+			reason = strings.TrimSpace(v)
+		case map[string]any:
+			if s, ok := v["content"].(string); ok {
+				reason = strings.TrimSpace(s)
+			} else if s, ok := v["text"].(string); ok {
+				reason = strings.TrimSpace(s)
+			} else if s, ok := v["summary"].(string); ok {
+				reason = strings.TrimSpace(s)
+			}
+		}
+	}
+	content, fromTag := splitThinkTags(content)
+	if reason == "" {
+		reason = fromTag
+	} else if fromTag != "" {
+		reason = reason + "\n" + fromTag
+	}
+	return LoopMsg{Role: "assistant", Content: content, Reasoning: reason, ToolCalls: m.ToolCalls}, nil
+}
+
+func splitThinkTags(content string) (clean string, reason string) {
+	if content == "" {
+		return "", ""
+	}
+	var reasons []string
+	clean = thinkTagRe.ReplaceAllStringFunc(content, func(m string) string {
+		sub := thinkTagRe.FindStringSubmatch(m)
+		if len(sub) >= 3 {
+			inner := strings.TrimSpace(sub[2])
+			if inner != "" {
+				reasons = append(reasons, inner)
+			}
+		}
+		return ""
+	})
+	clean = strings.TrimSpace(clean)
+	reason = strings.TrimSpace(strings.Join(reasons, "\n\n"))
+	return clean, reason
 }

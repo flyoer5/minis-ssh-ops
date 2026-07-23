@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/crypto"
@@ -38,6 +39,8 @@ type LLMSettings struct {
 	APIKeyMasked   string `json:"apiKeyMasked,omitempty"`
 	Model          string `json:"model"`
 	TimeoutSeconds int    `json:"timeoutSeconds"`
+	// ThinkingLevel: none|low|medium|high|xhigh|auto (Minis thinking_override style)
+	ThinkingLevel string `json:"thinkingLevel,omitempty"`
 }
 
 type HostSecrets struct {
@@ -514,12 +517,16 @@ func (s *Store) GetLLM() (LLMSettings, error) {
 		Model:          get("llm.model"),
 		TimeoutSeconds: timeout,
 		APIKeySet:      key != "",
+		ThinkingLevel:  get("llm.thinking_level"),
 	}
 	if st.Model == "" {
 		st.Model = "grok-4.5"
 	}
 	if st.TimeoutSeconds == 0 {
 		st.TimeoutSeconds = 180
+	}
+	if st.ThinkingLevel == "" {
+		st.ThinkingLevel = "auto"
 	}
 	if key != "" {
 		// User requested plaintext key in settings UI (local-only app).
@@ -567,6 +574,11 @@ func (s *Store) PutLLM(in LLMSettings) (LLMSettings, error) {
 	}
 	if in.TimeoutSeconds > 0 {
 		if err := put("llm.timeout_seconds", fmt.Sprintf("%d", in.TimeoutSeconds)); err != nil {
+			return in, err
+		}
+	}
+	if in.ThinkingLevel != "" {
+		if err := put("llm.thinking_level", strings.ToLower(strings.TrimSpace(in.ThinkingLevel))); err != nil {
 			return in, err
 		}
 	}

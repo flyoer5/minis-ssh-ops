@@ -23,4 +23,5 @@ enum ChatKind {
   stepResult,
   error,
   status,
+  reasoning,
 }

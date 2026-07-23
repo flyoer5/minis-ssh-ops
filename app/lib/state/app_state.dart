@@ -619,6 +619,42 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Minis-like: reasoning is a separate foldable block (not mixed into answer text).
+  void _pushReasoning(String reasoning) {
+    final r = reasoning.trim();
+    if (r.isEmpty) return;
+    if (agentMessages.isNotEmpty) {
+      final last = agentMessages.last;
+      if (last.kind == ChatKind.reasoning) {
+        if (r == last.content || last.content.contains(r)) return;
+        if (r.startsWith(last.content)) {
+          agentMessages[agentMessages.length - 1] = ChatMessage(
+            role: 'assistant',
+            content: r,
+            kind: ChatKind.reasoning,
+            meta: {'part': 'reasoning'},
+            at: last.at,
+          );
+          return;
+        }
+        agentMessages[agentMessages.length - 1] = ChatMessage(
+          role: 'assistant',
+          content: '${last.content}\n\n$r',
+          kind: ChatKind.reasoning,
+          meta: {'part': 'reasoning'},
+          at: last.at,
+        );
+        return;
+      }
+    }
+    agentMessages.add(ChatMessage(
+      role: 'assistant',
+      content: r,
+      kind: ChatKind.reasoning,
+      meta: {'part': 'reasoning'},
+    ));
+  }
+
   /// Stable id for pairing toolUse → toolResult across SSE events.
   String _newToolId() => 't${DateTime.now().microsecondsSinceEpoch}';
 
@@ -813,6 +849,7 @@ class AppState extends ChangeNotifier {
     final content = (raw['content'] ?? '').toString();
     final name = (raw['name'] ?? '').toString();
     final command = (raw['command'] ?? '').toString();
+    final reasoning = (raw['reasoning'] ?? '').toString().trim();
     if (type == 'memory') {
       // optional silent update; show short status once
       final facts = (raw['facts'] ?? '').toString().trim();
@@ -820,9 +857,13 @@ class AppState extends ChangeNotifier {
       if (facts.isNotEmpty || content.trim().isNotEmpty) {
         _pushMsg(ChatMessage(role: 'system', content: note, kind: ChatKind.status));
       }
-    } else if (type == 'assistant' && content.isNotEmpty) {
-      // Minis text part — merge consecutive assistant chunks into one bubble
-      _pushOrMergeAssistantText(content, part: 'text');
+    } else if (type == 'reasoning' && (reasoning.isNotEmpty || content.trim().isNotEmpty)) {
+      _pushReasoning(reasoning.isNotEmpty ? reasoning : content);
+    } else if (type == 'assistant' && (content.isNotEmpty || reasoning.isNotEmpty)) {
+      if (reasoning.isNotEmpty) _pushReasoning(reasoning);
+      if (content.isNotEmpty) {
+        _pushOrMergeAssistantText(content, part: 'text');
+      }
     } else if (type == 'tool') {
       // Minis toolUse — one open card; later tool_result completes same card
       String title;
@@ -901,9 +942,11 @@ class AppState extends ChangeNotifier {
         success: !failed,
         description: desc,
       );
-    } else if (type == 'final' && content.isNotEmpty) {
-      // final often repeats last assistant text — merge / dedupe
-      _pushOrMergeAssistantText(content, part: 'text');
+    } else if (type == 'final' && (content.isNotEmpty || reasoning.isNotEmpty)) {
+      if (reasoning.isNotEmpty) _pushReasoning(reasoning);
+      if (content.isNotEmpty) {
+        _pushOrMergeAssistantText(content, part: 'text');
+      }
     } else if (type == 'error' && content.isNotEmpty) {
       _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.error));
     }
@@ -1059,6 +1102,7 @@ class AppState extends ChangeNotifier {
     required String baseUrl,
     required String model,
     String? apiKey,
+    String? thinkingLevel,
   }) async {
     final body = <String, dynamic>{
       'baseUrl': baseUrl,
@@ -1066,6 +1110,9 @@ class AppState extends ChangeNotifier {
     };
     if (apiKey != null && apiKey.isNotEmpty) {
       body['apiKey'] = apiKey;
+    }
+    if (thinkingLevel != null && thinkingLevel.isNotEmpty) {
+      body['thinkingLevel'] = thinkingLevel;
     }
     llm = await api.putLlm(body);
     notifyListeners();
@@ -1134,17 +1181,26 @@ class ProbeSummary {
     final disk = pick('disk');
     final memory = pick('memory');
     final load = pick('load');
+    final cpuRaw = pick('cpu');
 
     final hasErr = [uname, uptime, disk, memory, load].any((s) => s.startsWith('错误:'));
     final ok = !hasErr && uname != '-';
 
-    // loadavg: "0.12 0.08 0.05 1/234 5678"
+    // loadavg kept for detail
     String loadHint = firstLine(load);
     final loadParts = loadHint.split(RegExp(r'\s+'));
     if (loadParts.isNotEmpty && double.tryParse(loadParts[0]) != null) {
       loadHint = loadParts.length >= 3
           ? '${loadParts[0]} / ${loadParts[1]} / ${loadParts[2]}'
           : loadParts[0];
+    }
+
+    // CPU utilization % from dual /proc/stat sample
+    String cpuHint = '—';
+    final cpuLine = firstLine(cpuRaw);
+    final cpuN = int.tryParse(cpuLine) ?? double.tryParse(cpuLine)?.round();
+    if (cpuN != null) {
+      cpuHint = '${cpuN.clamp(0, 100)}%';
     }
 
     // disk: df -h root line → Filesystem Size Used Avail Use% /
@@ -1238,16 +1294,37 @@ class ProbeSummary {
     final upm = RegExp(r'up\s+([^,]+)').firstMatch(uptime);
     if (upm != null) upHint = upm.group(1)!.trim();
 
-    final sys = firstLine(uname);
-    final one = ok ? 'disk $diskHint · mem $memHint · load ${loadParts.isNotEmpty ? loadParts[0] : '-'}' : '离线';
+    // uname -a → short: sysname release machine
+    String sys = firstLine(uname);
+    {
+      final parts = sys.split(RegExp(r'\s+'));
+      if (parts.length >= 5) {
+        final sysname = parts[0];
+        final release = parts[2];
+        String machine = '';
+        for (var i = parts.length - 1; i >= 3; i--) {
+          final p = parts[i];
+          if (RegExp(r'^(x86_64|amd64|aarch64|arm64|armv\d+l?|i[3-6]86|riscv64|ppc64le|s390x)$', caseSensitive: false).hasMatch(p)) {
+            machine = p;
+            break;
+          }
+        }
+        if (machine.isEmpty && parts.length >= 12) machine = parts[11];
+        sys = machine.isEmpty ? '$sysname $release' : '$sysname $release $machine';
+      } else if (sys.length > 48) {
+        sys = '${sys.substring(0, 48)}…';
+      }
+    }
+    final one = ok ? 'cpu $cpuHint · mem $memHint · disk $diskHint' : '离线';
 
     final lines = <ProbeLine>[
       ProbeLine('系统', sys),
+      ProbeLine('CPU', cpuHint),
       ProbeLine('负载', loadHint),
       ProbeLine('磁盘', diskSub.isEmpty ? diskHint : '$diskHint ($diskSub)'),
       ProbeLine('内存', memSub.isEmpty ? memHint : '$memHint ($memSub)'),
       ProbeLine('运行', upHint),
-      // extras for card big numbers
+      ProbeLine('CPU%', cpuHint),
       ProbeLine('磁盘%', diskHint),
       ProbeLine('内存主', memHint),
       ProbeLine('负载1', loadParts.isNotEmpty ? loadParts[0] : '—'),
@@ -1256,6 +1333,7 @@ class ProbeSummary {
     final detail = StringBuffer()
       ..writeln('uname:\n$uname\n')
       ..writeln('uptime:\n$uptime\n')
+      ..writeln('cpu:\n$cpuRaw\n')
       ..writeln('load:\n$load\n')
       ..writeln('disk:\n$disk\n')
       ..writeln('memory:\n$memory\n');

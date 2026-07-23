@@ -142,11 +142,6 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
               onTap: () => Navigator.pop(c, 'edit'),
             ),
             ListTile(
-              leading: const Icon(Icons.refresh),
-              title: const Text('刷新状态'),
-              onTap: () => Navigator.pop(c, 'probe'),
-            ),
-            ListTile(
               leading: const Icon(Icons.delete_outline, color: Color(0xFFF85149)),
               title: const Text('删除', style: TextStyle(color: Color(0xFFF85149))),
               onTap: () => Navigator.pop(c, 'delete'),
@@ -156,10 +151,6 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
       ),
     );
     if (action == null || !context.mounted) return;
-    if (action == 'probe') {
-      await _refreshProbe(state, id, force: true);
-      return;
-    }
     if (action == 'edit') {
       await _showEdit(context, state, h);
       return;
@@ -396,9 +387,9 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // CPU (load) + MEM + HDD
-    final load1 = _v('负载1');
-    final loadAll = _v('负载');
+    // CPU% + MEM + HDD
+    final cpuPctS = _v('CPU%');
+    final cpuFull = _v('CPU');
     final diskPctS = _v('磁盘%');
     final diskFull = _v('磁盘');
     final memMain = _v('内存主');
@@ -408,10 +399,7 @@ class _StatusCard extends StatelessWidget {
 
     final diskP = _pct(diskPctS) ?? _pct(diskFull);
     final memP = _pct(memMain) ?? _pct(memFull);
-    // load bar: 1m load / 4 (visual only, not utilization %)
-    double? loadP;
-    final loadN = double.tryParse(load1);
-    if (loadN != null) loadP = (loadN / 4.0).clamp(0.0, 1.0);
+    final cpuP = _pct(cpuPctS) ?? _pct(cpuFull);
 
     return Material(
       color: const Color(0xFF0F1419),
@@ -489,13 +477,12 @@ class _StatusCard extends StatelessWidget {
                 )
               else ...[
                 // ServerStatus style: label | value (no duplicate %) | bar
-                // CPU row shows loadavg; bar is 1m load / 4 (visual only)
+                // CPU utilization % (sampled /proc/stat)
                 _metricRow(
                   'CPU',
-                  loadAll == '—' ? load1 : loadAll,
-                  loadP,
+                  cpuPctS == '—' ? cpuFull : cpuPctS,
+                  cpuP,
                   const Color(0xFF38BDF8),
-                  showPct: false, // loadavg, not utilization %
                 ),
                 const SizedBox(height: 5),
                 // MEM: prefer "used/total" only; % comes from bar + optional once
@@ -542,9 +529,9 @@ class _StatusCard extends StatelessWidget {
                     if (up != '—') '⏱ $up',
                     if (sys != '—') sys,
                   ].join('  ·  '),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontFamily: 'monospace'),
+                  style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontFamily: 'monospace', height: 1.25),
                 ),
               ],
             ],

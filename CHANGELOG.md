@@ -1,3 +1,7 @@
+## 1.4.8
+
+- restore post-1.4.7: CPU%%, reasoning, markdown, files top bar, MT editor
+
 ## 1.4.7
 
 - 主机：顶栏/卡片密度压缩；CPU/MEM/HDD 指标；MEM/HDD 解析与去重

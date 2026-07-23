@@ -139,12 +139,13 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
+	cli.ThinkingLevel = llmCfg.ThinkingLevel
 	_ = s.Store.AddChat(body.SessionID, "user", body.Message)
 
 	// Durable memory + recent window (does not hard-forget older turns).
 	history, _ := agent.BuildMemoryMessages(s.Store, body.SessionID, body.Message, 16)
 
-	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; r(){ awk '/^cpu /{print $5+$6, $2+$3+$4+$5+$6+$7+$8+$9+$10+$11}' /proc/stat 2>/dev/null; }; set -- $(r); i1=$1 t1=$2; sleep 0.5; set -- $(r); i2=$1 t2=$2; di=$((i2-i1)); dt=$((t2-t1)); if [ -n "$dt" ] && [ "$dt" -gt 0 ]; then echo $(( (100*(dt-di))/dt )); else echo 0; fi; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 
 	run := func(name string, args map[string]any) (string, error) {
 		switch name {
@@ -276,10 +277,11 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 	writeEv(map[string]any{"type": "session", "sessionId": body.SessionID})
 
 	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
+	cli.ThinkingLevel = llmCfg.ThinkingLevel
 	_ = s.Store.AddChat(body.SessionID, "user", body.Message)
 	history, _ := agent.BuildMemoryMessages(s.Store, body.SessionID, body.Message, 16)
 
-	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; r(){ awk '/^cpu /{print $5+$6, $2+$3+$4+$5+$6+$7+$8+$9+$10+$11}' /proc/stat 2>/dev/null; }; set -- $(r); i1=$1 t1=$2; sleep 0.5; set -- $(r); i2=$1 t2=$2; di=$((i2-i1)); dt=$((t2-t1)); if [ -n "$dt" ] && [ "$dt" -gt 0 ]; then echo $(( (100*(dt-di))/dt )); else echo 0; fi; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 	run := func(name string, args map[string]any) (string, error) {
 		switch name {
 		case "probe_host":
@@ -384,6 +386,7 @@ func (s *Server) handleAgentPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
+	cli.ThinkingLevel = llmCfg.ThinkingLevel
 	_ = s.Store.AddChat(body.SessionID, "user", body.Goal)
 	raw, err := cli.Chat([]agent.Msg{
 		{Role: "system", Content: agent.SystemPrompt},
@@ -482,13 +485,14 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	// One SSH session / one compound command — much faster than 5 sequential dials.
-	const script = `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	const script = `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; r(){ awk '/^cpu /{print $5+$6, $2+$3+$4+$5+$6+$7+$8+$9+$10+$11}' /proc/stat 2>/dev/null; }; set -- $(r); i1=$1 t1=$2; sleep 0.5; set -- $(r); i2=$1 t2=$2; di=$((i2-i1)); dt=$((t2-t1)); if [ -n "$dt" ] && [ "$dt" -gt 0 ]; then echo $(( (100*(dt-di))/dt )); else echo 0; fi; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 	res, err := s.runSSH(id, script)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"uname":  map[string]any{"error": err.Error()},
 			"uptime": map[string]any{"error": err.Error()},
 			"load":   map[string]any{"error": err.Error()},
+			"cpu":    map[string]any{"error": err.Error()},
 			"disk":   map[string]any{"error": err.Error()},
 			"memory": map[string]any{"error": err.Error()},
 		})
@@ -502,6 +506,7 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 		"uname":  mk(parts["U"]),
 		"uptime": mk(parts["T"]),
 		"load":   mk(parts["L"]),
+		"cpu":    mk(parts["C"]),
 		"disk":   mk(parts["D"]),
 		"memory": mk(parts["M"]),
 		"durationMs": res.DurationMs,
@@ -509,7 +514,7 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 }
 
 func splitProbe(stdout string) map[string]string {
-	out := map[string]string{"U": "", "T": "", "L": "", "D": "", "M": ""}
+	out := map[string]string{"U": "", "T": "", "L": "", "C": "", "D": "", "M": ""}
 	cur := ""
 	for _, line := range strings.Split(stdout, "\n") {
 		if strings.HasPrefix(line, "___") && strings.HasSuffix(line, "___") && len(line) >= 7 {

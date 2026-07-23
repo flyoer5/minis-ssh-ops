@@ -15,6 +15,18 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
   @override
   bool get wantKeepAlive => true;
 
+  /// Backend stores UTC RFC3339; show device local wall clock.
+  String _fmtLocal(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return '';
+    final dt0 = DateTime.tryParse(s);
+    if (dt0 == null) return s;
+    final dt = dt0.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${dt.year}-${two(dt.month)}-${two(dt.day)} '
+        '${two(dt.hour)}:${two(dt.minute)}:${two(dt.second)}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -69,7 +81,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                       final risk = e['risk']?.toString() ?? '';
                       final cmd = e['command']?.toString() ?? '';
                       final exit = e['exitCode'];
-                      final at = e['createdAt']?.toString() ?? '';
+                      final at = _fmtLocal(e['createdAt']?.toString() ?? '');
                       return ListTile(
                         title: Text(cmd, maxLines: 2, overflow: TextOverflow.ellipsis),
                         subtitle: Text('[$risk] exit=$exit · $at'),
