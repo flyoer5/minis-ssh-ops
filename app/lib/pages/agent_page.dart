@@ -191,7 +191,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                   )
                 : ListView.builder(
                     controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
                     itemCount: state.agentMessages.length + (_busy ? 1 : 0),
                     itemBuilder: (_, i) {
                       if (_busy && i == state.agentMessages.length) {
@@ -213,6 +213,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                       return _Bubble(
                         key: ValueKey('$id|$part|${m.role}|${m.content.hashCode}'),
                         msg: m,
+                        fontSize: state.agentFontSize,
                       );
                     },
                   ),
@@ -225,7 +226,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                 color: Color(0xFF0D1117),
                 border: Border(top: BorderSide(color: Color(0xFF21262D))),
               ),
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -235,7 +236,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                       focusNode: _focus,
                       minLines: 1,
                       maxLines: 6,
-                      style: const TextStyle(fontSize: 15, color: Color(0xFFE6EDF3)),
+                      style: TextStyle(fontSize: state.agentFontSize, color: const Color(0xFFE6EDF3)),
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(state),
                       decoration: InputDecoration(
@@ -255,7 +256,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                           borderRadius: BorderRadius.circular(22),
                           borderSide: const BorderSide(color: Color(0xFF388BFD)),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
                   ),
@@ -267,7 +268,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                     shape: const CircleBorder(),
                     child: IconButton(
                       onPressed: (_busy || !state.backendOk || state.selectedHostId == null) ? null : () => _send(state),
-                      icon: const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+                      icon: const Icon(Icons.arrow_upward, color: Colors.white, size: 18),
                     ),
                   ),
                 ],
@@ -380,7 +381,8 @@ class _ConfirmPlanCard extends StatelessWidget {
 
 class _Bubble extends StatelessWidget {
   final ChatMessage msg;
-  const _Bubble({super.key, required this.msg});
+  final double fontSize;
+  const _Bubble({super.key, required this.msg, this.fontSize = 15});
 
   Future<void> _copy(BuildContext context, String text) async {
     await Clipboard.setData(ClipboardData(text: text));
@@ -404,6 +406,7 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fs = fontSize;
     if (msg.kind == ChatKind.plan) {
       return _ConfirmPlanCard(msg: msg);
     }
@@ -417,20 +420,20 @@ class _Bubble extends StatelessWidget {
         alignment: Alignment.centerRight,
         child: Container(
           constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
-          margin: const EdgeInsets.only(bottom: 10, left: 48),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          margin: const EdgeInsets.only(bottom: 8, left: 40),
+          padding: EdgeInsets.symmetric(horizontal: 11, vertical: fs > 16 ? 9 : 7),
           decoration: const BoxDecoration(
             color: Color(0xFF2563EB),
             borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(14),
-              topRight: Radius.circular(14),
-              bottomLeft: Radius.circular(14),
+              topLeft: Radius.circular(12),
+              topRight: Radius.circular(12),
+              bottomLeft: Radius.circular(12),
               bottomRight: Radius.circular(4),
             ),
           ),
           child: SelectableText(
             msg.content,
-            style: const TextStyle(height: 1.4, color: Colors.white, fontSize: 14.5),
+            style: TextStyle(height: 1.35, color: Colors.white, fontSize: fs - 0.5),
           ),
         ),
       );
@@ -439,40 +442,49 @@ class _Bubble extends StatelessWidget {
     // —— memory / generic status line ——
     if (msg.kind == ChatKind.status && part != 'toolUse') {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 8, left: 2),
-        child: Text(msg.content, style: const TextStyle(fontSize: 12.5, color: Color(0xFF8B949E))),
+        padding: const EdgeInsets.only(bottom: 6, left: 2),
+        child: Text(msg.content, style: TextStyle(fontSize: fs - 2.5, color: const Color(0xFF8B949E))),
       );
     }
 
     // —— toolUse / toolResult (Minis) ——
     if (part == 'toolUse' || part == 'toolResult') {
-      return _MinisToolBlock(msg: msg, part: part, onCopy: () => _copy(context, _copyText));
+      return _MinisToolBlock(
+        msg: msg,
+        part: part,
+        fontSize: fs,
+        onCopy: () => _copy(context, _copyText),
+      );
     }
 
     // —— reasoning (Minis messages.reasoning_content) ——
     if (msg.kind == ChatKind.reasoning || part == 'reasoning') {
-      return _ReasoningBlock(content: msg.content, onCopy: () => _copy(context, msg.content));
+      return _ReasoningBlock(
+        content: msg.content,
+        fontSize: fs,
+        onCopy: () => _copy(context, msg.content),
+      );
     }
 
     // —— error ——
     if (msg.kind == ChatKind.error || part == 'error') {
       return Container(
         width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.fromLTRB(10, 7, 10, 8),
         decoration: BoxDecoration(
           color: const Color(0xFF2D1214),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: const Color(0xFF6E2A2E)),
         ),
-        child: _MdBody(data: msg.content, baseColor: const Color(0xFFFFB4A9), fontSize: 14),
+        child: _MdBody(data: msg.content, baseColor: const Color(0xFFFFB4A9), fontSize: fs - 1),
       );
     }
 
     // —— text (assistant): Markdown ——
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12, right: 4),
-      child: _MdBody(data: msg.content, baseColor: const Color(0xFFE6EDF3), fontSize: 15),
+      padding: const EdgeInsets.only(bottom: 10, right: 4),
+      child: _MdBody(data: msg.content, baseColor: const Color(0xFFE6EDF3), fontSize: fs),
     );
   }
 
@@ -490,8 +502,9 @@ class _Bubble extends StatelessWidget {
 class _MinisToolBlock extends StatefulWidget {
   final ChatMessage msg;
   final String part;
+  final double fontSize;
   final VoidCallback onCopy;
-  const _MinisToolBlock({required this.msg, required this.part, required this.onCopy});
+  const _MinisToolBlock({required this.msg, required this.part, required this.onCopy, this.fontSize = 15});
 
   @override
   State<_MinisToolBlock> createState() => _MinisToolBlockState();
@@ -605,7 +618,7 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
                       running
                           ? Icons.play_circle_outline
                           : (success == false ? Icons.error_outline : Icons.check_circle_outline),
-                      size: 15,
+                      size: (widget.fontSize - 1).clamp(12, 18).toDouble(),
                       color: accent,
                     ),
                   ),
@@ -620,7 +633,7 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: widget.fontSize - 3,
                             fontWeight: FontWeight.w700,
                             color: accent,
                             fontFamily: 'monospace',
@@ -633,7 +646,7 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
                             _desc,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12.5, color: Color(0xFFC9D1D9), height: 1.3),
+                            style: TextStyle(fontSize: widget.fontSize - 2.5, color: const Color(0xFFC9D1D9), height: 1.3),
                           ),
                         ],
                       ],
@@ -663,14 +676,14 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
                 color: Color(0xFF0D1117),
                 border: Border(top: BorderSide(color: Color(0xFF21262D))),
               ),
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
               child: SelectableText(
                 body,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'monospace',
-                  fontSize: 12,
+                  fontSize: widget.fontSize - 3,
                   height: 1.35,
-                  color: Color(0xFFC9D1D9),
+                  color: const Color(0xFFC9D1D9),
                 ),
               ),
             ),
@@ -683,8 +696,9 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
 /// Minis-like deep thinking: separate from answer, collapsed by default.
 class _ReasoningBlock extends StatefulWidget {
   final String content;
+  final double fontSize;
   final VoidCallback onCopy;
-  const _ReasoningBlock({required this.content, required this.onCopy});
+  const _ReasoningBlock({required this.content, required this.onCopy, this.fontSize = 15});
 
   @override
   State<_ReasoningBlock> createState() => _ReasoningBlockState();
@@ -721,10 +735,10 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('思考', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFA78BFA))),
+                        Text('思考', style: TextStyle(fontSize: widget.fontSize - 3, fontWeight: FontWeight.w700, color: const Color(0xFFA78BFA))),
                         if (!_open && short.isNotEmpty)
                           Text(short, maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF8B949E))),
+                              style: TextStyle(fontSize: widget.fontSize - 3.5, color: const Color(0xFF8B949E))),
                       ],
                     ),
                   ),
@@ -747,10 +761,10 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
                 color: Color(0xFF0D1117),
                 border: Border(top: BorderSide(color: Color(0xFF21262D))),
               ),
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
               child: SelectableText(
                 widget.content,
-                style: const TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF9CA3AF), fontFamily: 'monospace'),
+                style: TextStyle(fontSize: widget.fontSize - 2.5, height: 1.4, color: const Color(0xFF9CA3AF), fontFamily: 'monospace'),
               ),
             ),
         ],

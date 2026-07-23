@@ -1,3 +1,9 @@
+## 1.4.9
+
+- 设置页分区重做；终端/Agent/记录字号可调
+- Agent 控件与正文字号联动收紧
+- 记录页更密列表 + 本地时间
+
 ## 1.4.8
 
 - restore post-1.4.7: CPU%%, reasoning, markdown, files top bar, MT editor

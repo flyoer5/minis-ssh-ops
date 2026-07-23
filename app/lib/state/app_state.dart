@@ -108,6 +108,8 @@ class AppState extends ChangeNotifier {
   final Map<String, Map<String, dynamic>> probeCache = {};
   // --- UI prefs ---
   double termFontSize = 13;
+  double agentFontSize = 15; // assistant body base
+  double recordsFontSize = 13;
   bool confirmWrites = false; // reserved; agent auto-runs non-blocked
   bool batteryIgnored = true;
   bool onboarded = true;
@@ -122,6 +124,8 @@ class AppState extends ChangeNotifier {
     api.baseUrl = prefs.getString('baseUrl') ?? api.baseUrl;
     api.localToken = prefs.getString('localToken') ?? api.localToken;
     termFontSize = prefs.getDouble('termFontSize') ?? 13;
+    agentFontSize = prefs.getDouble('agentFontSize') ?? 15;
+    recordsFontSize = prefs.getDouble('recordsFontSize') ?? 13;
     selectedHostId = prefs.getString('selectedHostId') ?? selectedHostId;
     onboarded = true; // onboarding removed
     confirmWrites = prefs.getBool('confirmWrites') ?? false;
@@ -267,6 +271,20 @@ class AppState extends ChangeNotifier {
     termFontSize = v.clamp(10, 22);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('termFontSize', termFontSize);
+    notifyListeners();
+  }
+
+  Future<void> setAgentFontSize(double v) async {
+    agentFontSize = v.clamp(12, 20);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('agentFontSize', agentFontSize);
+    notifyListeners();
+  }
+
+  Future<void> setRecordsFontSize(double v) async {
+    recordsFontSize = v.clamp(11, 18);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('recordsFontSize', recordsFontSize);
     notifyListeners();
   }
 
@@ -554,6 +572,8 @@ class AppState extends ChangeNotifier {
       'llm': llmOut,
       'prefs': {
         'termFontSize': termFontSize,
+        'agentFontSize': agentFontSize,
+        'recordsFontSize': recordsFontSize,
         'confirmWrites': confirmWrites,
       },
       'note': includeSecrets
@@ -603,6 +623,12 @@ class AppState extends ChangeNotifier {
     if (pr is Map) {
       if (pr['termFontSize'] is num) {
         await setTermFontSize((pr['termFontSize'] as num).toDouble());
+      }
+      if (pr['agentFontSize'] is num) {
+        await setAgentFontSize((pr['agentFontSize'] as num).toDouble());
+      }
+      if (pr['recordsFontSize'] is num) {
+        await setRecordsFontSize((pr['recordsFontSize'] as num).toDouble());
       }
       if (pr['confirmWrites'] is bool) {
         await setConfirmWrites(pr['confirmWrites'] as bool);
