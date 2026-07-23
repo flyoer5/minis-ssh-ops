@@ -302,17 +302,7 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
 	_ = s.Store.AddChat(body.SessionID, "user", body.Message)
 	histRows, _ := s.Store.ListChat(body.SessionID, 40)
-	var history []agent.LoopMsg
-	for _, row := range histRows {
-		role, _ := row["role"].(string)
-		content, _ := row["content"].(string)
-		if role == "user" || role == "assistant" {
-			history = append(history, agent.LoopMsg{Role: role, Content: content})
-		}
-	}
-	if n := len(history); n > 0 && history[n-1].Role == "user" && history[n-1].Content == body.Message {
-		history = history[:n-1]
-	}
+	history := compactChatHistory(histRows, body.Message, 12)
 
 	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 	run := func(name string, args map[string]any) (string, error) {
