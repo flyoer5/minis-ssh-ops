@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:ssh_ai_agent/backend/native_backend.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
 class FilesPage extends StatefulWidget {
@@ -234,32 +235,45 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       final size = r['size'] ?? 0;
       if (!mounted) return;
       final bytes = base64Decode(b64);
-      String asText;
+      String asText = '';
       try {
         asText = utf8.decode(bytes, allowMalformed: true);
+      } catch (_) {}
+      final looksText =
+          asText.isNotEmpty && !asText.contains('\u0000') && size is int && size < 512 * 1024;
+
+      String? savedPath;
+      try {
+        savedPath = await NativeBackend.saveBytesToDownloads(name: name, b64: b64);
       } catch (_) {
-        asText = '';
+        savedPath = null;
       }
-      final looksText = asText.isNotEmpty && !asText.contains('\u0000') && size is int && size < 512 * 1024;
+
+      if (!mounted) return;
       await showDialog(
         context: context,
         builder: (c) => AlertDialog(
           title: Text(name),
-          content: Text(looksText ? '已下载 $size 字节，可复制文本内容。' : '已下载 $size 字节（二进制）。可复制 base64。'),
+          content: Text(
+            savedPath != null
+                ? '已保存 $size 字节到下载目录：\n$savedPath'
+                : '已拉取 $size 字节（无法写入下载目录时可复制内容）。',
+          ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
-            FilledButton(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: looksText ? asText : b64));
-                if (c.mounted) Navigator.pop(c);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(looksText ? '已复制文本' : '已复制 base64')),
-                  );
-                }
-              },
-              child: Text(looksText ? '复制文本' : '复制 base64'),
-            ),
+            if (looksText || b64.isNotEmpty)
+              FilledButton(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: looksText ? asText : b64));
+                  if (c.mounted) Navigator.pop(c);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(looksText ? '已复制文本' : '已复制 base64')),
+                    );
+                  }
+                },
+                child: Text(looksText ? '复制文本' : '复制 base64'),
+              ),
           ],
         ),
       );

@@ -560,7 +560,7 @@ class AppState extends ChangeNotifier {
           ? 'secrets not exported via this path'
           : 'passwords/keys not included',
     };
-    return const JsonEncoder.withIndent('  ').convert(obj);
+    return JsonEncoder.withIndent('  ').convert(obj);
   }
 
   Future<String> importConfigJson(String raw) async {
@@ -885,43 +885,6 @@ class AppState extends ChangeNotifier {
     llm = await api.putLlm(body);
     notifyListeners();
   }
-}
-
-class JsonEncoder {
-  final String? indent;
-  const JsonEncoder.withIndent(this.indent);
-  String convert(Object? value) => _enc(value, 0);
-
-  String _enc(Object? v, int level) {
-    final pad = '  ' * level;
-    final pad1 = '  ' * (level + 1);
-    if (v is Map) {
-      if (v.isEmpty) return '{}';
-      final b = StringBuffer('{\n');
-      final keys = v.keys.toList();
-      for (var i = 0; i < keys.length; i++) {
-        final k = keys[i];
-        b.write('$pad1"$k": ${_enc(v[k], level + 1)}');
-        b.write(i == keys.length - 1 ? '\n' : ',\n');
-      }
-      b.write('$pad}');
-      return b.toString();
-    }
-    if (v is List) {
-      if (v.isEmpty) return '[]';
-      final b = StringBuffer('[\n');
-      for (var i = 0; i < v.length; i++) {
-        b.write('$pad1${_enc(v[i], level + 1)}');
-        b.write(i == v.length - 1 ? '\n' : ',\n');
-      }
-      b.write('$pad]');
-      return b.toString();
-    }
-    if (v is String) return '"${v.replaceAll('"', '\\"')}"';
-    return '$v';
-  }
-}
-
 
   String _friendlyErr(Object e) {
     final s = e.toString();
@@ -939,6 +902,7 @@ class JsonEncoder {
     if (m != null) return m.group(1)!;
     return s;
   }
+}
 
 class ProbeLine {
   final String label;

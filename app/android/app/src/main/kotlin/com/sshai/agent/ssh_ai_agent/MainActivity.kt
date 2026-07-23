@@ -108,9 +108,57 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                     }
+                    "saveBytesToDownloads" -> {
+                        executor.execute {
+                            try {
+                                val name = call.argument<String>("name") ?: "download.bin"
+                                val b64 = call.argument<String>("b64") ?: ""
+                                val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+                                val path = saveToDownloads(name, bytes)
+                                mainHandler.post { result.success(path) }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "saveBytesToDownloads failed", e)
+                                mainHandler.post { result.error("SAVE", e.message, null) }
+                            }
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun saveToDownloads(name: String, bytes: ByteArray): String {
+        val safe = name.replace(Regex("[\\\\/]+"), "_").ifEmpty { "download.bin" }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = applicationContext.contentResolver
+            val values = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.Downloads.DISPLAY_NAME, safe)
+                put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/octet-stream")
+                put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("MediaStore insert failed")
+            resolver.openOutputStream(uri)?.use { it.write(bytes) }
+                ?: throw IllegalStateException("openOutputStream failed")
+            values.clear()
+            values.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+            return uri.toString()
+        }
+        @Suppress("DEPRECATION")
+        val dir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+        if (!dir.exists()) dir.mkdirs()
+        var out = File(dir, safe)
+        var i = 1
+        val dot = safe.lastIndexOf('.')
+        val base = if (dot > 0) safe.substring(0, dot) else safe
+        val ext = if (dot > 0) safe.substring(dot) else ""
+        while (out.exists()) {
+            out = File(dir, "${base}_$i$ext")
+            i++
+        }
+        FileOutputStream(out).use { it.write(bytes) }
+        return out.absolutePath
     }
 
     private fun isIgnoringBattery(): Boolean {

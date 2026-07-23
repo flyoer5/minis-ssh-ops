@@ -46,4 +46,19 @@ class NativeBackend {
     final v = await _channel.invokeMethod<dynamic>('exportBackendLog');
     return v?.toString() ?? '';
   }
+
+  /// Save raw base64 bytes into system Downloads. Returns path/uri string.
+  static Future<String> saveBytesToDownloads({
+    required String name,
+    required String b64,
+  }) async {
+    if (!isAndroidNative) {
+      throw PlatformException(code: 'UNSUPPORTED', message: 'only Android');
+    }
+    final v = await _channel.invokeMethod<dynamic>('saveBytesToDownloads', {
+      'name': name,
+      'b64': b64,
+    });
+    return v?.toString() ?? '';
+  }
 }
