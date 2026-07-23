@@ -346,116 +346,167 @@ class _StatusCard extends StatelessWidget {
   }
 
   double? _pct(String s) {
-    final m = RegExp(r'(\d+(?:\.\d+)?)%').firstMatch(s);
+    final m = RegExp(r'(\d+(?:\.\d+)?)\s*%').firstMatch(s);
     if (m != null) return (double.tryParse(m.group(1)!) ?? 0).clamp(0, 100) / 100.0;
-    final n = double.tryParse(s.replaceAll('%', '').trim());
-    if (n != null && n <= 100) return (n.clamp(0, 100)) / 100.0;
+    // used/total like 1.2Gi/3.7Gi
+    final parts = s.split('/');
+    if (parts.length == 2) {
+      double? parse(String x) {
+        x = x.trim().toUpperCase();
+        final m2 = RegExp(r'([\d.]+)\s*([KMGT]?I?B?)').firstMatch(x);
+        if (m2 == null) return null;
+        var n = double.tryParse(m2.group(1)!) ?? 0;
+        final u = m2.group(2) ?? '';
+        if (u.startsWith('T')) n *= 1024 * 1024;
+        else if (u.startsWith('G')) n *= 1024;
+        else if (u.startsWith('M')) n *= 1;
+        else if (u.startsWith('K')) n /= 1024;
+        return n;
+      }
+      final a = parse(parts[0]);
+      final b = parse(parts[1]);
+      if (a != null && b != null && b > 0) return (a / b).clamp(0.0, 1.0);
+    }
     return null;
   }
 
+  Color _barColor(double? p) {
+    if (p == null) return const Color(0xFF64748B);
+    if (p >= 0.9) return const Color(0xFFEF4444);
+    if (p >= 0.75) return const Color(0xFFF59E0B);
+    return const Color(0xFF22C55E);
+  }
+
   Color get _status {
-    if (loading) return const Color(0xFFFFB020);
+    if (loading) return const Color(0xFFFBBF24);
     if (summary == null) return const Color(0xFF64748B);
     if (!summary!.ok) return const Color(0xFFEF4444);
-    final d = _pct(_v('磁盘%')) ?? 0;
-    final m = _pct(_v('内存主')) ?? 0;
-    if (d >= 0.9 || m >= 0.9) return const Color(0xFFEF4444);
-    if (d >= 0.75 || m >= 0.75) return const Color(0xFFF59E0B);
     return const Color(0xFF22C55E);
+  }
+
+  String get _statusText {
+    if (loading) return '探测中';
+    if (summary == null) return '未探测';
+    return summary!.ok ? 'Online' : 'Offline';
   }
 
   @override
   Widget build(BuildContext context) {
-    final diskPctS = _v('磁盘%');
-    final memMain = _v('内存主');
+    // ServerStatus-like fields
     final load1 = _v('负载1');
+    final loadAll = _v('负载');
+    final diskPctS = _v('磁盘%');
+    final diskFull = _v('磁盘');
+    final memMain = _v('内存主');
+    final memFull = _v('内存');
     final up = _v('运行');
     final sys = _v('系统');
-    final diskFull = _v('磁盘');
-    final memFull = _v('内存');
+
     final diskP = _pct(diskPctS) ?? _pct(diskFull);
     final memP = _pct(memMain) ?? _pct(memFull);
+    // load as relative bar (cap at 4 for visual)
+    double? loadP;
+    final loadN = double.tryParse(load1);
+    if (loadN != null) loadP = (loadN / 4.0).clamp(0.0, 1.0);
 
     return Material(
-      color: const Color(0xFF0B1220),
+      color: const Color(0xFF0F1419),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: selected ? const Color(0xFF38BDF8) : const Color(0xFF1E293B),
-          width: selected ? 1.6 : 1,
+          color: selected ? const Color(0xFF3B82F6) : const Color(0xFF1E293B),
+          width: selected ? 1.5 : 1,
         ),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         onTap: onSelect,
         onLongPress: onMenu,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          padding: const EdgeInsets.fromLTRB(12, 10, 6, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // name row — like ServerStatus node header
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _status.withAlpha(0x22),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: _status.withAlpha(0x66)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(width: 7, height: 7, decoration: BoxDecoration(color: _status, shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Text(
-                          loading ? '探测中' : (summary == null ? '未探测' : (summary!.ok ? '在线' : '异常')),
-                          style: TextStyle(fontSize: 11, color: _status, fontWeight: FontWeight.w700),
-                        ),
-                      ],
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(color: _status, shape: BoxShape.circle, boxShadow: [
+                      BoxShadow(color: _status.withAlpha(0x66), blurRadius: 6),
+                    ]),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.2),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                        Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'monospace')),
-                      ],
-                    ),
+                  Text(
+                    _statusText,
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _status),
                   ),
                   if (loading)
                     const Padding(
-                      padding: EdgeInsets.only(right: 10),
-                      child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                      padding: EdgeInsets.only(left: 8, right: 6),
+                      child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
                     )
                   else ...[
-                    IconButton(visualDensity: VisualDensity.compact, onPressed: onRefresh, icon: const Icon(Icons.sync, size: 18, color: Color(0xFF94A3B8))),
-                    IconButton(visualDensity: VisualDensity.compact, onPressed: onMenu, icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF94A3B8))),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      onPressed: onRefresh,
+                      icon: const Icon(Icons.sync, size: 16, color: Color(0xFF64748B)),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      onPressed: onMenu,
+                      icon: const Icon(Icons.more_vert, size: 16, color: Color(0xFF64748B)),
+                    ),
                   ],
                 ],
               ),
-              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.only(left: 17, top: 2),
+                child: Text(addr, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontFamily: 'monospace')),
+              ),
+              const SizedBox(height: 10),
               if (summary == null && !loading)
-                const Text('下拉刷新或点同步获取探针数据', style: TextStyle(fontSize: 12, color: Color(0xFF64748B)))
+                const Padding(
+                  padding: EdgeInsets.only(left: 4),
+                  child: Text('下拉或点同步获取探针数据', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                )
               else ...[
-                _gauge('CPU负载', load1, null, const Color(0xFF38BDF8), subtitle: _v('负载')),
+                // ServerStatus style metric rows: label | bar | value
+                _metricRow('CPU', loadAll == '—' ? load1 : loadAll, loadP, const Color(0xFF38BDF8)),
                 const SizedBox(height: 8),
-                _gauge('磁盘', diskPctS == '—' ? diskFull : diskPctS, diskP, const Color(0xFFA78BFA), subtitle: diskFull),
+                _metricRow('MEM', memMain == '—' ? memFull : '$memMain  $memFull'.trim(), memP, const Color(0xFFA78BFA)),
                 const SizedBox(height: 8),
-                _gauge('内存', memMain == '—' ? memFull : memMain, memP, const Color(0xFF4ADE80), subtitle: memFull),
-                const SizedBox(height: 8),
+                _metricRow('HDD', diskPctS == '—' ? diskFull : '$diskPctS  $diskFull'.trim(), diskP, const Color(0xFF34D399)),
+                const SizedBox(height: 10),
+                // uptime + OS like server table footer
                 Row(
                   children: [
-                    const Icon(Icons.schedule, size: 14, color: Color(0xFFFBBF24)),
-                    const SizedBox(width: 6),
-                    Text('运行 $up', style: const TextStyle(fontSize: 12, color: Color(0xFFCBD5E1))),
+                    const Icon(Icons.schedule, size: 13, color: Color(0xFFFBBF24)),
+                    const SizedBox(width: 4),
+                    Text('Uptime $up', style: const TextStyle(fontSize: 11, color: Color(0xFFCBD5E1), fontFamily: 'monospace')),
                   ],
                 ),
                 if (sys != '—') ...[
-                  const SizedBox(height: 6),
-                  Text(sys, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontFamily: 'monospace')),
+                  const SizedBox(height: 4),
+                  Text(
+                    sys,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontFamily: 'monospace'),
+                  ),
                 ],
               ],
             ],
@@ -465,44 +516,40 @@ class _StatusCard extends StatelessWidget {
     );
   }
 
-  Widget _gauge(String title, String value, double? progress, Color color, {String? subtitle}) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1E293B)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(title, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w700)),
-              const Spacer(),
-              Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, fontFamily: 'monospace')),
-            ],
-          ),
-          if (progress != null) ...[
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(99),
-              child: LinearProgressIndicator(
-                value: progress.clamp(0.0, 1.0),
-                minHeight: 6,
-                backgroundColor: const Color(0xFF1E293B),
-                color: progress >= 0.9
-                    ? const Color(0xFFEF4444)
-                    : (progress >= 0.75 ? const Color(0xFFF59E0B) : color),
+  Widget _metricRow(String label, String value, double? progress, Color accent) {
+    final c = progress == null ? accent : _barColor(progress);
+    final pctText = progress == null ? '' : '  ${(progress * 100).toStringAsFixed(0)}%';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 36,
+              child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: accent, letterSpacing: 0.5)),
+            ),
+            Expanded(
+              child: Text(
+                value + pctText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: Color(0xFFE2E8F0)),
               ),
             ),
           ],
-          if (subtitle != null && subtitle != '—' && subtitle != value) ...[
-            const SizedBox(height: 4),
-            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontFamily: 'monospace')),
-          ],
-        ],
-      ),
+        ),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: LinearProgressIndicator(
+            value: progress?.clamp(0.0, 1.0) ?? 0,
+            minHeight: 6,
+            backgroundColor: const Color(0xFF1E293B),
+            color: progress == null ? const Color(0xFF334155) : c,
+          ),
+        ),
+      ],
     );
   }
 }

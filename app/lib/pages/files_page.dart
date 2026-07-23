@@ -435,11 +435,21 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                 color: focused ? const Color(0xFF1A2A33) : const Color(0xFF1E1E1E),
                 child: Column(
                   children: [
+                    // MT-style path strip: ~ / full/path   [↑] [↻]
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(6, 6, 2, 2),
+                      padding: const EdgeInsets.fromLTRB(8, 8, 2, 4),
                       child: Row(
                         children: [
-                          Icon(Icons.folder, size: 16, color: focused ? const Color(0xFFFFB74D) : Colors.white54),
+                          Text(
+                            idx == 0 ? '左' : '右',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: focused ? const Color(0xFF4FC3F7) : const Color(0xFF666666),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text('~', style: TextStyle(fontSize: 13, color: Color(0xFF9E9E9E), fontFamily: 'monospace')),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
@@ -448,16 +458,16 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontFamily: 'monospace',
-                                fontSize: 11,
-                                color: focused ? Colors.white : Colors.white70,
+                                fontSize: 12,
+                                color: focused ? Colors.white : const Color(0xFFBDBDBD),
                               ),
                             ),
                           ),
                           IconButton(
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                            icon: const Icon(Icons.arrow_upward, size: 16),
+                            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                            icon: const Icon(Icons.arrow_upward, size: 18),
                             onPressed: () {
                               setState(() => focus = idx);
                               _up(pane);
@@ -466,8 +476,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                           IconButton(
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                            icon: const Icon(Icons.refresh, size: 16),
+                            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                            icon: const Icon(Icons.refresh, size: 18),
                             onPressed: pane.loading
                                 ? null
                                 : () {
@@ -522,45 +532,9 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                               final name = e['name']?.toString() ?? '';
                               final fp = e['path']?.toString() ?? name;
                               final sel = pane.selected.contains(fp);
-                              return ListTile(
-                                dense: true,
-                                visualDensity: VisualDensity.compact,
-                                selected: sel,
-                                selectedTileColor: const Color(0xFF1A3A5C),
-                                leading: pane.selecting
-                                    ? Checkbox(
-                                        value: sel,
-                                        onChanged: (_) {
-                                          setState(() {
-                                            focus = idx;
-                                            if (sel) {
-                                              pane.selected.remove(fp);
-                                            } else {
-                                              pane.selected.add(fp);
-                                            }
-                                            pane.selecting = pane.selected.isNotEmpty;
-                                          });
-                                        },
-                                      )
-                                    : Icon(
-                                        isDir ? Icons.folder : Icons.insert_drive_file,
-                                        size: 20,
-                                        color: isDir ? const Color(0xFFFFB74D) : const Color(0xFF90CAF9),
-                                      ),
-                                title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
-                                subtitle: Text(
-                                  isDir ? (e['mode']?.toString() ?? '') : _fmtSize(e['size']),
-                                  style: const TextStyle(fontSize: 10, color: Color(0xFF9E9E9E), fontFamily: 'monospace'),
-                                ),
-                                trailing: pane.selecting
-                                    ? null
-                                    : IconButton(
-                                        icon: const Icon(Icons.more_vert, size: 16),
-                                        onPressed: () {
-                                          setState(() => focus = idx);
-                                          _itemSheet(e);
-                                        },
-                                      ),
+                              final mtime = e['modTime']?.toString() ?? e['mtime']?.toString() ?? e['time']?.toString() ?? '';
+                              final sizeStr = isDir ? '' : _fmtSize(e['size']);
+                              return InkWell(
                                 onTap: () {
                                   setState(() => focus = idx);
                                   if (pane.selecting) {
@@ -587,6 +561,72 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                     pane.selected.add(fp);
                                   });
                                 },
+                                child: Container(
+                                  color: sel ? const Color(0xFF1A3A5C) : Colors.transparent,
+                                  padding: const EdgeInsets.fromLTRB(8, 7, 4, 7),
+                                  child: Row(
+                                    children: [
+                                      if (pane.selecting)
+                                        Padding(
+                                          padding: const EdgeInsets.only(right: 6),
+                                          child: Icon(
+                                            sel ? Icons.check_circle : Icons.radio_button_unchecked,
+                                            size: 18,
+                                            color: sel ? const Color(0xFF4FC3F7) : Colors.white38,
+                                          ),
+                                        )
+                                      else
+                                        Padding(
+                                          padding: const EdgeInsets.only(right: 8),
+                                          child: Icon(
+                                            isDir ? Icons.folder : Icons.insert_drive_file_outlined,
+                                            size: 22,
+                                            color: isDir ? const Color(0xFFFFB74D) : const Color(0xFF90CAF9),
+                                          ),
+                                        ),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                            ),
+                                            if (mtime.isNotEmpty || (!isDir && sizeStr.isNotEmpty))
+                                              Text(
+                                                [
+                                                  if (!isDir && sizeStr.isNotEmpty) sizeStr,
+                                                  if (mtime.isNotEmpty) mtime,
+                                                  if (isDir) (e['mode']?.toString() ?? ''),
+                                                ].where((s) => s.toString().isNotEmpty).join('  ·  '),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E), fontFamily: 'monospace'),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (!isDir && sizeStr.isNotEmpty && mtime.isEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(right: 4),
+                                          child: Text(sizeStr, style: const TextStyle(fontSize: 11, color: Color(0xFFBDBDBD), fontFamily: 'monospace')),
+                                        ),
+                                      if (!pane.selecting)
+                                        IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                          icon: const Icon(Icons.more_horiz, size: 18, color: Colors.white54),
+                                          onPressed: () {
+                                            setState(() => focus = idx);
+                                            _itemSheet(e);
+                                          },
+                                        ),
+                                    ],
+                                  ),
+                                ),
                               );
                             },
                           ),
@@ -605,8 +645,6 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     if (state.selectedHostId == null) {
       return const Scaffold(body: Center(child: Text('先选主机')));
     }
-    final wide = dualPane;
-
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
@@ -656,21 +694,15 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       body: Column(
         children: [
           Expanded(
-            child: wide
+            child: dualPane
                 ? Row(
                     children: [
                       _pane(context, _left, 0),
-                      Container(width: 2, color: const Color(0xFF0A0A0A)),
+                      Container(width: 1, color: const Color(0xFF2A2A2A)),
                       _pane(context, _right, 1),
                     ],
                   )
-                : Column(
-                    children: [
-                      Expanded(child: _pane(context, _left, 0)),
-                      Container(height: 2, color: const Color(0xFF0A0A0A)),
-                      Expanded(child: _pane(context, _right, 1)),
-                    ],
-                  ),
+                : Row(children: [_pane(context, active, focus)]),
           ),
           // MT-like bottom bar operates on focused pane / cross-pane
           Material(
@@ -683,8 +715,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                     ? Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _bar(Icons.copy_all, '复制→', active.selected.isEmpty ? null : () => _copyToOther()),
-                          _bar(Icons.drive_file_move_outline, '移动→', active.selected.isEmpty ? null : _moveToOther),
+                          _bar(Icons.copy_all, '复制', active.selected.isEmpty ? null : () => _copyToOther()),
+                          _bar(Icons.drive_file_move_outline, '移动', active.selected.isEmpty ? null : _moveToOther),
                           _bar(Icons.delete_outline, '删除', active.selected.isEmpty ? null : () => _deletePaths(active.selected, ask: true)),
                           _bar(Icons.close, '取消', () {
                             setState(() {
@@ -697,11 +729,57 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _bar(Icons.create_new_folder_outlined, '新建夹', _mkdir),
-                          _bar(Icons.note_add_outlined, '新文件', _newFile),
+                          _bar(Icons.create_new_folder_outlined, '新建', () async {
+                            final a = await showModalBottomSheet<String>(
+                              context: context,
+                              backgroundColor: const Color(0xFF1E1E1E),
+                              builder: (c) => SafeArea(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ListTile(leading: const Icon(Icons.create_new_folder_outlined), title: const Text('新建文件夹'), onTap: () => Navigator.pop(c, 'dir')),
+                                    ListTile(leading: const Icon(Icons.note_add_outlined), title: const Text('新建文件'), onTap: () => Navigator.pop(c, 'file')),
+                                  ],
+                                ),
+                              ),
+                            );
+                            if (a == 'dir') await _mkdir();
+                            if (a == 'file') await _newFile();
+                          }),
                           _bar(Icons.checklist, '多选', () => setState(() => active.selecting = true)),
+                          _bar(Icons.view_column_outlined, dualPane ? '单栏' : '双栏', () => setState(() => dualPane = !dualPane)),
                           _bar(Icons.swap_horiz, '切栏', () => setState(() => focus = 1 - focus)),
-                          _bar(Icons.refresh, '刷新', active.loading ? null : () => _load(active)),
+                          _bar(Icons.more_horiz, '更多', () async {
+                            final a = await showModalBottomSheet<String>(
+                              context: context,
+                              backgroundColor: const Color(0xFF1E1E1E),
+                              builder: (c) => SafeArea(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ListTile(leading: const Icon(Icons.refresh), title: const Text('刷新'), onTap: () => Navigator.pop(c, 'refresh')),
+                                    ListTile(leading: const Icon(Icons.swap_vert), title: const Text('交换左右路径'), onTap: () => Navigator.pop(c, 'swap')),
+                                    ListTile(leading: const Icon(Icons.home_outlined), title: const Text('回到 /'), onTap: () => Navigator.pop(c, 'root')),
+                                  ],
+                                ),
+                              ),
+                            );
+                            if (a == 'refresh') _load(active);
+                            if (a == 'root') _go(active, '/');
+                            if (a == 'swap') {
+                              setState(() {
+                                final tp = _left.path;
+                                final te = _left.entries;
+                                final terr = _left.err;
+                                _left.path = _right.path;
+                                _left.entries = _right.entries;
+                                _left.err = _right.err;
+                                _right.path = tp;
+                                _right.entries = te;
+                                _right.err = terr;
+                              });
+                            }
+                          }),
                         ],
                       ),
               ),

@@ -139,6 +139,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     super.build(context);
     final state = context.watch<AppState>();
     return Scaffold(
+      backgroundColor: const Color(0xFF0D1117),
       appBar: AppBar(
         title: Text(
           state.selectedHostId == null ? 'Agent' : state.hostLabel,
@@ -203,32 +204,58 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                     },
                   ),
           ),
+          // Minis-like composer
           SafeArea(
             top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFF0D1117),
+                border: Border(top: BorderSide(color: Color(0xFF21262D))),
+              ),
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _input,
                       focusNode: _focus,
                       minLines: 1,
-                      maxLines: 5,
+                      maxLines: 6,
+                      style: const TextStyle(fontSize: 15, color: Color(0xFFE6EDF3)),
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(state),
                       decoration: InputDecoration(
-                        hintText: state.selectedHostId == null ? '先选主机' : null,
+                        hintText: state.selectedHostId == null ? '先选主机' : '消息',
+                        hintStyle: const TextStyle(color: Color(0xFF6E7681)),
                         filled: true,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        fillColor: const Color(0xFF161B22),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: const BorderSide(color: Color(0xFF30363D)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: const BorderSide(color: Color(0xFF30363D)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: const BorderSide(color: Color(0xFF388BFD)),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: (_busy || !state.backendOk || state.selectedHostId == null) ? null : () => _send(state),
-                    icon: const Icon(Icons.arrow_upward),
+                  Material(
+                    color: (_busy || !state.backendOk || state.selectedHostId == null)
+                        ? const Color(0xFF21262D)
+                        : const Color(0xFF238636),
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      onPressed: (_busy || !state.backendOk || state.selectedHostId == null) ? null : () => _send(state),
+                      icon: const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+                    ),
                   ),
                 ],
               ),
@@ -342,6 +369,15 @@ class _Bubble extends StatelessWidget {
   final ChatMessage msg;
   const _Bubble({required this.msg});
 
+  Future<void> _copy(BuildContext context, String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (msg.kind == ChatKind.plan) {
@@ -353,170 +389,229 @@ class _Bubble extends StatelessWidget {
     final isStatus = msg.kind == ChatKind.status;
     final isErr = msg.kind == ChatKind.error;
 
+    // —— USER (Minis-like right bubble) ——
     if (isUser) {
       return Align(
         alignment: Alignment.centerRight,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 12, left: 40),
+          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.82),
+          margin: const EdgeInsets.only(bottom: 12, left: 36),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF2563EB),
-            borderRadius: BorderRadius.circular(16),
+          decoration: const BoxDecoration(
+            color: Color(0xFF2B5CFF),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+              bottomLeft: Radius.circular(16),
+              bottomRight: Radius.circular(4),
+            ),
           ),
-          child: SelectableText(msg.content, style: const TextStyle(height: 1.4, color: Colors.white, fontSize: 14.5)),
+          child: SelectableText(
+            msg.content,
+            style: const TextStyle(height: 1.4, color: Colors.white, fontSize: 15),
+          ),
         ),
       );
     }
 
-    // Minis-like tool / status / assistant blocks
-    if (isTool || isStatus) {
-      final running = isStatus || msg.content == 'running' || msg.content.startsWith('探测');
-      final title = () {
-        if (msg.meta?['name'] == 'probe_host' || msg.content.contains('探测主机')) return 'probe_host';
-        if (msg.content.startsWith(r'$ ')) return 'run_command';
-        return msg.meta?['name']?.toString() ?? 'tool';
-      }();
-      // split command vs body for stepResult
-      String header = title;
+    // —— STATUS (compact Minis "working" line) ——
+    if (isStatus && !isTool) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10, left: 4, right: 4),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 1.6, color: Color(0xFFD97706)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                msg.content,
+                style: const TextStyle(fontSize: 13, color: Color(0xFFD97706), height: 1.3),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // —— TOOL call / result (Minis tool block) ——
+    if (isTool || (isStatus && msg.meta != null)) {
+      final name = msg.meta?['name']?.toString() ?? 'tool';
+      final command = msg.meta?['command']?.toString() ?? '';
+      String headerCmd = command;
       String body = msg.content;
-      if (msg.kind == ChatKind.stepResult && msg.content.startsWith(r'$ ')) {
+      if (msg.content.startsWith(r'$ ')) {
         final nl = msg.content.indexOf('\n');
-        if (nl > 0) {
-          header = msg.content.substring(0, nl);
+        if (nl >= 0) {
+          headerCmd = msg.content.substring(2, nl);
           body = msg.content.substring(nl + 1);
         } else {
-          header = msg.content;
+          headerCmd = msg.content.substring(2);
           body = '';
         }
-      } else if (isStatus) {
-        header = msg.content;
+      } else if (msg.kind == ChatKind.status) {
         body = '';
       }
+      final running = msg.kind == ChatKind.status || body.isEmpty && command.isNotEmpty;
+      final title = name == 'probe_host' ? 'probe_host' : (name.isEmpty ? 'run_command' : name);
+
       return Container(
         width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 10),
+        margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: const Color(0xFF0D1117),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFF30363D)),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // tool chrome — like Minis skill/tool strip
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF161B22),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              ),
+              padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+              color: const Color(0xFF161B22),
               child: Row(
                 children: [
-                  Icon(
-                    running ? Icons.play_circle_outline : Icons.terminal,
-                    size: 16,
-                    color: running ? const Color(0xFFD29922) : const Color(0xFF79C0FF),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1F6FEB).withAlpha(0x33),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF1F6FEB).withAlpha(0x66)),
+                    ),
+                    child: Text(
+                      title,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF79C0FF), fontFamily: 'monospace'),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      header,
+                      headerCmd.isEmpty ? (running ? 'running…' : '') : headerCmd,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF79C0FF)),
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF8B949E)),
                     ),
                   ),
-                  if (body.trim().isNotEmpty)
-                    InkWell(
-                      onTap: () async {
-                        await Clipboard.setData(ClipboardData(text: msg.content));
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
-                          );
-                        }
-                      },
-                      child: const Icon(Icons.copy, size: 14, color: Color(0xFF8B949E)),
+                  if (msg.content.trim().isNotEmpty)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      onPressed: () => _copy(context, msg.content),
+                      icon: const Icon(Icons.copy_all, size: 14, color: Color(0xFF8B949E)),
                     ),
                 ],
               ),
             ),
             if (body.trim().isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                color: const Color(0xFF0D1117),
                 child: SelectableText(
                   body,
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, height: 1.35, color: Color(0xFFC9D1D9)),
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12.5,
+                    height: 1.4,
+                    color: Color(0xFFC9D1D9),
+                  ),
                 ),
               )
             else if (running)
               const Padding(
-                padding: EdgeInsets.fromLTRB(10, 6, 10, 10),
-                child: Text('running…', style: TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
+                padding: EdgeInsets.fromLTRB(12, 8, 12, 10),
+                child: Text('…', style: TextStyle(color: Color(0xFF8B949E), fontFamily: 'monospace')),
               ),
           ],
         ),
       );
     }
 
-    // assistant / error prose
-    final rail = isErr ? const Color(0xFFF85149) : const Color(0xFF3FB950);
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF30363D)),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    // —— ASSISTANT / ERROR (Minis prose, minimal chrome) ——
+    if (isErr) {
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2D1214),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF6E2A2E)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: rail,
-                borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(isErr ? 'error' : 'assistant', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: rail)),
-                        const Spacer(),
-                        InkWell(
-                          onTap: () async {
-                            await Clipboard.setData(ClipboardData(text: msg.content));
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
-                              );
-                            }
-                          },
-                          child: const Icon(Icons.copy, size: 14, color: Color(0xFF8B949E)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    SelectableText(
-                      msg.content,
-                      style: TextStyle(
-                        height: 1.45,
-                        fontSize: 14.5,
-                        color: isErr ? const Color(0xFFFFB4A9) : const Color(0xFFE6EDF3),
-                      ),
-                    ),
-                  ],
+            Row(
+              children: [
+                const Icon(Icons.error_outline, size: 14, color: Color(0xFFF85149)),
+                const SizedBox(width: 6),
+                const Text('error', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFF85149))),
+                const Spacer(),
+                InkWell(
+                  onTap: () => _copy(context, msg.content),
+                  child: const Icon(Icons.copy_all, size: 14, color: Color(0xFF8B949E)),
                 ),
-              ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SelectableText(
+              msg.content,
+              style: const TextStyle(height: 1.45, fontSize: 14.5, color: Color(0xFFFFB4A9)),
             ),
           ],
         ),
+      );
+    }
+
+    // plain assistant — Minis style: avatar-less, clean left text block
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            margin: const EdgeInsets.only(right: 10, top: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFF21262D),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF30363D)),
+            ),
+            child: const Center(
+              child: Text('A', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF3FB950))),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text('Assistant', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF8B949E))),
+                    const Spacer(),
+                    InkWell(
+                      onTap: () => _copy(context, msg.content),
+                      child: const Icon(Icons.copy_all, size: 14, color: Color(0xFF8B949E)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                SelectableText(
+                  msg.content,
+                  style: const TextStyle(height: 1.5, fontSize: 15, color: Color(0xFFE6EDF3)),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
