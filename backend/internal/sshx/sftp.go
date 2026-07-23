@@ -184,6 +184,54 @@ func Remove(p ConnectParams, remote string, recursive bool) error {
 	})
 }
 
+// Move moves src to dest (same remote). Tries native rename first;
+// on failure (cross-device, etc.) falls back to Copy + Remove(recursive).
+func Move(p ConnectParams, src, dest string) (files int, dirs int, method string, err error) {
+	if strings.TrimSpace(src) == "" || strings.TrimSpace(dest) == "" {
+		return 0, 0, "", fmt.Errorf("src and dest required")
+	}
+	src = path.Clean(src)
+	dest = path.Clean(dest)
+	// try rename path (dest may be existing dir → join basename)
+	err = withSFTP(p, func(sc *sftp.Client) error {
+		st, err := sc.Stat(src)
+		if err != nil {
+			return err
+		}
+		final := dest
+		if dstSt, err := sc.Stat(dest); err == nil && dstSt.IsDir() {
+			final = path.Join(dest, path.Base(src))
+		} else {
+			_ = sc.MkdirAll(path.Dir(final))
+		}
+		if st.IsDir() && (final == src || strings.HasPrefix(final, src+"/")) {
+			return fmt.Errorf("cannot move directory into itself")
+		}
+		if err := sc.Rename(src, final); err != nil {
+			return err
+		}
+		if st.IsDir() {
+			dirs = 1
+		} else {
+			files = 1
+		}
+		method = "rename"
+		return nil
+	})
+	if err == nil {
+		return files, dirs, method, nil
+	}
+	// fallback: copy then remove source
+	files, dirs, err2 := Copy(p, src, dest)
+	if err2 != nil {
+		return 0, 0, "", fmt.Errorf("rename failed (%v); copy failed: %w", err, err2)
+	}
+	if err3 := Remove(p, src, true); err3 != nil {
+		return files, dirs, "copy", fmt.Errorf("copied but remove source failed: %w", err3)
+	}
+	return files, dirs, "copy+delete", nil
+}
+
 // Copy copies src to dest on the same remote (file or directory tree).
 // If dest exists as a directory, copies into dest/<basename(src)>.
 // Refuses to copy a directory into its own subdirectory.

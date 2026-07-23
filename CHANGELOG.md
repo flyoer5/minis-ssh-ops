@@ -1,3 +1,9 @@
+## 1.4.11
+
+- A: server fs/move (rename or copy+delete)
+- B: fs/read size+binary gates for editor
+- C: hosts list search
+
 ## 1.4.10
 
 - shared HTTP client

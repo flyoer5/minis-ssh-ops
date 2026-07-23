@@ -101,22 +101,62 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     try {
       final r = await s.api.fsRead(id, p);
       if (!mounted) return;
-      final text = r['text']?.toString() ?? '';
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          builder: (_) => FileEditorPage(
-            path: p,
-            initialText: text,
-            onSave: (body) async {
-              await s.api.fsWrite(id, p, body, confirmed: true);
-              if (mounted) await _load(active);
-            },
+      if (r['tooLarge'] == true) {
+        final go = await showDialog<bool>(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: const Text('文件过大'),
+            content: Text('${r['error'] ?? "超过编辑器限制"}\n仍要强制打开？（最多约 2MB）'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('强制打开')),
+            ],
           ),
-        ),
-      );
+        );
+        if (go != true || !mounted) return;
+        final r2 = await s.api.fsRead(id, p, force: true);
+        if (!mounted) return;
+        await _pushEditor(id, p, r2['text']?.toString() ?? '');
+        return;
+      }
+      if (r['binary'] == true) {
+        final go = await showDialog<bool>(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: const Text('可能是二进制文件'),
+            content: const Text('检测到空字节，用文本编辑可能乱码。仍要打开？'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('仍打开')),
+            ],
+          ),
+        );
+        if (go != true || !mounted) return;
+        final r2 = await s.api.fsRead(id, p, force: true);
+        if (!mounted) return;
+        await _pushEditor(id, p, r2['text']?.toString() ?? '');
+        return;
+      }
+      await _pushEditor(id, p, r['text']?.toString() ?? '');
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
+  }
+
+  Future<void> _pushEditor(String hostId, String path, String text) async {
+    final s = context.read<AppState>();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => FileEditorPage(
+          path: path,
+          initialText: text,
+          onSave: (body) async {
+            await s.api.fsWrite(hostId, path, body, confirmed: true);
+            if (mounted) await _load(active);
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _mkdir() async {
@@ -311,20 +351,31 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('先多选项目')));
       return;
     }
-    final destDir = inactive.path;
-    var n = 0;
+    final destDir = inactive.path.isEmpty ? '/' : inactive.path;
+    var okN = 0;
+    var failN = 0;
     for (final src in srcs) {
-      final name = src.split('/').last;
-      final dest = destDir.endsWith('/') || destDir.isEmpty ? '$destDir$name' : '$destDir/$name';
+      final name = src.split('/').where((e) => e.isNotEmpty).isEmpty
+          ? src
+          : src.split('/').where((e) => e.isNotEmpty).last;
+      final dest = destDir.endsWith('/') ? '$destDir$name' : '$destDir/$name';
       try {
-        await s.api.fsRename(id, src, dest, confirmed: true);
-        n++;
-      } catch (_) {}
+        await s.api.fsMove(id, src: src, dest: dest, confirmed: true);
+        okN++;
+      } catch (_) {
+        failN++;
+      }
     }
+    setState(() {
+      active.selecting = false;
+      active.selected.clear();
+    });
     await _load(active);
     await _load(inactive);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已移动 $n 项')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(failN == 0 ? '已移动 $okN 项' : '移动：成功 $okN · 失败 $failN'),
+      ));
     }
   }
 

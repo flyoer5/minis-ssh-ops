@@ -54,6 +54,8 @@ func (s *Server) handleFSRead(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Path     string `json:"path"`
 		MaxBytes int64  `json:"maxBytes"`
+		// Force: ignore soft text limits (still capped by maxBytes hard limit)
+		Force bool `json:"force"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Path) == "" {
 		writeErr(w, http.StatusBadRequest, "path required")
@@ -64,12 +66,95 @@ func (s *Server) handleFSRead(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	// Soft editor default 1 MiB; hard default 2 MiB (sshx.ReadFile)
+	const softText = int64(1 << 20)
+	if body.MaxBytes <= 0 {
+		if body.Force {
+			body.MaxBytes = 2 << 20
+		} else {
+			body.MaxBytes = softText
+		}
+	}
 	data, err := sshx.ReadFile(p, body.Path, body.MaxBytes)
+	if err != nil {
+		// surface size errors as structured response for UI
+		msg := err.Error()
+		if strings.Contains(msg, "file too large") {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"path":     body.Path,
+				"tooLarge": true,
+				"error":    msg,
+				"maxBytes": body.MaxBytes,
+				"text":     "",
+			})
+			return
+		}
+		writeErr(w, http.StatusBadGateway, msg)
+		return
+	}
+	// binary sniff: NUL in first 8KiB
+	sample := data
+	if len(sample) > 8192 {
+		sample = sample[:8192]
+	}
+	binary := false
+	for _, b := range sample {
+		if b == 0 {
+			binary = true
+			break
+		}
+	}
+	if binary && !body.Force {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"path":   body.Path,
+			"size":   len(data),
+			"binary": true,
+			"text":   "",
+			"error":  "looks like binary; open with force or download",
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"path":   body.Path,
+		"size":   len(data),
+		"binary": binary,
+		"text":   string(data),
+	})
+}
+
+func (s *Server) handleFSMove(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body struct {
+		Src       string `json:"src"`
+		Dest      string `json:"dest"`
+		Confirmed bool   `json:"confirmed"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Src) == "" || strings.TrimSpace(body.Dest) == "" {
+		writeErr(w, http.StatusBadRequest, "src and dest required")
+		return
+	}
+	if !body.Confirmed {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "confirmation required", "risk": "write", "src": body.Src, "dest": body.Dest})
+		return
+	}
+	p, err := s.connectParams(id)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	files, dirs, method, err := sshx.Move(p, body.Src, body.Dest)
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"path": body.Path, "size": len(data), "text": string(data)})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":     true,
+		"src":    body.Src,
+		"dest":   body.Dest,
+		"files":  files,
+		"dirs":   dirs,
+		"method": method,
+	})
 }
 
 func (s *Server) handleFSWrite(w http.ResponseWriter, r *http.Request) {

@@ -271,12 +271,19 @@ class ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> fsRead(String hostId, String path) async {
+  Future<Map<String, dynamic>> fsRead(
+    String hostId,
+    String path, {
+    int? maxBytes,
+    bool force = false,
+  }) async {
+    final body = <String, dynamic>{'path': path, 'force': force};
+    if (maxBytes != null) body['maxBytes'] = maxBytes;
     final r = await _c
         .post(
           _u('/v1/hosts/$hostId/fs/read'),
           headers: _headers,
-          body: jsonEncode({'path': path}),
+          body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 60));
     _ensureOk(r);
@@ -347,6 +354,27 @@ class ApiClient {
     final r = await _c
         .post(
           _u('/v1/hosts/$hostId/fs/copy'),
+          headers: _headers,
+          body: jsonEncode({
+            'src': src,
+            'dest': dest,
+            'confirmed': confirmed,
+          }),
+        )
+        .timeout(const Duration(seconds: 180));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> fsMove(
+    String hostId, {
+    required String src,
+    required String dest,
+    bool confirmed = true,
+  }) async {
+    final r = await _c
+        .post(
+          _u('/v1/hosts/$hostId/fs/move'),
           headers: _headers,
           body: jsonEncode({
             'src': src,

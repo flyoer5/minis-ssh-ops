@@ -21,6 +21,12 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   bool get wantKeepAlive => true;
 
   @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final state = context.watch<AppState>();
@@ -97,32 +103,94 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
           ? Center(child: FilledButton(onPressed: () => state.bootstrap(), child: const Text('连接后端')))
           : state.hosts.isEmpty
               ? const Center(child: Text('无主机'))
-              : RefreshIndicator(
-                  onRefresh: () => _refreshAll(state),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 16),
-                    itemCount: state.hosts.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) {
-                      final h = state.hosts[i] as Map<String, dynamic>;
-                      final id = h['id'] as String;
-                      final name = (h['name'] as String?)?.isNotEmpty == true
-                          ? h['name'] as String
-                          : '${h['host']}';
-                      final addr = '${h['username']}@${h['host']}:${h['port']}';
-                      return _StatusCard(
-                        name: name,
-                        addr: addr,
-                        selected: state.selectedHostId == id,
-                        loading: _loading.contains(id),
-                        summary: _summary[id],
-                        probedAt: state.probeCacheTime(id),
-                        onSelect: () => state.selectHost(id),
-                        onRefresh: () => _refreshProbe(state, id, force: true),
-                        onMenu: () => _hostMenu(context, state, h),
-                      );
-                    },
-                  ),
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+                      child: TextField(
+                        controller: _search,
+                        onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+                        style: const TextStyle(fontSize: 14),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: '搜索名称 / 地址 / 用户',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          suffixIcon: _query.isEmpty
+                              ? null
+                              : IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () {
+                                    _search.clear();
+                                    setState(() => _query = '');
+                                  },
+                                ),
+                          filled: true,
+                          fillColor: const Color(0xFF0F172A),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFF1E293B)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFF1E293B)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Builder(
+                        builder: (context) {
+                          final q = _query;
+                          final list = state.hosts.where((raw) {
+                            if (q.isEmpty) return true;
+                            final h = raw as Map<String, dynamic>;
+                            final name = (h['name']?.toString() ?? '').toLowerCase();
+                            final host = (h['host']?.toString() ?? '').toLowerCase();
+                            final user = (h['username']?.toString() ?? '').toLowerCase();
+                            final note = (h['note']?.toString() ?? h['remark']?.toString() ?? '').toLowerCase();
+                            final addr = '$user@$host:${h['port']}';
+                            return name.contains(q) ||
+                                host.contains(q) ||
+                                user.contains(q) ||
+                                note.contains(q) ||
+                                addr.contains(q);
+                          }).toList();
+                          if (list.isEmpty) {
+                            return const Center(child: Text('无匹配主机', style: TextStyle(color: Color(0xFF64748B))));
+                          }
+                          return RefreshIndicator(
+                            onRefresh: () => _refreshAll(state),
+                            child: ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(10, 4, 10, 16),
+                              itemCount: list.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 8),
+                              itemBuilder: (_, i) {
+                                final h = list[i] as Map<String, dynamic>;
+                                final id = h['id'] as String;
+                                final name = (h['name'] as String?)?.isNotEmpty == true
+                                    ? h['name'] as String
+                                    : '${h['host']}';
+                                final addr = '${h['username']}@${h['host']}:${h['port']}';
+                                return _StatusCard(
+                                  name: name,
+                                  addr: addr,
+                                  selected: state.selectedHostId == id,
+                                  loading: _loading.contains(id),
+                                  summary: _summary[id],
+                                  probedAt: state.probeCacheTime(id),
+                                  onSelect: () => state.selectHost(id),
+                                  onRefresh: () => _refreshProbe(state, id, force: true),
+                                  onMenu: () => _hostMenu(context, state, h),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
     );
   }
