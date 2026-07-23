@@ -677,7 +677,14 @@ class AppState extends ChangeNotifier {
     final content = (raw['content'] ?? '').toString();
     final name = (raw['name'] ?? '').toString();
     final command = (raw['command'] ?? '').toString();
-    if (type == 'assistant' && content.isNotEmpty) {
+    if (type == 'memory') {
+      // optional silent update; show short status once
+      final facts = (raw['facts'] ?? '').toString().trim();
+      final note = content.trim().isEmpty ? '长期记忆已更新' : '长期记忆已更新';
+      if (facts.isNotEmpty || content.trim().isNotEmpty) {
+        _pushMsg(ChatMessage(role: 'system', content: note, kind: ChatKind.status));
+      }
+    } else if (type == 'assistant' && content.isNotEmpty) {
       _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.text));
     } else if (type == 'tool') {
       final label = command.isNotEmpty ? (r'$ ' + command) : name;

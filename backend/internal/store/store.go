@@ -98,8 +98,129 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   content TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS session_memory (
+  session_id TEXT PRIMARY KEY,
+  summary TEXT NOT NULL DEFAULT '',
+  facts TEXT NOT NULL DEFAULT '',
+  covered_until_id INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_session_id ON chat_messages(session_id);
 `)
 	return err
+}
+
+// SessionMemory is durable long-term memory for one agent chat session.
+type SessionMemory struct {
+	SessionID      string `json:"sessionId"`
+	Summary        string `json:"summary"`
+	Facts          string `json:"facts"`
+	CoveredUntilID int64  `json:"coveredUntilId"`
+	UpdatedAt      string `json:"updatedAt"`
+}
+
+func (s *Store) GetSessionMemory(sessionID string) (SessionMemory, error) {
+	var m SessionMemory
+	err := s.db.QueryRow(
+		`SELECT session_id, summary, facts, covered_until_id, updated_at FROM session_memory WHERE session_id=?`,
+		sessionID,
+	).Scan(&m.SessionID, &m.Summary, &m.Facts, &m.CoveredUntilID, &m.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return SessionMemory{SessionID: sessionID}, nil
+	}
+	return m, err
+}
+
+func (s *Store) UpsertSessionMemory(m SessionMemory) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	if m.UpdatedAt == "" {
+		m.UpdatedAt = now
+	}
+	_, err := s.db.Exec(
+		`INSERT INTO session_memory(session_id,summary,facts,covered_until_id,updated_at)
+		 VALUES(?,?,?,?,?)
+		 ON CONFLICT(session_id) DO UPDATE SET
+		   summary=excluded.summary,
+		   facts=excluded.facts,
+		   covered_until_id=excluded.covered_until_id,
+		   updated_at=excluded.updated_at`,
+		m.SessionID, m.Summary, m.Facts, m.CoveredUntilID, m.UpdatedAt,
+	)
+	return err
+}
+
+func (s *Store) DeleteSessionMemory(sessionID string) error {
+	_, err := s.db.Exec(`DELETE FROM session_memory WHERE session_id=?`, sessionID)
+	return err
+}
+
+// CountChat returns total messages in a session.
+func (s *Store) CountChat(sessionID string) (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(1) FROM chat_messages WHERE session_id=?`, sessionID).Scan(&n)
+	return n, err
+}
+
+// ListChatRecent returns the newest messages in chronological order (oldest→newest among the recent set).
+func (s *Store) ListChatRecent(sessionID string, limit int) ([]map[string]any, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := s.db.Query(
+		`SELECT id,session_id,role,content,created_at FROM (
+		   SELECT id,session_id,role,content,created_at FROM chat_messages
+		   WHERE session_id=? ORDER BY id DESC LIMIT ?
+		 ) ORDER BY id ASC`,
+		sessionID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []map[string]any
+	for rows.Next() {
+		var id int64
+		var sid, role, content, ca string
+		if err := rows.Scan(&id, &sid, &role, &content, &ca); err != nil {
+			return nil, err
+		}
+		out = append(out, map[string]any{
+			"id": id, "sessionId": sid, "role": role, "content": content, "createdAt": ca,
+		})
+	}
+	if out == nil {
+		out = []map[string]any{}
+	}
+	return out, rows.Err()
+}
+
+// ListChatAfter returns messages with id > afterID ascending.
+func (s *Store) ListChatAfter(sessionID string, afterID int64, limit int) ([]map[string]any, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := s.db.Query(
+		`SELECT id,session_id,role,content,created_at FROM chat_messages
+		 WHERE session_id=? AND id>? ORDER BY id ASC LIMIT ?`,
+		sessionID, afterID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []map[string]any
+	for rows.Next() {
+		var id int64
+		var sid, role, content, ca string
+		if err := rows.Scan(&id, &sid, &role, &content, &ca); err != nil {
+			return nil, err
+		}
+		out = append(out, map[string]any{
+			"id": id, "sessionId": sid, "role": role, "content": content, "createdAt": ca,
+		})
+	}
+	if out == nil {
+		out = []map[string]any{}
+	}
+	return out, rows.Err()
 }
 
 type AuditEntry struct {
@@ -171,32 +292,9 @@ func (s *Store) AddChat(sessionID, role, content string) error {
 	return err
 }
 
+// ListChat returns recent messages (chronological). Prefer ListChatRecent for new code.
 func (s *Store) ListChat(sessionID string, limit int) ([]map[string]any, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-	rows, err := s.db.Query(
-		`SELECT id,session_id,role,content,created_at FROM chat_messages WHERE session_id=? ORDER BY id ASC LIMIT ?`,
-		sessionID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []map[string]any
-	for rows.Next() {
-		var id int64
-		var sid, role, content, ca string
-		if err := rows.Scan(&id, &sid, &role, &content, &ca); err != nil {
-			return nil, err
-		}
-		out = append(out, map[string]any{
-			"id": id, "sessionId": sid, "role": role, "content": content, "createdAt": ca,
-		})
-	}
-	if out == nil {
-		out = []map[string]any{}
-	}
-	return out, rows.Err()
+	return s.ListChatRecent(sessionID, limit)
 }
 
 func (s *Store) ListHosts() ([]Host, error) {

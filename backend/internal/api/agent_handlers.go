@@ -108,37 +108,6 @@ type chatBody struct {
 }
 
 
-// compactChatHistory keeps recent user/assistant turns short for speed & focus.
-func compactChatHistory(rows []map[string]any, currentUser string, maxTurns int) []agent.LoopMsg {
-	if maxTurns <= 0 {
-		maxTurns = 12
-	}
-	var all []agent.LoopMsg
-	for _, row := range rows {
-		role, _ := row["role"].(string)
-		content, _ := row["content"].(string)
-		if role != "user" && role != "assistant" {
-			continue
-		}
-		content = strings.TrimSpace(content)
-		if content == "" {
-			continue
-		}
-		// drop huge tool dumps if any leaked into chat table
-		if len(content) > 1200 {
-			content = content[:1200] + "…"
-		}
-		all = append(all, agent.LoopMsg{Role: role, Content: content})
-	}
-	if n := len(all); n > 0 && all[n-1].Role == "user" && all[n-1].Content == currentUser {
-		all = all[:n-1]
-	}
-	if len(all) > maxTurns {
-		all = all[len(all)-maxTurns:]
-	}
-	return all
-}
-
 // handleAgentChat: OpenClaw-style multi-turn tool loop (model decides tools).
 func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	var body chatBody
@@ -172,8 +141,8 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
 	_ = s.Store.AddChat(body.SessionID, "user", body.Message)
 
-	histRows, _ := s.Store.ListChat(body.SessionID, 40)
-	history := compactChatHistory(histRows, body.Message, 12)
+	// Durable memory + recent window (does not hard-forget older turns).
+	history, _ := agent.BuildMemoryMessages(s.Store, body.SessionID, body.Message, 16)
 
 	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 
@@ -244,9 +213,16 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// Update rolling long-term memory (summary/facts) when enough new turns exist.
+	_ = agent.MaybeRefreshMemory(cli, s.Store, body.SessionID, 20, 8)
+	mem, _ := s.Store.GetSessionMemory(body.SessionID)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"sessionId": body.SessionID,
 		"events":    events,
+		"memory": map[string]any{
+			"summary": mem.Summary,
+			"facts":   mem.Facts,
+		},
 	})
 }
 
@@ -301,8 +277,7 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 
 	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
 	_ = s.Store.AddChat(body.SessionID, "user", body.Message)
-	histRows, _ := s.Store.ListChat(body.SessionID, 40)
-	history := compactChatHistory(histRows, body.Message, 12)
+	history, _ := agent.BuildMemoryMessages(s.Store, body.SessionID, body.Message, 16)
 
 	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 	run := func(name string, args map[string]any) (string, error) {
@@ -371,6 +346,9 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	_ = agent.MaybeRefreshMemory(cli, s.Store, body.SessionID, 20, 8)
+	mem, _ := s.Store.GetSessionMemory(body.SessionID)
+	writeEv(map[string]any{"type": "memory", "content": mem.Summary, "facts": mem.Facts})
 	writeEv(map[string]any{"type": "done", "sessionId": body.SessionID})
 }
 
