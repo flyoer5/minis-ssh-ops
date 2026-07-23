@@ -38,20 +38,11 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       llmBase.text = (llm['baseUrl'] as String?) ?? '';
       llmModel.text = (llm['model'] as String?) ?? 'grok-4.5';
       final k = llm['apiKey']?.toString();
-      if (k != null && k.isNotEmpty) {
-        llmKey.text = k;
-      }
+      if (k != null && k.isNotEmpty) llmKey.text = k;
     }
     if (s.backendOk) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _refreshModels(s));
     }
-    // Soft prompt once if battery not ignored
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      if (!s.batteryIgnored) {
-        // non-blocking: user can act in 保活 section
-      }
-    });
   }
 
   @override
@@ -72,9 +63,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       if (!mounted) return;
       setState(() {
         _modelIds = ids;
-        if (llmModel.text.isEmpty && ids.isNotEmpty) {
-          llmModel.text = ids.first;
-        }
+        if (llmModel.text.isEmpty && ids.isNotEmpty) llmModel.text = ids.first;
       });
     } catch (e) {
       if (mounted) _toast('拉取模型列表失败: $e');
@@ -91,13 +80,12 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
   Widget build(BuildContext context) {
     super.build(context);
     final state = context.watch<AppState>();
-    final llm = state.llm;
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('SSH AI Agent 1.4.2', style: Theme.of(context).textTheme.titleMedium),
+          Text('SSH AI Agent 1.4.3', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text('个人向 · arm64 · 固定签名可覆盖升级', style: TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
           const Divider(height: 28),
@@ -107,7 +95,8 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             state.backendOk ? '已连接 · ${state.api.baseUrl}' : '未连接',
             style: TextStyle(color: state.backendOk ? const Color(0xFF3FB950) : const Color(0xFFF85149)),
           ),
-          if (state.backendNote != null) Text(state.backendNote!, style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
+          if (state.backendNote != null)
+            Text(state.backendNote!, style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
           TextField(controller: baseUrl, decoration: const InputDecoration(labelText: 'Go Base URL')),
           TextField(controller: token, decoration: const InputDecoration(labelText: 'X-Local-Token')),
           const SizedBox(height: 8),
@@ -124,8 +113,17 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           ),
           const Divider(height: 28),
           Text('大模型', style: Theme.of(context).textTheme.titleMedium),
-          TextField(controller: llmBase, decoration: const InputDecoration(labelText: 'LLM Base URL', helperText: '含 /v1')),
-          TextField(controller: llmKey, decoration: const InputDecoration(labelText: 'API Key'), obscureText: false, enableSuggestions: false, autocorrect: false),
+          TextField(
+            controller: llmBase,
+            decoration: const InputDecoration(labelText: 'LLM Base URL', helperText: '含 /v1'),
+          ),
+          TextField(
+            controller: llmKey,
+            decoration: const InputDecoration(labelText: 'API Key'),
+            obscureText: false,
+            enableSuggestions: false,
+            autocorrect: false,
+          ),
           Row(
             children: [
               Expanded(
@@ -141,7 +139,8 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                         value: _modelIds.contains(llmModel.text) ? llmModel.text : null,
                         decoration: const InputDecoration(labelText: '模型'),
                         items: [
-                          for (final id in _modelIds) DropdownMenuItem(value: id, child: Text(id, overflow: TextOverflow.ellipsis)),
+                          for (final id in _modelIds)
+                            DropdownMenuItem(value: id, child: Text(id, overflow: TextOverflow.ellipsis)),
                         ],
                         onChanged: (v) {
                           if (v != null) setState(() => llmModel.text = v);
@@ -169,8 +168,11 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 ? null
                 : () async {
                     try {
-                      await state.saveLlm(baseUrl: llmBase.text.trim(), model: llmModel.text.trim(), apiKey: llmKey.text);
-                      llmKey.clear();
+                      await state.saveLlm(
+                        baseUrl: llmBase.text.trim(),
+                        model: llmModel.text.trim(),
+                        apiKey: llmKey.text,
+                      );
                       await _refreshModels(state);
                       _toast('LLM 已保存');
                     } catch (e) {
@@ -182,41 +184,51 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           const Divider(height: 28),
           Text('连通性', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            FilledButton.tonal(
-              onPressed: !state.backendOk || state.selectedHostId == null || pinging
-                  ? null
-                  : () async {
-                      setState(() { pinging = true; pingMsg = null; });
-                      try {
-                        final o = await state.testHostSsh();
-                        setState(() => pingMsg = 'SSH OK: $o');
-                      } catch (e) {
-                        setState(() => pingMsg = 'SSH 失败: $e');
-                      } finally {
-                        setState(() => pinging = false);
-                      }
-                    },
-              child: const Text('测 SSH'),
-            ),
-            FilledButton.tonal(
-              onPressed: !state.backendOk || state.selectedHostId == null || pinging
-                  ? null
-                  : () async {
-                      setState(() { pinging = true; pingMsg = null; });
-                      try {
-                        final o = await state.testLlmReachable();
-                        setState(() => pingMsg = o);
-                      } catch (e) {
-                        setState(() => pingMsg = '模型失败: $e');
-                      } finally {
-                        setState(() => pinging = false);
-                      }
-                    },
-              child: const Text('测模型'),
-            ),
-            if (pinging) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-          ]),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonal(
+                onPressed: !state.backendOk || state.selectedHostId == null || pinging
+                    ? null
+                    : () async {
+                        setState(() {
+                          pinging = true;
+                          pingMsg = null;
+                        });
+                        try {
+                          final o = await state.testHostSsh();
+                          setState(() => pingMsg = 'SSH OK: $o');
+                        } catch (e) {
+                          setState(() => pingMsg = 'SSH 失败: $e');
+                        } finally {
+                          setState(() => pinging = false);
+                        }
+                      },
+                child: const Text('测 SSH'),
+              ),
+              FilledButton.tonal(
+                onPressed: !state.backendOk || state.selectedHostId == null || pinging
+                    ? null
+                    : () async {
+                        setState(() {
+                          pinging = true;
+                          pingMsg = null;
+                        });
+                        try {
+                          final o = await state.testLlmReachable();
+                          setState(() => pingMsg = o);
+                        } catch (e) {
+                          setState(() => pingMsg = '模型失败: $e');
+                        } finally {
+                          setState(() => pinging = false);
+                        }
+                      },
+                child: const Text('测模型'),
+              ),
+              if (pinging) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+            ],
+          ),
           if (pingMsg != null) ...[
             const SizedBox(height: 8),
             SelectableText(pingMsg!, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
@@ -235,10 +247,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               child: const Text('去设置'),
             ),
           ),
-          TextButton(
-            onPressed: () => state.openBatterySettings(),
-            child: const Text('打开电池优化列表'),
-          ),
+          TextButton(onPressed: () => state.openBatterySettings(), child: const Text('打开电池优化列表')),
           const Divider(height: 28),
           Text('Agent', style: Theme.of(context).textTheme.titleMedium),
           SwitchListTile(
@@ -268,7 +277,6 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           ),
           const Divider(height: 28),
           Text('诊断', style: Theme.of(context).textTheme.titleMedium),
-),
           FilledButton.tonal(
             onPressed: !state.backendOk
                 ? null
@@ -314,7 +322,11 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       context: context,
                       builder: (c) => AlertDialog(
                         title: const Text('导入配置 JSON'),
-                        content: TextField(controller: ctrl, maxLines: 12, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                        content: TextField(
+                          controller: ctrl,
+                          maxLines: 12,
+                          style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                        ),
                         actions: [
                           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
                           FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('导入')),
@@ -345,7 +357,10 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                     width: double.maxFinite,
                     height: 360,
                     child: SingleChildScrollView(
-                      child: SelectableText(log.isEmpty ? '(empty)' : log, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                      child: SelectableText(
+                        log.isEmpty ? '(empty)' : log,
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                      ),
                     ),
                   ),
                   actions: [
@@ -392,11 +407,8 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                                       final fp = e['fingerprint']?.toString() ?? '';
                                       return ListTile(
                                         dense: true,
-                                        title: Text('$host:$port',
-                                            style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                                        subtitle: Text(fp,
-                                            maxLines: 2,
-                                            style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
+                                        title: Text('$host:$port', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                                        subtitle: Text(fp, maxLines: 2, style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
                                         trailing: IconButton(
                                           icon: const Icon(Icons.delete_outline, size: 18),
                                           onPressed: () async {
