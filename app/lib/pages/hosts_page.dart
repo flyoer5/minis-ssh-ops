@@ -16,6 +16,8 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   final Map<String, ProbeSummary?> _summary = {};
   final Set<String> _loading = {};
   bool _autoStarted = false;
+  final TextEditingController _search = TextEditingController();
+  String _query = '';
 
   @override
   bool get wantKeepAlive => true;
@@ -197,6 +199,57 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                     ),
                   ],
                 ),
+    );
+  }
+
+
+  void _showProbeDetail(BuildContext context, String name, String addr, ProbeSummary? s) {
+    if (s == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('尚无探针数据')));
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF161B22),
+      isScrollControlled: true,
+      builder: (c) => Padding(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(c).bottom),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: const Color(0xFF30363D), borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 12),
+              Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              Text(addr, style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+              const SizedBox(height: 8),
+              Text(
+                s.ok ? 'Online · ${s.oneLine}' : s.oneLine,
+                style: TextStyle(color: s.ok ? const Color(0xFF3FB950) : const Color(0xFFF85149), fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 10),
+              for (final l in s.lines)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(width: 48, child: Text(l.label, style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E)))),
+                      Expanded(child: SelectableText(l.value, style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Color(0xFFC9D1D9)))),
+                    ],
+                  ),
+                ),
+              if (s.detail.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Text('原始详情', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF8B949E))),
+                const SizedBox(height: 4),
+                SelectableText(s.detail, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF8B949E))),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 
