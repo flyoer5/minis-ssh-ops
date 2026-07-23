@@ -227,11 +227,22 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
 
   Future<void> _pushEditor(String hostId, String path, String text) async {
     final s = context.read<AppState>();
+    Map? meta;
+    for (final e in active.entries) {
+      if (e is Map && e['path']?.toString() == path) {
+        meta = e;
+        break;
+      }
+    }
+    final size = (meta?['size'] as num?)?.toInt();
+    final mode = meta?['mode']?.toString() ?? meta?['perm']?.toString();
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => FileEditorPage(
           path: path,
           initialText: text,
+          remoteSize: size,
+          remoteMode: mode,
           onSave: (body) async {
             await s.api.fsWrite(hostId, path, body, confirmed: true);
             if (mounted) await _load(active);

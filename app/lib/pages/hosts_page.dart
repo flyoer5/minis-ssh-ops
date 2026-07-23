@@ -187,6 +187,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                   onSelect: () => state.selectHost(id),
                                   onRefresh: () => _refreshProbe(state, id, force: true),
                                   onMenu: () => _hostMenu(context, state, h),
+                                  onShowDetail: () => _showProbeDetail(context, name, addr, _summary[id]),
                                 );
                               },
                             ),
@@ -391,6 +392,7 @@ class _StatusCard extends StatelessWidget {
   final VoidCallback onSelect;
   final VoidCallback onRefresh;
   final VoidCallback onMenu;
+  final VoidCallback? onShowDetail;
 
   const _StatusCard({
     required this.name,
@@ -402,6 +404,7 @@ class _StatusCard extends StatelessWidget {
     required this.onSelect,
     required this.onRefresh,
     required this.onMenu,
+    this.onShowDetail,
   });
 
   String get _ageText {
@@ -534,6 +537,15 @@ class _StatusCard extends StatelessWidget {
                     _statusText,
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _status),
                   ),
+                  if (onShowDetail != null)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      tooltip: '探针详情',
+                      onPressed: onShowDetail,
+                      icon: const Icon(Icons.info_outline, size: 16, color: Color(0xFF8B949E)),
+                    ),
                   if (loading)
                     const Padding(
                       padding: EdgeInsets.only(left: 8, right: 6),

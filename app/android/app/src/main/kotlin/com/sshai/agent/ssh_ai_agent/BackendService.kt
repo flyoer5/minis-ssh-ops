@@ -24,14 +24,16 @@ class BackendService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        // Derive package-specific port before any isHealthy() check.
+        BackendRuntime.resolvePort(applicationContext)
         createChannel()
-        startForeground(NOTIF_ID, buildNotification("后端运行中"))
+        startForeground(NOTIF_ID, buildNotification("后端启动中 :${BackendRuntime.PORT}"))
         exec.scheduleWithFixedDelay({
             try {
                 if (!BackendRuntime.isHealthy()) {
                     Log.w(TAG, "backend unhealthy, restarting")
                     BackendRuntime.ensureStarted(applicationContext)
-                    updateNotification("后端已恢复")
+                    updateNotification("后端已恢复 :${BackendRuntime.PORT}")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "watchdog: ${e.message}")

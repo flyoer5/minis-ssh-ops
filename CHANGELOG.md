@@ -1,3 +1,7 @@
+## 1.4.13
+
+- E: package-derived backend port; records host filter; probe detail sheet; editor remote size/mode
+
 ## 1.4.12
 
 - D: files top bar compact + sort; plan card font; friendly probe errors

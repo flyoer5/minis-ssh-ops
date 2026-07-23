@@ -7,12 +7,17 @@ class FileEditorPage extends StatefulWidget {
   final String path;
   final String initialText;
   final Future<void> Function(String text) onSave;
+  /// Optional remote size in bytes / mode string from listing.
+  final int? remoteSize;
+  final String? remoteMode;
 
   const FileEditorPage({
     super.key,
     required this.path,
     required this.initialText,
     required this.onSave,
+    this.remoteSize,
+    this.remoteMode,
   });
 
   @override
@@ -40,6 +45,12 @@ class _FileEditorPageState extends State<FileEditorPage> {
     final p = widget.path;
     final i = p.lastIndexOf('/');
     return i < 0 ? p : p.substring(i + 1);
+  }
+
+  String _fmtSize(int n) {
+    if (n < 1024) return '$n B';
+    if (n < 1024 * 1024) return '${(n / 1024).toStringAsFixed(1)} K';
+    return '${(n / 1024 / 1024).toStringAsFixed(1)} M';
   }
 
   String get _lang {
@@ -465,6 +476,14 @@ class _FileEditorPageState extends State<FileEditorPage> {
                   const SizedBox(width: 10),
                   const Text('UTF-8', style: TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
                   const SizedBox(width: 10),
+                  if (widget.remoteMode != null && widget.remoteMode!.isNotEmpty) ...[
+                    Text(widget.remoteMode!, style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                    const SizedBox(width: 8),
+                  ],
+                  if (widget.remoteSize != null) ...[
+                    Text(_fmtSize(widget.remoteSize!), style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                    const SizedBox(width: 8),
+                  ],
                   Text('${_ctrl.text.length} 字符', style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
                 ],
               ),

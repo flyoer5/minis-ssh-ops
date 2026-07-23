@@ -198,10 +198,31 @@ class MainActivity : FlutterActivity() {
  * Prefer jniLibs `libssh_ai_agent.so` (Android-extracted, executable), fall back to assets.
  */
 object BackendRuntime {
-    const val PORT = 17890
+    /**
+     * Base listen port. Real port is derived from package name so sibling
+     * installs (old / next) do not share one :17890 and steal each other's backend.
+     * Range: 17890 + (hash % 1024) → 17890..18913
+     */
+    private const val PORT_BASE = 17890
+    private const val PORT_SPAN = 1024
+    @Volatile
+    private var resolvedPort: Int = PORT_BASE
+
+    /** Current derived port (valid after resolvePort / ensureStarted). */
+    val PORT: Int
+        get() = resolvedPort
+
     private const val TAG = "SshAiBackend"
     private val processRef = AtomicReference<Process?>(null)
     private val lock = Any()
+
+    fun resolvePort(ctx: android.content.Context): Int {
+        val pkg = ctx.applicationContext.packageName
+        val offset = (pkg.hashCode() and 0x7fffffff) % PORT_SPAN
+        resolvedPort = PORT_BASE + offset
+        Log.i(TAG, "resolvePort pkg=$pkg → $resolvedPort")
+        return resolvedPort
+    }
 
     fun isProcessAlive(): Boolean {
         val p = processRef.get()
@@ -229,6 +250,7 @@ object BackendRuntime {
     fun ensureStarted(ctx: android.content.Context): Map<String, Any> {
         synchronized(lock) {
             val app = ctx.applicationContext
+            resolvePort(app)
             val dataDir = File(app.filesDir, "backend-data").apply { mkdirs() }
             val tokenFile = File(dataDir, "local.token")
             val token = loadOrCreateToken(tokenFile)
@@ -236,12 +258,12 @@ object BackendRuntime {
             if (isHealthy()) {
                 val existing = if (tokenFile.exists()) tokenFile.readText().trim() else token
                 publishDebugToken(app, existing)
-                Log.i(TAG, "backend already healthy")
+                Log.i(TAG, "backend already healthy on :$PORT")
                 return resultMap(existing, already = true)
             }
 
             val bin = resolveBinary(app)
-            Log.i(TAG, "starting backend bin=${bin.absolutePath} size=${bin.length()} exec=${bin.canExecute()}")
+            Log.i(TAG, "starting backend bin=${bin.absolutePath} size=${bin.length()} exec=${bin.canExecute()} port=$PORT")
 
             // Best-effort stop previous handle (orphans may remain).
             stop()

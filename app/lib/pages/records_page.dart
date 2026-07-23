@@ -10,12 +10,12 @@ class RecordsPage extends StatefulWidget {
 }
 
 class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClientMixin {
-  String filter = 'all'; // all|read|write|destructive|blocked
+  String filter = 'all';
+  String hostFilter = 'all';
 
   @override
   bool get wantKeepAlive => true;
 
-  /// Backend stores UTC RFC3339; show device local wall clock.
   String _fmtLocal(String raw) {
     final s = raw.trim();
     if (s.isEmpty) return '';
@@ -42,6 +42,18 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
     }
   }
 
+  String _hostLabel(AppState state, String hostId) {
+    if (hostId.isEmpty) return '未知主机';
+    for (final raw in state.hosts) {
+      if (raw is Map && raw['id']?.toString() == hostId) {
+        final name = raw['name']?.toString() ?? '';
+        if (name.isNotEmpty) return name;
+        return '${raw['host']}:${raw['port']}';
+      }
+    }
+    return hostId.length > 8 ? '${hostId.substring(0, 8)}…' : hostId;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -56,9 +68,20 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
     final state = context.watch<AppState>();
     final fs = state.recordsFontSize;
     final all = state.audit.whereType<Map>().toList();
-    final list = filter == 'all'
-        ? all
-        : all.where((e) => (e['risk']?.toString() ?? '') == filter).toList();
+
+    final hostIds = <String>{};
+    for (final e in all) {
+      final id = e['hostId']?.toString() ?? '';
+      if (id.isNotEmpty) hostIds.add(id);
+    }
+
+    var list = all;
+    if (filter != 'all') {
+      list = list.where((e) => (e['risk']?.toString() ?? '') == filter).toList();
+    }
+    if (hostFilter != 'all') {
+      list = list.where((e) => (e['hostId']?.toString() ?? '') == hostFilter).toList();
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1117),
@@ -66,10 +89,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
         toolbarHeight: 44,
         titleSpacing: 12,
         backgroundColor: const Color(0xFF0D1117),
-        title: Text(
-          '记录',
-          style: TextStyle(fontSize: fs + 1, fontWeight: FontWeight.w700),
-        ),
+        title: Text('记录', style: TextStyle(fontSize: fs + 1, fontWeight: FontWeight.w700)),
         actions: [
           IconButton(
             visualDensity: VisualDensity.compact,
@@ -83,7 +103,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
         children: [
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
+            padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
             child: Row(
               children: [
                 for (final f in const [
@@ -106,6 +126,36 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
               ],
             ),
           ),
+          if (hostIds.isNotEmpty)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+              child: Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      visualDensity: VisualDensity.compact,
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                      label: Text('全部主机', style: TextStyle(fontSize: fs - 1.5)),
+                      selected: hostFilter == 'all',
+                      onSelected: (_) => setState(() => hostFilter = 'all'),
+                    ),
+                  ),
+                  for (final id in hostIds)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        visualDensity: VisualDensity.compact,
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                        label: Text(_hostLabel(state, id), style: TextStyle(fontSize: fs - 1.5)),
+                        selected: hostFilter == id,
+                        onSelected: (_) => setState(() => hostFilter = id),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
             child: Align(
@@ -118,9 +168,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
           ),
           Expanded(
             child: list.isEmpty
-                ? Center(
-                    child: Text('暂无审计记录', style: TextStyle(fontSize: fs, color: const Color(0xFF8B949E))),
-                  )
+                ? Center(child: Text('暂无审计记录', style: TextStyle(fontSize: fs, color: const Color(0xFF8B949E))))
                 : ListView.separated(
                     padding: const EdgeInsets.only(bottom: 16),
                     itemCount: list.length,
@@ -131,94 +179,54 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                       final cmd = e['command']?.toString() ?? '';
                       final exit = e['exitCode'];
                       final at = _fmtLocal(e['createdAt']?.toString() ?? '');
+                      final hostId = e['hostId']?.toString() ?? '';
+                      final hostName = _hostLabel(state, hostId);
                       final rc = _riskColor(risk);
                       return InkWell(
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              backgroundColor: const Color(0xFF161B22),
-                              title: Text(
-                                risk.isEmpty ? '详情' : risk,
-                                style: TextStyle(fontSize: fs + 1, color: rc, fontWeight: FontWeight.w700),
-                              ),
-                              content: SizedBox(
-                                width: double.maxFinite,
-                                child: SingleChildScrollView(
-                                  child: SelectableText(
-                                    '$cmd\n\n--- stdout ---\n${e['stdout'] ?? ''}\n--- stderr ---\n${e['stderr'] ?? ''}',
-                                    style: TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontSize: fs - 1,
-                                      height: 1.35,
-                                      color: const Color(0xFFC9D1D9),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: Text('关闭', style: TextStyle(fontSize: fs)),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                        onTap: () => _showDetail(context, e, hostName, fs),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                          child: Column(
+                          child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                cmd,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: fs,
-                                  height: 1.3,
-                                  color: const Color(0xFFE6EDF3),
-                                  fontWeight: FontWeight.w500,
+                              Container(
+                                margin: const EdgeInsets.only(top: 3),
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(color: rc, shape: BoxShape.circle),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      cmd,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: fs,
+                                        fontFamily: 'monospace',
+                                        height: 1.3,
+                                        color: const Color(0xFFE6EDF3),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 2,
+                                      children: [
+                                        Text(risk.isEmpty ? '—' : risk, style: TextStyle(fontSize: fs - 2, color: rc, fontWeight: FontWeight.w600)),
+                                        Text('exit $exit', style: TextStyle(fontSize: fs - 2, color: const Color(0xFF8B949E), fontFamily: 'monospace')),
+                                        Text(hostName, style: TextStyle(fontSize: fs - 2, color: const Color(0xFF79C0FF))),
+                                        if (at.isNotEmpty)
+                                          Text(at, style: TextStyle(fontSize: fs - 2, color: const Color(0xFF8B949E), fontFamily: 'monospace')),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: rc.withAlpha(0x22),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: rc.withAlpha(0x66)),
-                                    ),
-                                    child: Text(
-                                      risk.isEmpty ? '?' : risk,
-                                      style: TextStyle(fontSize: fs - 2.5, color: rc, fontWeight: FontWeight.w700),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'exit $exit',
-                                    style: TextStyle(
-                                      fontSize: fs - 2,
-                                      fontFamily: 'monospace',
-                                      color: (exit is int && exit != 0)
-                                          ? const Color(0xFFF85149)
-                                          : const Color(0xFF8B949E),
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    at,
-                                    style: TextStyle(
-                                      fontSize: fs - 2.5,
-                                      fontFamily: 'monospace',
-                                      color: const Color(0xFF6E7681),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              const Icon(Icons.chevron_right, size: 16, color: Color(0xFF484F58)),
                             ],
                           ),
                         ),
@@ -227,6 +235,51 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showDetail(BuildContext context, Map e, String hostName, double fs) {
+    final risk = e['risk']?.toString() ?? '';
+    final cmd = e['command']?.toString() ?? '';
+    final stdout = e['stdout']?.toString() ?? '';
+    final stderr = e['stderr']?.toString() ?? '';
+    final at = _fmtLocal(e['createdAt']?.toString() ?? '');
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF161B22),
+      builder: (c) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.55,
+        maxChildSize: 0.9,
+        minChildSize: 0.35,
+        builder: (_, sc) => ListView(
+          controller: sc,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: const Color(0xFF30363D), borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 12),
+            Text('命令详情', style: TextStyle(fontSize: fs + 1, fontWeight: FontWeight.w700, color: const Color(0xFFE6EDF3))),
+            const SizedBox(height: 8),
+            SelectableText(cmd, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 1, color: const Color(0xFFC9D1D9))),
+            const SizedBox(height: 10),
+            Text('风险 $risk · exit ${e['exitCode']} · $hostName', style: TextStyle(fontSize: fs - 2, color: const Color(0xFF8B949E))),
+            if (at.isNotEmpty) Text(at, style: TextStyle(fontSize: fs - 2, color: const Color(0xFF8B949E), fontFamily: 'monospace')),
+            if (stdout.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text('stdout', style: TextStyle(fontSize: fs - 2, fontWeight: FontWeight.w700, color: const Color(0xFF3FB950))),
+              const SizedBox(height: 4),
+              SelectableText(stdout, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 2, color: const Color(0xFFC9D1D9))),
+            ],
+            if (stderr.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text('stderr', style: TextStyle(fontSize: fs - 2, fontWeight: FontWeight.w700, color: const Color(0xFFF85149))),
+              const SizedBox(height: 4),
+              SelectableText(stderr, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 2, color: const Color(0xFFFFB4A9))),
+            ],
+          ],
+        ),
       ),
     );
   }
