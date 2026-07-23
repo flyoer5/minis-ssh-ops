@@ -4,7 +4,6 @@ import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/pages/agent_page.dart';
 import 'package:ssh_ai_agent/pages/files_page.dart';
 import 'package:ssh_ai_agent/pages/hosts_page.dart';
-import 'package:ssh_ai_agent/pages/onboarding_page.dart';
 import 'package:ssh_ai_agent/pages/records_page.dart';
 import 'package:ssh_ai_agent/pages/settings_page.dart';
 import 'package:ssh_ai_agent/pages/terminal_page.dart';
@@ -54,9 +53,6 @@ class RootGate extends StatelessWidget {
           ),
         ),
       );
-    }
-    if (!state.onboarded) {
-      return OnboardingPage(onDone: () {});
     }
     return const HomeShell();
   }

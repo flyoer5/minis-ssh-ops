@@ -37,6 +37,10 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     if (llm != null) {
       llmBase.text = (llm['baseUrl'] as String?) ?? '';
       llmModel.text = (llm['model'] as String?) ?? 'grok-4.5';
+      final k = llm['apiKey']?.toString();
+      if (k != null && k.isNotEmpty) {
+        llmKey.text = k;
+      }
     }
     if (s.backendOk) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _refreshModels(s));
@@ -93,7 +97,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('SSH AI Agent 1.4.0', style: Theme.of(context).textTheme.titleMedium),
+          Text('SSH AI Agent 1.4.2', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text('个人向 · arm64 · 固定签名可覆盖升级', style: TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
           const Divider(height: 28),
@@ -120,9 +124,8 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           ),
           const Divider(height: 28),
           Text('大模型', style: Theme.of(context).textTheme.titleMedium),
-          if (llm != null) Text('Key: ${llm['apiKeySet'] == true ? (llm['apiKeyMasked'] ?? '已设置') : '未设置'}', style: const TextStyle(fontSize: 12)),
           TextField(controller: llmBase, decoration: const InputDecoration(labelText: 'LLM Base URL', helperText: '含 /v1')),
-          TextField(controller: llmKey, decoration: const InputDecoration(labelText: 'API Key（留空不改）'), obscureText: true),
+          TextField(controller: llmKey, decoration: const InputDecoration(labelText: 'API Key'), obscureText: false, enableSuggestions: false, autocorrect: false),
           Row(
             children: [
               Expanded(
@@ -265,16 +268,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           ),
           const Divider(height: 28),
           Text('诊断', style: Theme.of(context).textTheme.titleMedium),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('重新走初始配置'),
-            trailing: TextButton(
-              onPressed: () async {
-                await state.resetOnboarding();
-              },
-              child: const Text('重置向导'),
-            ),
-          ),
+),
           FilledButton.tonal(
             onPressed: !state.backendOk
                 ? null

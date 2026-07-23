@@ -522,8 +522,9 @@ func (s *Store) GetLLM() (LLMSettings, error) {
 		st.TimeoutSeconds = 180
 	}
 	if key != "" {
+		// User requested plaintext key in settings UI (local-only app).
+		st.APIKey = key
 		st.APIKeyMasked = maskKey(key)
-		// do not put full key in GET by default
 	}
 	return st, nil
 }

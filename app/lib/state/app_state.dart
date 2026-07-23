@@ -123,7 +123,7 @@ class AppState extends ChangeNotifier {
     api.localToken = prefs.getString('localToken') ?? api.localToken;
     termFontSize = prefs.getDouble('termFontSize') ?? 13;
     selectedHostId = prefs.getString('selectedHostId') ?? selectedHostId;
-    onboarded = prefs.getBool('onboarded') ?? false;
+    onboarded = true; // onboarding removed
     confirmWrites = prefs.getBool('confirmWrites') ?? false;
     _loadSessionsFromPrefs(prefs);
 
@@ -687,7 +687,14 @@ class AppState extends ChangeNotifier {
     } else if (type == 'assistant' && content.isNotEmpty) {
       _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.text));
     } else if (type == 'tool') {
-      final label = command.isNotEmpty ? (r'$ ' + command) : name;
+      String label;
+      if (name == 'probe_host') {
+        label = '探测主机状态';
+      } else if (command.isNotEmpty) {
+        label = r'$ ' + command;
+      } else {
+        label = name;
+      }
       _pushMsg(ChatMessage(
         role: 'tool',
         content: label,

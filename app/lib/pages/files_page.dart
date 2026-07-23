@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
+/// File browser closer to MT Manager: path bar, multi-select, bottom actions.
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
   @override
@@ -18,6 +19,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
   bool loading = false;
   String? err;
   String? hostId;
+  bool selecting = false;
+  final Set<String> selected = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -39,11 +42,20 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     setState(() {
       loading = true;
       err = null;
+      selected.clear();
+      selecting = false;
     });
     try {
       final r = await s.api.fsList(id, path);
+      final list = List<dynamic>.from((r['entries'] as List?) ?? []);
+      list.sort((a, b) {
+        final am = a as Map, bm = b as Map;
+        final ad = am['isDir'] == true, bd = bm['isDir'] == true;
+        if (ad != bd) return ad ? -1 : 1;
+        return (am['name']?.toString() ?? '').toLowerCase().compareTo((bm['name']?.toString() ?? '').toLowerCase());
+      });
       setState(() {
-        entries = (r['entries'] as List?) ?? [];
+        entries = list;
         final rp = r['path']?.toString();
         if (rp != null && rp.isNotEmpty) path = rp;
       });
@@ -60,6 +72,17 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     final i = p.lastIndexOf('/');
     setState(() => path = i <= 0 ? '/' : p.substring(0, i));
     _load();
+  }
+
+  void _toggleSelect(String p) {
+    setState(() {
+      if (selected.contains(p)) {
+        selected.remove(p);
+      } else {
+        selected.add(p);
+      }
+      selecting = selected.isNotEmpty;
+    });
   }
 
   Future<void> _openFile(String p) async {
@@ -93,14 +116,10 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       );
       if (ok == true) {
         await s.api.fsWrite(id, p, ctrl.text, confirmed: true);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
-        }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
@@ -112,8 +131,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     final name = await showDialog<String>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('新建目录'),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: '目录名')),
+        title: const Text('新建文件夹'),
+        content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: '名称')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
           FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('创建')),
@@ -130,7 +149,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     }
   }
 
-  Future<void> _uploadText() async {
+  Future<void> _newFile() async {
     final s = context.read<AppState>();
     final id = s.selectedHostId;
     if (id == null) return;
@@ -139,7 +158,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('上传文本文件'),
+        title: const Text('新建文件'),
         content: SizedBox(
           width: double.maxFinite,
           child: Column(
@@ -152,7 +171,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('上传')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('保存')),
         ],
       ),
     );
@@ -163,20 +182,93 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     try {
       await s.api.fsWrite(id, full, bodyCtrl.text, confirmed: true);
       await _load();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已上传')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
-  Future<void> _delete(String p, bool isDir) async {
+  Future<void> _rename(String oldPath, String oldName) async {
+    final s = context.read<AppState>();
+    final id = s.selectedHostId;
+    if (id == null) return;
+    final ctrl = TextEditingController(text: oldName);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('重命名'),
+        content: TextField(controller: ctrl),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('确定')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty || name == oldName) return;
+    final slash = oldPath.lastIndexOf('/');
+    final parent = slash <= 0 ? '' : oldPath.substring(0, slash);
+    final newPath = parent.isEmpty ? name : '$parent/$name';
+    try {
+      await s.api.fsRename(id, oldPath, newPath, confirmed: true);
+      await _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _download(String filePath, String name) async {
+    final s = context.read<AppState>();
+    final id = s.selectedHostId;
+    if (id == null) return;
+    try {
+      final r = await s.api.fsDownload(id, filePath);
+      final b64 = r['b64']?.toString() ?? '';
+      final n = r['name']?.toString() ?? name;
+      final size = r['size'] ?? 0;
+      String? saved;
+      try {
+        saved = await NativeBackend.saveBytesToDownloads(name: n, b64: b64);
+      } catch (_) {}
+      if (!mounted) return;
+      final bytes = base64Decode(b64);
+      String text = '';
+      try {
+        text = utf8.decode(bytes, allowMalformed: true);
+      } catch (_) {}
+      final looksText = text.isNotEmpty && !text.contains('\u0000') && size is int && size < 512 * 1024;
+      await showDialog(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text(n),
+          content: Text(saved != null ? '已保存 $size 字节\n$saved' : '已拉取 $size 字节'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
+            if (looksText || b64.isNotEmpty)
+              FilledButton(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: looksText ? text : b64));
+                  if (c.mounted) Navigator.pop(c);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制')));
+                  }
+                },
+                child: Text(looksText ? '复制文本' : '复制 base64'),
+              ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _deleteOne(String p, bool isDir) async {
     final s = context.read<AppState>();
     final id = s.selectedHostId;
     if (id == null) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text(isDir ? '删除目录？' : '删除文件？'),
+        title: Text(isDir ? '删除文件夹？' : '删除文件？'),
         content: Text(p),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
@@ -193,93 +285,99 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     }
   }
 
-  Future<void> _rename(String oldPath, String oldName, bool isDir) async {
+  Future<void> _deleteSelected() async {
+    if (selected.isEmpty) return;
     final s = context.read<AppState>();
     final id = s.selectedHostId;
     if (id == null) return;
-    final ctrl = TextEditingController(text: oldName);
-    final name = await showDialog<String>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('重命名'),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: '新名称')),
+        title: Text('删除 ${selected.length} 项？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('确定')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('删除')),
         ],
       ),
     );
-    if (name == null || name.isEmpty || name == oldName) return;
-    final slash = oldPath.lastIndexOf('/');
-    final parent = slash <= 0 ? '' : oldPath.substring(0, slash);
-    final newPath = parent.isEmpty ? name : '$parent/$name';
-    try {
-      await s.api.fsRename(id, oldPath, newPath, confirmed: true);
-      await _load();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已重命名')));
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    if (ok != true) return;
+    for (final p in selected.toList()) {
+      final e = entries.cast<Map>().firstWhere((x) => x['path'] == p, orElse: () => {'isDir': false});
+      try {
+        await s.api.fsRemove(id, p, recursive: e['isDir'] == true, confirmed: true);
+      } catch (_) {}
     }
+    await _load();
   }
 
-  Future<void> _download(String filePath) async {
-    final s = context.read<AppState>();
-    final id = s.selectedHostId;
-    if (id == null) return;
-    try {
-      final r = await s.api.fsDownload(id, filePath);
-      final name = r['name']?.toString() ?? 'file.bin';
-      final b64 = r['b64']?.toString() ?? '';
-      final size = r['size'] ?? 0;
-      if (!mounted) return;
-      final bytes = base64Decode(b64);
-      String asText = '';
-      try {
-        asText = utf8.decode(bytes, allowMalformed: true);
-      } catch (_) {}
-      final looksText =
-          asText.isNotEmpty && !asText.contains('\u0000') && size is int && size < 512 * 1024;
-
-      String? savedPath;
-      try {
-        savedPath = await NativeBackend.saveBytesToDownloads(name: name, b64: b64);
-      } catch (_) {
-        savedPath = null;
-      }
-
-      if (!mounted) return;
-      await showDialog(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: Text(name),
-          content: Text(
-            savedPath != null
-                ? '已保存 $size 字节到下载目录：\n$savedPath'
-                : '已拉取 $size 字节（无法写入下载目录时可复制内容）。',
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
-            if (looksText || b64.isNotEmpty)
-              FilledButton(
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: looksText ? asText : b64));
-                  if (c.mounted) Navigator.pop(c);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(looksText ? '已复制文本' : '已复制 base64')),
-                    );
-                  }
+  void _showItemSheet(Map e) {
+    final isDir = e['isDir'] == true;
+    final name = e['name']?.toString() ?? '';
+    final p = e['path']?.toString() ?? name;
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(title: Text(name, style: const TextStyle(fontFamily: 'monospace')), subtitle: Text(p, maxLines: 2)),
+            if (!isDir)
+              ListTile(
+                leading: const Icon(Icons.edit_note),
+                title: const Text('打开 / 编辑'),
+                onTap: () {
+                  Navigator.pop(c);
+                  _openFile(p);
                 },
-                child: Text(looksText ? '复制文本' : '复制 base64'),
               ),
+            if (isDir)
+              ListTile(
+                leading: const Icon(Icons.folder_open),
+                title: const Text('进入'),
+                onTap: () {
+                  Navigator.pop(c);
+                  setState(() => path = p);
+                  _load();
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.drive_file_rename_outline),
+              title: const Text('重命名'),
+              onTap: () {
+                Navigator.pop(c);
+                _rename(p, name);
+              },
+            ),
+            if (!isDir)
+              ListTile(
+                leading: const Icon(Icons.download),
+                title: const Text('下载'),
+                onTap: () {
+                  Navigator.pop(c);
+                  _download(p, name);
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Color(0xFFF85149)),
+              title: const Text('删除', style: TextStyle(color: Color(0xFFF85149))),
+              onTap: () {
+                Navigator.pop(c);
+                _deleteOne(p, isDir);
+              },
+            ),
           ],
         ),
-      );
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
+      ),
+    );
+  }
+
+  String _fmtSize(dynamic s) {
+    final n = s is int ? s : int.tryParse('$s') ?? 0;
+    if (n < 1024) return '$n B';
+    if (n < 1024 * 1024) return '${(n / 1024).toStringAsFixed(1)} K';
+    if (n < 1024 * 1024 * 1024) return '${(n / (1024 * 1024)).toStringAsFixed(1)} M';
+    return '${(n / (1024 * 1024 * 1024)).toStringAsFixed(1)} G';
   }
 
   @override
@@ -290,42 +388,97 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       return const Scaffold(body: Center(child: Text('先选主机')));
     }
     return Scaffold(
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        title: const Text('文件'),
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: selecting ? Text('已选 ${selected.length}') : const Text('文件'),
+        leading: selecting
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => setState(() {
+                  selecting = false;
+                  selected.clear();
+                }),
+              )
+            : null,
         actions: [
-          IconButton(onPressed: _up, icon: const Icon(Icons.arrow_upward)),
-          IconButton(onPressed: _mkdir, icon: const Icon(Icons.create_new_folder_outlined)),
-          IconButton(onPressed: _uploadText, icon: const Icon(Icons.upload_file)),
-          IconButton(onPressed: loading ? null : _load, icon: const Icon(Icons.refresh)),
+          if (!selecting) ...[
+            IconButton(onPressed: _up, icon: const Icon(Icons.arrow_upward)),
+            IconButton(onPressed: loading ? null : _load, icon: const Icon(Icons.refresh)),
+            PopupMenuButton<String>(
+              onSelected: (a) {
+                if (a == 'mkdir') _mkdir();
+                if (a == 'newfile') _newFile();
+                if (a == 'select') setState(() => selecting = true);
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'mkdir', child: Text('新建文件夹')),
+                PopupMenuItem(value: 'newfile', child: Text('新建文件')),
+                PopupMenuItem(value: 'select', child: Text('多选')),
+              ],
+            ),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.select_all),
+              onPressed: () {
+                setState(() {
+                  selected
+                    ..clear()
+                    ..addAll(entries.whereType<Map>().map((e) => e['path']?.toString() ?? ''));
+                  selected.removeWhere((e) => e.isEmpty);
+                });
+              },
+            ),
+            IconButton(icon: const Icon(Icons.delete_outline), onPressed: _deleteSelected),
+          ],
         ],
       ),
       body: Column(
         children: [
+          // path bar like MT
           Material(
-            color: const Color(0xFF161B22),
+            color: const Color(0xFF1E1E1E),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ListTile(
-                  dense: true,
-                  title: Text(
-                    path.isEmpty ? '~' : path,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                InkWell(
+                  onLongPress: () async {
+                    await Clipboard.setData(ClipboardData(text: path.isEmpty ? '/' : path));
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('路径已复制')));
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.folder, size: 18, color: Color(0xFFFFB74D)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            path.isEmpty ? '/' : path,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  subtitle: Text(state.hostLabel, style: const TextStyle(fontSize: 11)),
                 ),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                   child: Row(
                     children: [
-                      for (final b in const ['', '/etc', '/var/log', '/tmp', '/home'])
+                      for (final b in const ['', '/sdcard', '/data', '/etc', '/var/log', '/tmp', '/home', '/root'])
                         Padding(
                           padding: const EdgeInsets.only(right: 6),
                           child: ActionChip(
-                            label: Text(b.isEmpty ? '~' : b, style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+                            visualDensity: VisualDensity.compact,
+                            label: Text(
+                              b.isEmpty ? '~' : b,
+                              style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                            ),
                             onPressed: () {
                               setState(() => path = b);
                               _load();
@@ -339,66 +492,147 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
             ),
           ),
           if (err != null)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(err!, style: const TextStyle(color: Color(0xFFF85149))),
+            Material(
+              color: const Color(0xFF3D1F1F),
+              child: ListTile(
+                dense: true,
+                title: Text(err!, style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 12)),
+              ),
             ),
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
                     onRefresh: _load,
-                    child: ListView.separated(
-                      itemCount: entries.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (_, i) {
-                        final e = entries[i] as Map;
-                        final isDir = e['isDir'] == true;
-                        final name = e['name']?.toString() ?? '';
-                        final p = e['path']?.toString() ?? name;
-                        return ListTile(
-                          leading: Icon(isDir ? Icons.folder : Icons.insert_drive_file_outlined),
-                          title: Text(name),
-                          subtitle: Text('${e['mode'] ?? ''} · ${e['size'] ?? 0}', style: const TextStyle(fontSize: 11)),
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (a) async {
-                              if (a == 'open') {
-                                if (isDir) {
-                                  setState(() => path = p);
-                                  _load();
-                                } else {
-                                  await _openFile(p);
-                                }
-                              } else if (a == 'rename') {
-                                await _rename(p, name, isDir);
-                              } else if (a == 'download') {
-                                await _download(p);
-                              } else if (a == 'delete') {
-                                await _delete(p, isDir);
-                              }
+                    child: entries.isEmpty
+                        ? ListView(children: const [SizedBox(height: 120), Center(child: Text('空目录'))])
+                        : ListView.separated(
+                            itemCount: entries.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF2A2A2A)),
+                            itemBuilder: (_, i) {
+                              final e = entries[i] as Map;
+                              final isDir = e['isDir'] == true;
+                              final name = e['name']?.toString() ?? '';
+                              final fp = e['path']?.toString() ?? name;
+                              final sel = selected.contains(fp);
+                              return ListTile(
+                                dense: true,
+                                selected: sel,
+                                selectedTileColor: const Color(0xFF1A3A5C),
+                                leading: selecting
+                                    ? Checkbox(
+                                        value: sel,
+                                        onChanged: (_) => _toggleSelect(fp),
+                                      )
+                                    : Icon(
+                                        isDir ? Icons.folder : Icons.insert_drive_file,
+                                        color: isDir ? const Color(0xFFFFB74D) : const Color(0xFF90CAF9),
+                                      ),
+                                title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                subtitle: Text(
+                                  isDir ? (e['mode']?.toString() ?? 'dir') : '${_fmtSize(e['size'])}  ${e['mode'] ?? ''}',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E), fontFamily: 'monospace'),
+                                ),
+                                trailing: selecting
+                                    ? null
+                                    : IconButton(
+                                        icon: const Icon(Icons.more_vert, size: 18),
+                                        onPressed: () => _showItemSheet(e),
+                                      ),
+                                onTap: () {
+                                  if (selecting) {
+                                    _toggleSelect(fp);
+                                    return;
+                                  }
+                                  if (isDir) {
+                                    setState(() => path = fp);
+                                    _load();
+                                  } else {
+                                    _openFile(fp);
+                                  }
+                                },
+                                onLongPress: () {
+                                  if (!selecting) {
+                                    setState(() {
+                                      selecting = true;
+                                      selected.add(fp);
+                                    });
+                                  } else {
+                                    _toggleSelect(fp);
+                                  }
+                                },
+                              );
                             },
-                            itemBuilder: (_) => [
-                              PopupMenuItem(value: 'open', child: Text(isDir ? '打开' : '查看/编辑')),
-                              const PopupMenuItem(value: 'rename', child: Text('重命名')),
-                              if (!isDir) const PopupMenuItem(value: 'download', child: Text('下载到本机')),
-                              const PopupMenuItem(value: 'delete', child: Text('删除')),
-                            ],
                           ),
-                          onTap: () {
-                            if (isDir) {
-                              setState(() => path = p);
-                              _load();
-                            } else {
-                              _openFile(p);
-                            }
-                          },
-                        );
-                      },
-                    ),
                   ),
           ),
+          // bottom action bar like MT
+          if (!selecting)
+            Material(
+              color: const Color(0xFF1E1E1E),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _barBtn(Icons.create_new_folder_outlined, '新建夹', _mkdir),
+                      _barBtn(Icons.note_add_outlined, '新文件', _newFile),
+                      _barBtn(Icons.checklist, '多选', () => setState(() => selecting = true)),
+                      _barBtn(Icons.refresh, '刷新', loading ? null : _load),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            Material(
+              color: const Color(0xFF1E1E1E),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _barBtn(Icons.delete_outline, '删除', selected.isEmpty ? null : _deleteSelected),
+                      _barBtn(Icons.close, '取消', () => setState(() {
+                            selecting = false;
+                            selected.clear();
+                          })),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  Widget _barBtn(IconData icon, String label, VoidCallback? onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: onTap == null ? Colors.white24 : Colors.white70),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(fontSize: 10, color: onTap == null ? Colors.white24 : Colors.white70)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _fmtSize(dynamic s) {
+    final n = s is int ? s : int.tryParse('$s') ?? 0;
+    if (n < 1024) return '$n B';
+    if (n < 1024 * 1024) return '${(n / 1024).toStringAsFixed(1)} K';
+    if (n < 1024 * 1024 * 1024) return '${(n / (1024 * 1024)).toStringAsFixed(1)} M';
+    return '${(n / (1024 * 1024 * 1024)).toStringAsFixed(1)} G';
   }
 }

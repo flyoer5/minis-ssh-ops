@@ -31,7 +31,7 @@ var defaultTools = []map[string]any{
 		"type": "function",
 		"function": map[string]any{
 			"name":        "probe_host",
-			"description": "Quick host health: uname, uptime, load, disk, memory.",
+			"description": "Optional broad health snapshot (uname/uptime/load/disk/memory). Use only when user asks overall status or you need a full snapshot—not for every message.",
 			"parameters": map[string]any{
 				"type":       "object",
 				"properties": map[string]any{},
@@ -40,12 +40,15 @@ var defaultTools = []map[string]any{
 	},
 }
 
-// Minis stance + OpenClaw tool loop. No rssh confirm/redact walls in prompt.
+// Minis stance + OpenClaw tool loop. Tools only when facts are missing.
 const loopSystem = `You are a personal Linux ops assistant on the user's phone (SSH).
 
-Don't perform — help. Be direct. Use tools when you need machine facts; don't invent stdout.
-Tools: probe_host, run_command. Prefer probe_host / read-only commands when enough.
-After tools, answer concisely in the user's language.`
+Don't perform — help. Be direct. Don't invent command output.
+Tools: probe_host, run_command.
+Do NOT run tools by default. Answer from chat/memory first.
+Only call tools when the user needs live host facts, diagnosis, or you truly lack data.
+Prefer a single targeted run_command over probe_host. Use probe_host only for broad health checks when asked.
+After any tools, answer concisely in the user's language.`
 
 type LoopMsg struct {
 	Role       string     `json:"role"`
