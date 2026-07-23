@@ -54,7 +54,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     });
     try {
       await state.agentChat(text);
-    } catch (_) {
+    } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('HOSTKEY_MISMATCH') || msg.toLowerCase().contains('hostkey_mismatch')) {
+        if (mounted) await _handleHostKeyMismatch(state);
+      }
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -69,7 +73,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       context: context,
       showDragHandle: true,
       builder: (c) {
-        final list = state.agentSessions;
+        final onlyCurrent = true;
+        final list = state.sessionsForHost(state.selectedHostId, onlyCurrent: onlyCurrent);
         if (list.isEmpty) {
           return const SafeArea(
             child: Padding(
@@ -83,9 +88,10 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
             itemCount: list.length,
             itemBuilder: (_, i) {
               final s = list[i];
+              final hostHint = s.hostId == null ? '' : state.hostLabelFor(s.hostId);
               return ListTile(
                 title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text('${s.messages.length} 条'),
+                subtitle: Text('${s.messages.length} 条${hostHint.isEmpty ? '' : ' · $hostHint'}', maxLines: 1, overflow: TextOverflow.ellipsis),
                 onTap: () {
                   state.openAgentSession(s);
                   Navigator.pop(c);
@@ -209,6 +215,104 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       ),
     );
   }
+
+  Future<void> _handleHostKeyMismatch(AppState state) async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('主机密钥已变化'),
+        content: const Text(
+          '服务器 SSH 指纹与本地记录不一致（可能重装过系统，或存在中间人风险）。\n确认环境安全后，可清除旧记录并在下次连接时重新信任。',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('清除并重信')),
+        ],
+      ),
+    );
+    if (go == true) {
+      try {
+        await state.resetHostKeyForSelected();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已清除，请重试')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        }
+      }
+    }
+  }
+}
+
+class _ConfirmPlanCard extends StatelessWidget {
+  final ChatMessage msg;
+  const _ConfirmPlanCard({required this.msg});
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.read<AppState>();
+    final plan = msg.meta?['plan'];
+    final steps = plan is Map ? (plan['steps'] as List?) ?? [] : <dynamic>[];
+    final outputs = (msg.meta?['outputs'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {};
+    if (steps.isEmpty) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161B22),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFD29922)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('需要确认的命令', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFD29922))),
+          const SizedBox(height: 8),
+          for (final raw in steps)
+            if (raw is Map)
+              Builder(
+                builder: (_) {
+                  final id = raw['id'];
+                  final stepId = id is int ? id : int.tryParse('$id') ?? 0;
+                  final cmd = raw['command']?.toString() ?? '';
+                  final risk = raw['risk']?.toString() ?? 'write';
+                  final out = outputs['step_$stepId'];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('[$risk] $cmd', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                        if (out != null) ...[
+                          const SizedBox(height: 4),
+                          Text(out, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF8B949E))),
+                        ] else
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FilledButton(
+                              onPressed: () async {
+                                try {
+                                  await state.runAgentStep(stepId: stepId, command: cmd, confirmed: true);
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+                                  }
+                                }
+                              },
+                              child: const Text('运行'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Bubble extends StatelessWidget {
@@ -217,7 +321,9 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (msg.kind == ChatKind.plan) return const SizedBox.shrink();
+    if (msg.kind == ChatKind.plan) {
+      return _ConfirmPlanCard(msg: msg);
+    }
     if (msg.kind == ChatKind.status) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 6),

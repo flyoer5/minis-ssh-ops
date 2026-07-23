@@ -48,10 +48,12 @@ class AppState extends ChangeNotifier {
 
   String get terminalBuffer => _termBuf.toString();
 
-  String get hostLabel {
-    if (selectedHostId == null) return '未选择主机';
+  String get hostLabel => hostLabelFor(selectedHostId);
+
+  String hostLabelFor(String? id) {
+    if (id == null) return '未选择主机';
     for (final h in hosts) {
-      if (h is Map && h['id'] == selectedHostId) {
+      if (h is Map && h['id'] == id) {
         final name = (h['name'] as String?)?.trim();
         final user = h['username'] ?? '';
         final host = h['host'] ?? '';
@@ -62,7 +64,29 @@ class AppState extends ChangeNotifier {
         return '$user@$host:$port';
       }
     }
-    return selectedHostId!;
+    return id;
+  }
+
+  Map<String, dynamic>? hostMap(String? id) {
+    if (id == null) return null;
+    for (final h in hosts) {
+      if (h is Map && h['id'] == id) return Map<String, dynamic>.from(h);
+    }
+    return null;
+  }
+
+  Future<void> resetHostKeyForSelected() async {
+    final h = hostMap(selectedHostId);
+    if (h == null) return;
+    final host = h['host']?.toString() ?? '';
+    final port = h['port'] is int ? h['port'] as int : int.tryParse('${h['port']}') ?? 22;
+    if (host.isEmpty) return;
+    await api.deleteKnownHost(host, port);
+  }
+
+  List<AgentSession> sessionsForHost(String? hostId, {bool onlyCurrent = true}) {
+    if (!onlyCurrent || hostId == null) return List.from(agentSessions);
+    return agentSessions.where((s) => s.hostId == null || s.hostId == hostId).toList();
   }
 
   String get terminalPrompt {
