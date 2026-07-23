@@ -971,36 +971,79 @@ class ProbeSummary {
     final hasErr = [uname, uptime, disk, memory, load].any((s) => s.startsWith('错误:'));
     final ok = !hasErr && uname != '-';
 
-    // disk use%
-    String diskHint = firstLine(disk);
-    final useMatch = RegExp(r'(\d+)%').firstMatch(disk);
-    if (useMatch != null) {
-      diskHint = '使用 ${useMatch.group(1)}%';
-      // try root line
-      for (final line in disk.split('\n')) {
-        if (line.trim().endsWith(' /') || line.contains(r' /$')) {
-          final m = RegExp(r'(\d+)%').firstMatch(line);
-          if (m != null) {
-            diskHint = '根分区 ${m.group(1)}%';
-            break;
-          }
-        }
+    // loadavg: "0.12 0.08 0.05 1/234 5678"
+    String loadHint = firstLine(load);
+    final loadParts = loadHint.split(RegExp(r'\s+'));
+    if (loadParts.isNotEmpty && double.tryParse(loadParts[0]) != null) {
+      loadHint = loadParts.length >= 3
+          ? '${loadParts[0]} / ${loadParts[1]} / ${loadParts[2]}'
+          : loadParts[0];
+    }
+
+    // disk: find root %
+    String diskHint = '—';
+    String diskSub = '';
+    for (final line in disk.split('\n')) {
+      final cols = line.trim().split(RegExp(r'\s+'));
+      if (cols.length >= 5 && cols.last == '/') {
+        final pct = cols[cols.length - 2];
+        diskHint = pct.contains('%') ? pct : '$pct%';
+        // used/total if present Size Used
+        if (cols.length >= 4) diskSub = '${cols[2]}/${cols[1]}';
+        break;
+      }
+    }
+    if (diskHint == '—') {
+      final m = RegExp(r'(\d+)%').firstMatch(disk);
+      if (m != null) diskHint = '${m.group(1)}%';
+    }
+
+    // memory: free -h "Mem: total used free ..." or meminfo
+    String memHint = '—';
+    String memSub = '';
+    final memFirst = firstLine(memory);
+    if (memFirst.toLowerCase().startsWith('mem:')) {
+      final cols = memFirst.split(RegExp(r'\s+'));
+      // Mem: total used free shared buff/cache available
+      if (cols.length >= 3) {
+        memSub = '${cols[2]}/${cols[1]}';
+        // percent if possible skip
+        memHint = cols[2]; // used
+      }
+    } else {
+      // MemTotal / MemAvailable kB
+      final totalM = RegExp(r'MemTotal:\s+(\d+)').firstMatch(memory);
+      final availM = RegExp(r'MemAvailable:\s+(\d+)').firstMatch(memory);
+      if (totalM != null && availM != null) {
+        final total = int.parse(totalM.group(1)!);
+        final avail = int.parse(availM.group(1)!);
+        final used = total - avail;
+        final pct = total == 0 ? 0 : (used * 100 / total).round();
+        memHint = '$pct%';
+        memSub = '${(used / 1024 / 1024).toStringAsFixed(1)}G/${(total / 1024 / 1024).toStringAsFixed(1)}G';
+      } else {
+        memHint = memFirst;
       }
     }
 
-    final memLine = firstLine(memory);
-    final loadLine = firstLine(load);
-    final upLine = firstLine(uptime);
-    final one = ok
-        ? '${firstLine(uname).length > 48 ? '${firstLine(uname).substring(0, 48)}…' : firstLine(uname)} · $diskHint'
-        : '连接或采集失败';
+    // uptime shorten
+    String upHint = firstLine(uptime);
+    final upm = RegExp(r'up\s+([^,]+)').firstMatch(uptime);
+    if (upm != null) upHint = upm.group(1)!.trim();
+
+    final sys = firstLine(uname);
+    final one = ok ? '$diskHint disk · load ${loadParts.isNotEmpty ? loadParts[0] : '-'}' : '离线';
 
     final lines = <ProbeLine>[
-      ProbeLine('系统', firstLine(uname)),
-      ProbeLine('运行', upLine),
-      ProbeLine('负载', loadLine),
-      ProbeLine('磁盘', diskHint),
-      ProbeLine('内存', memLine),
+      ProbeLine('系统', sys),
+      ProbeLine('负载', loadHint),
+      ProbeLine('磁盘', diskSub.isEmpty ? diskHint : '$diskHint ($diskSub)'),
+      ProbeLine('内存', memSub.isEmpty ? memHint : '$memHint ($memSub)'),
+      ProbeLine('运行', upHint),
+      // extras for card big numbers
+      ProbeLine('磁盘%', diskHint),
+      ProbeLine('内存主', memHint),
+      ProbeLine('负载1', loadParts.isNotEmpty ? loadParts[0] : '—'),
     ];
 
     final detail = StringBuffer()

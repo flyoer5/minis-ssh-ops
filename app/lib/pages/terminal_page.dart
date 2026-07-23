@@ -95,12 +95,28 @@ class _TerminalPageState extends State<TerminalPage>
   }
 
   String _stripAnsi(String s) {
-    return s
-        .replaceAll(RegExp(r'\x1B\][^\x07]*\x07'), '')
-        .replaceAll(RegExp(r'\x1B\[[0-9;?]*[A-Za-z]'), '')
-        .replaceAll(RegExp(r'\x1B.'), '')
-        .replaceAll('\r\n', '\n')
-        .replaceAll('\r', '');
+    // Strip OSC (] ... BEL/ST), CSI ([ ... letter), charset, and other ESC sequences.
+    var t = s
+        .replaceAll(RegExp(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'), '')
+        .replaceAll(RegExp(r'\x1B\[[0-9;?]*[ -/]*[@-~]'), '')
+        .replaceAll(RegExp(r'\x1B[()][0-9A-Za-z]'), '')
+        .replaceAll(RegExp(r'\x1B.'), '');
+    // Normalize newlines; drop CR alone
+    t = t.replaceAll('\r\n', '\n').replaceAll('\r', '');
+    // Drop leftover C0 controls except tab/newline (bell, backspace already handled by server usually)
+    final out = StringBuffer();
+    for (final cu in t.runes) {
+      if (cu == 0x09 || cu == 0x0A) {
+        out.writeCharCode(cu);
+      } else if (cu < 0x20 || cu == 0x7F) {
+        // skip other controls that often render as tofu/box
+      } else if (cu == 0xFFFD) {
+        // skip replacement character
+      } else {
+        out.writeCharCode(cu);
+      }
+    }
+    return out.toString();
   }
 
   void _connect(AppState state) {

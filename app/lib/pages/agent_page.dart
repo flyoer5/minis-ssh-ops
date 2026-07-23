@@ -349,100 +349,127 @@ class _Bubble extends StatelessWidget {
     }
 
     final isUser = msg.role == 'user';
-    final isTool = msg.role == 'tool' || msg.kind == ChatKind.stepResult || msg.kind == ChatKind.status;
+    final isToolResult = msg.kind == ChatKind.stepResult || (msg.role == 'tool' && msg.kind != ChatKind.status);
+    final isStatus = msg.kind == ChatKind.status;
     final isErr = msg.kind == ChatKind.error;
 
     if (isUser) {
       return Align(
         alignment: Alignment.centerRight,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 10, left: 36),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          margin: const EdgeInsets.only(bottom: 12, left: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFF1F6FEB),
-            borderRadius: BorderRadius.circular(14),
+            color: const Color(0xFF2563EB),
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: SelectableText(msg.content, style: const TextStyle(height: 1.35, color: Colors.white)),
+          child: SelectableText(msg.content, style: const TextStyle(height: 1.4, color: Colors.white, fontSize: 15)),
         ),
       );
     }
 
-    // Minis-like: left rail + block
-    Color rail = const Color(0xFF3FB950);
-    Color bg = const Color(0xFF161B22);
-    String tag = 'assistant';
-    if (isErr) {
-      rail = const Color(0xFFF85149);
-      tag = 'error';
-    } else if (msg.kind == ChatKind.status) {
-      rail = const Color(0xFFD29922);
-      tag = 'status';
-      bg = const Color(0xFF1C1912);
-    } else if (isTool || msg.kind == ChatKind.stepResult) {
-      rail = const Color(0xFF79C0FF);
-      tag = 'tool';
-      bg = const Color(0xFF0D1117);
+    // Parse tool output " $ cmd\nresult"
+    String? toolCmd;
+    String body = msg.content;
+    if (isToolResult || msg.role == 'tool') {
+      final lines = msg.content.split('\n');
+      if (lines.isNotEmpty && (lines.first.startsWith(r'$ ') || lines.first.startsWith('›'))) {
+        toolCmd = lines.first.replaceFirst(RegExp(r'^[›$]\s*'), '');
+        body = lines.skip(1).join('\n');
+      }
     }
+
+    if (isStatus && toolCmd == null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            const SizedBox(width: 8, height: 8, child: DecoratedBox(decoration: BoxDecoration(color: Color(0xFFD97706), shape: BoxShape.circle))),
+            const SizedBox(width: 8),
+            Expanded(child: Text(msg.content, style: const TextStyle(fontSize: 12, color: Color(0xFFD97706)))),
+          ],
+        ),
+      );
+    }
+
+    // Minis-style assistant / tool card
+    final accent = isErr
+        ? const Color(0xFFEF4444)
+        : (isToolResult || msg.role == 'tool')
+            ? const Color(0xFF38BDF8)
+            : const Color(0xFF22C55E);
+    final label = isErr
+        ? 'error'
+        : (isToolResult || msg.role == 'tool')
+            ? 'tool'
+            : 'assistant';
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF30363D)),
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1E293B)),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: rail,
-                borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
-              ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: const Color(0xFF111827),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: accent.withAlpha(0x33),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: accent.withAlpha(0x66)),
+                  ),
+                  child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: accent)),
+                ),
+                if (toolCmd != null) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      toolCmd,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF94A3B8)),
+                    ),
+                  ),
+                ] else
+                  const Spacer(),
+                InkWell(
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: msg.content));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
+                      );
+                    }
+                  },
+                  child: const Icon(Icons.copy_all, size: 15, color: Color(0xFF64748B)),
+                ),
+              ],
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(tag, style: TextStyle(fontSize: 11, color: rail, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
-                        const Spacer(),
-                        if (msg.content.trim().isNotEmpty)
-                          InkWell(
-                            onTap: () async {
-                              await Clipboard.setData(ClipboardData(text: msg.content));
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
-                                );
-                              }
-                            },
-                            child: const Icon(Icons.copy, size: 14, color: Color(0xFF8B949E)),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    SelectableText(
-                      msg.content,
-                      style: TextStyle(
-                        height: 1.4,
-                        fontSize: isTool ? 12.5 : 14,
-                        fontFamily: isTool ? 'monospace' : null,
-                        color: isErr ? const Color(0xFFFFB4A9) : const Color(0xFFE6EDF3),
-                      ),
-                    ),
-                  ],
+          ),
+          if (body.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: SelectableText(
+                body,
+                style: TextStyle(
+                  height: 1.45,
+                  fontSize: (isToolResult || msg.role == 'tool') ? 12.5 : 14.5,
+                  fontFamily: (isToolResult || msg.role == 'tool') ? 'monospace' : null,
+                  color: isErr ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0),
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

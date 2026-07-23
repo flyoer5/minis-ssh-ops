@@ -28,7 +28,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
   /// 0 = left, 1 = right
   int focus = 0;
   String? hostId;
-  bool landscapeForced = false;
+  bool dualPane = true;
 
   _Pane get active => focus == 0 ? _left : _right;
   _Pane get inactive => focus == 0 ? _right : _left;
@@ -605,21 +605,21 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     if (state.selectedHostId == null) {
       return const Scaffold(body: Center(child: Text('先选主机')));
     }
-    final wide = MediaQuery.of(context).size.width >= 520 || landscapeForced;
+    final wide = dualPane;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
         title: Text(
-          active.selecting ? '已选 ${active.selected.length}' : '文件 · 双栏',
+          active.selecting ? '已选 ${active.selected.length}' : (dualPane ? '文件 L | R' : '文件'),
           style: const TextStyle(fontSize: 16),
         ),
         actions: [
           IconButton(
-            tooltip: wide ? '单栏' : '双栏',
-            onPressed: () => setState(() => landscapeForced = !landscapeForced),
-            icon: Icon(wide ? Icons.view_agenda_outlined : Icons.view_column_outlined),
+            tooltip: dualPane ? '单栏' : '双栏',
+            onPressed: () => setState(() => dualPane = !dualPane),
+            icon: Icon(dualPane ? Icons.view_agenda_outlined : Icons.view_column_outlined),
           ),
           PopupMenuButton<String>(
             onSelected: (a) {
@@ -677,8 +677,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                     ? Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _bar(Icons.copy_all, '到另一栏', active.selected.isEmpty ? null : () => _copyToOther()),
-                          _bar(Icons.drive_file_move_outline, '移动', active.selected.isEmpty ? null : _moveToOther),
+                          _bar(Icons.copy_all, '复制→', active.selected.isEmpty ? null : () => _copyToOther()),
+                          _bar(Icons.drive_file_move_outline, '移动→', active.selected.isEmpty ? null : _moveToOther),
                           _bar(Icons.delete_outline, '删除', active.selected.isEmpty ? null : () => _deletePaths(active.selected, ask: true)),
                           _bar(Icons.close, '取消', () {
                             setState(() {
@@ -694,7 +694,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                           _bar(Icons.create_new_folder_outlined, '新建夹', _mkdir),
                           _bar(Icons.note_add_outlined, '新文件', _newFile),
                           _bar(Icons.checklist, '多选', () => setState(() => active.selecting = true)),
-                          _bar(Icons.swap_horiz, '焦点', () => setState(() => focus = 1 - focus)),
+                          _bar(Icons.swap_horiz, '切栏', () => setState(() => focus = 1 - focus)),
                           _bar(Icons.refresh, '刷新', active.loading ? null : () => _load(active)),
                         ],
                       ),
