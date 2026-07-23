@@ -1007,8 +1007,9 @@ class ProbeSummary {
       // Mem: total used free shared buff/cache available
       if (cols.length >= 3) {
         memSub = '${cols[2]}/${cols[1]}';
-        // percent if possible skip
-        memHint = cols[2]; // used
+        memHint = cols[2]; // used as display
+        // derive percent from used/total if human sizes not parseable; keep used string
+        // free -h doesn't give %; leave memHint as used, card uses free text
       }
     } else {
       // MemTotal / MemAvailable kB
@@ -1032,7 +1033,7 @@ class ProbeSummary {
     if (upm != null) upHint = upm.group(1)!.trim();
 
     final sys = firstLine(uname);
-    final one = ok ? '$diskHint disk · load ${loadParts.isNotEmpty ? loadParts[0] : '-'}' : '离线';
+    final one = ok ? 'disk $diskHint · mem $memHint · load ${loadParts.isNotEmpty ? loadParts[0] : '-'}' : '离线';
 
     final lines = <ProbeLine>[
       ProbeLine('系统', sys),

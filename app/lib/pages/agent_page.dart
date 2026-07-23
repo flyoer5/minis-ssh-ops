@@ -349,7 +349,7 @@ class _Bubble extends StatelessWidget {
     }
 
     final isUser = msg.role == 'user';
-    final isToolResult = msg.kind == ChatKind.stepResult || (msg.role == 'tool' && msg.kind != ChatKind.status);
+    final isTool = msg.role == 'tool' || msg.kind == ChatKind.stepResult;
     final isStatus = msg.kind == ChatKind.status;
     final isErr = msg.kind == ChatKind.error;
 
@@ -357,119 +357,166 @@ class _Bubble extends StatelessWidget {
       return Align(
         alignment: Alignment.centerRight,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 12, left: 48),
+          margin: const EdgeInsets.only(bottom: 12, left: 40),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xFF2563EB),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: SelectableText(msg.content, style: const TextStyle(height: 1.4, color: Colors.white, fontSize: 15)),
+          child: SelectableText(msg.content, style: const TextStyle(height: 1.4, color: Colors.white, fontSize: 14.5)),
         ),
       );
     }
 
-    // Parse tool output " $ cmd\nresult"
-    String? toolCmd;
-    String body = msg.content;
-    if (isToolResult || msg.role == 'tool') {
-      final lines = msg.content.split('\n');
-      if (lines.isNotEmpty && (lines.first.startsWith(r'$ ') || lines.first.startsWith('›'))) {
-        toolCmd = lines.first.replaceFirst(RegExp(r'^[›$]\s*'), '');
-        body = lines.skip(1).join('\n');
+    // Minis-like tool / status / assistant blocks
+    if (isTool || isStatus) {
+      final running = isStatus || msg.content == 'running' || msg.content.startsWith('探测');
+      final title = () {
+        if (msg.meta?['name'] == 'probe_host' || msg.content.contains('探测主机')) return 'probe_host';
+        if (msg.content.startsWith(r'$ ')) return 'run_command';
+        return msg.meta?['name']?.toString() ?? 'tool';
+      }();
+      // split command vs body for stepResult
+      String header = title;
+      String body = msg.content;
+      if (msg.kind == ChatKind.stepResult && msg.content.startsWith(r'$ ')) {
+        final nl = msg.content.indexOf('\n');
+        if (nl > 0) {
+          header = msg.content.substring(0, nl);
+          body = msg.content.substring(nl + 1);
+        } else {
+          header = msg.content;
+          body = '';
+        }
+      } else if (isStatus) {
+        header = msg.content;
+        body = '';
       }
-    }
-
-    if (isStatus && toolCmd == null) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D1117),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF30363D)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(width: 8, height: 8, child: DecoratedBox(decoration: BoxDecoration(color: Color(0xFFD97706), shape: BoxShape.circle))),
-            const SizedBox(width: 8),
-            Expanded(child: Text(msg.content, style: const TextStyle(fontSize: 12, color: Color(0xFFD97706)))),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: const BoxDecoration(
+                color: Color(0xFF161B22),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    running ? Icons.play_circle_outline : Icons.terminal,
+                    size: 16,
+                    color: running ? const Color(0xFFD29922) : const Color(0xFF79C0FF),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      header,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF79C0FF)),
+                    ),
+                  ),
+                  if (body.trim().isNotEmpty)
+                    InkWell(
+                      onTap: () async {
+                        await Clipboard.setData(ClipboardData(text: msg.content));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
+                          );
+                        }
+                      },
+                      child: const Icon(Icons.copy, size: 14, color: Color(0xFF8B949E)),
+                    ),
+                ],
+              ),
+            ),
+            if (body.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: SelectableText(
+                  body,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, height: 1.35, color: Color(0xFFC9D1D9)),
+                ),
+              )
+            else if (running)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(10, 6, 10, 10),
+                child: Text('running…', style: TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
+              ),
           ],
         ),
       );
     }
 
-    // Minis-style assistant / tool card
-    final accent = isErr
-        ? const Color(0xFFEF4444)
-        : (isToolResult || msg.role == 'tool')
-            ? const Color(0xFF38BDF8)
-            : const Color(0xFF22C55E);
-    final label = isErr
-        ? 'error'
-        : (isToolResult || msg.role == 'tool')
-            ? 'tool'
-            : 'assistant';
-
+    // assistant / error prose
+    final rail = isErr ? const Color(0xFFF85149) : const Color(0xFF3FB950);
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF1E293B)),
+        color: const Color(0xFF161B22),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF30363D)),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            color: const Color(0xFF111827),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: accent.withAlpha(0x33),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: accent.withAlpha(0x66)),
-                  ),
-                  child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: accent)),
-                ),
-                if (toolCmd != null) ...[
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      toolCmd,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF94A3B8)),
-                    ),
-                  ),
-                ] else
-                  const Spacer(),
-                InkWell(
-                  onTap: () async {
-                    await Clipboard.setData(ClipboardData(text: msg.content));
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
-                      );
-                    }
-                  },
-                  child: const Icon(Icons.copy_all, size: 15, color: Color(0xFF64748B)),
-                ),
-              ],
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: rail,
+                borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
+              ),
             ),
-          ),
-          if (body.trim().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: SelectableText(
-                body,
-                style: TextStyle(
-                  height: 1.45,
-                  fontSize: (isToolResult || msg.role == 'tool') ? 12.5 : 14.5,
-                  fontFamily: (isToolResult || msg.role == 'tool') ? 'monospace' : null,
-                  color: isErr ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(isErr ? 'error' : 'assistant', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: rail)),
+                        const Spacer(),
+                        InkWell(
+                          onTap: () async {
+                            await Clipboard.setData(ClipboardData(text: msg.content));
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
+                              );
+                            }
+                          },
+                          child: const Icon(Icons.copy, size: 14, color: Color(0xFF8B949E)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText(
+                      msg.content,
+                      style: TextStyle(
+                        height: 1.45,
+                        fontSize: 14.5,
+                        color: isErr ? const Color(0xFFFFB4A9) : const Color(0xFFE6EDF3),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

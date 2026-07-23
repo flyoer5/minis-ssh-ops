@@ -345,34 +345,52 @@ class _StatusCard extends StatelessWidget {
     return '—';
   }
 
+  double? _pct(String s) {
+    final m = RegExp(r'(\d+(?:\.\d+)?)%').firstMatch(s);
+    if (m != null) return (double.tryParse(m.group(1)!) ?? 0).clamp(0, 100) / 100.0;
+    final n = double.tryParse(s.replaceAll('%', '').trim());
+    if (n != null && n <= 100) return (n.clamp(0, 100)) / 100.0;
+    return null;
+  }
+
   Color get _status {
     if (loading) return const Color(0xFFFFB020);
-    if (summary == null) return const Color(0xFF6B7280);
-    return summary!.ok ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    if (summary == null) return const Color(0xFF64748B);
+    if (!summary!.ok) return const Color(0xFFEF4444);
+    final d = _pct(_v('磁盘%')) ?? 0;
+    final m = _pct(_v('内存主')) ?? 0;
+    if (d >= 0.9 || m >= 0.9) return const Color(0xFFEF4444);
+    if (d >= 0.75 || m >= 0.75) return const Color(0xFFF59E0B);
+    return const Color(0xFF22C55E);
   }
 
   @override
   Widget build(BuildContext context) {
-    final load1 = _v('负载1');
-    final diskPct = _v('磁盘%');
+    final diskPctS = _v('磁盘%');
     final memMain = _v('内存主');
+    final load1 = _v('负载1');
     final up = _v('运行');
     final sys = _v('系统');
     final diskFull = _v('磁盘');
     final memFull = _v('内存');
+    final diskP = _pct(diskPctS) ?? _pct(diskFull);
+    final memP = _pct(memMain) ?? _pct(memFull);
 
     return Material(
       color: const Color(0xFF0B1220),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: selected ? const Color(0xFF38BDF8) : const Color(0xFF1F2937), width: selected ? 1.5 : 1),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: selected ? const Color(0xFF38BDF8) : const Color(0xFF1E293B),
+          width: selected ? 1.6 : 1,
+        ),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         onTap: onSelect,
         onLongPress: onMenu,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 14),
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -402,8 +420,8 @@ class _StatusCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                        Text(addr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'monospace')),
+                        Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                        Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'monospace')),
                       ],
                     ),
                   ),
@@ -420,38 +438,25 @@ class _StatusCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               if (summary == null && !loading)
-                const Text('下拉或点同步刷新', style: TextStyle(color: Color(0xFF64748B), fontSize: 12))
+                const Text('下拉刷新或点同步获取探针数据', style: TextStyle(fontSize: 12, color: Color(0xFF64748B)))
               else ...[
-                // probe-service style big tiles
+                _gauge('CPU负载', load1, null, const Color(0xFF38BDF8), subtitle: _v('负载')),
+                const SizedBox(height: 8),
+                _gauge('磁盘', diskPctS == '—' ? diskFull : diskPctS, diskP, const Color(0xFFA78BFA), subtitle: diskFull),
+                const SizedBox(height: 8),
+                _gauge('内存', memMain == '—' ? memFull : memMain, memP, const Color(0xFF4ADE80), subtitle: memFull),
+                const SizedBox(height: 8),
                 Row(
                   children: [
-                    Expanded(child: _big('LOAD', load1, '1m', const Color(0xFF38BDF8))),
-                    const SizedBox(width: 8),
-                    Expanded(child: _big('DISK', diskPct, diskFull == '—' ? 'root' : diskFull, const Color(0xFFA78BFA))),
-                    const SizedBox(width: 8),
-                    Expanded(child: _big('MEM', memMain, memFull == '—' ? 'used' : memFull, const Color(0xFF34D399))),
+                    const Icon(Icons.schedule, size: 14, color: Color(0xFFFBBF24)),
+                    const SizedBox(width: 6),
+                    Text('运行 $up', style: const TextStyle(fontSize: 12, color: Color(0xFFCBD5E1))),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF111827),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF1F2937)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('UP  $up', style: const TextStyle(fontSize: 12, color: Color(0xFFFBBF24), fontFamily: 'monospace')),
-                      if (sys != '—') ...[
-                        const SizedBox(height: 4),
-                        Text(sys, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'monospace', height: 1.25)),
-                      ],
-                    ],
-                  ),
-                ),
+                if (sys != '—') ...[
+                  const SizedBox(height: 6),
+                  Text(sys, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontFamily: 'monospace')),
+                ],
               ],
             ],
           ),
@@ -460,26 +465,42 @@ class _StatusCard extends StatelessWidget {
     );
   }
 
-  Widget _big(String k, String v, String sub, Color c) {
+  Widget _gauge(String title, String value, double? progress, Color color, {String? subtitle}) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [c.withAlpha(0x28), const Color(0xFF111827)],
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: c.withAlpha(0x55)),
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF1E293B)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(k, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: c, letterSpacing: 0.6)),
-          const SizedBox(height: 6),
-          Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, fontFamily: 'monospace')),
-          const SizedBox(height: 2),
-          Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontFamily: 'monospace')),
+          Row(
+            children: [
+              Text(title, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, fontFamily: 'monospace')),
+            ],
+          ),
+          if (progress != null) ...[
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                value: progress.clamp(0.0, 1.0),
+                minHeight: 6,
+                backgroundColor: const Color(0xFF1E293B),
+                color: progress >= 0.9
+                    ? const Color(0xFFEF4444)
+                    : (progress >= 0.75 ? const Color(0xFFF59E0B) : color),
+              ),
+            ),
+          ],
+          if (subtitle != null && subtitle != '—' && subtitle != value) ...[
+            const SizedBox(height: 4),
+            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontFamily: 'monospace')),
+          ],
         ],
       ),
     );

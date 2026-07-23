@@ -95,24 +95,30 @@ class _TerminalPageState extends State<TerminalPage>
   }
 
   String _stripAnsi(String s) {
-    // Strip OSC (] ... BEL/ST), CSI ([ ... letter), charset, and other ESC sequences.
+    // Strip OSC/CSI and most terminal control sequences that become "□" in plain Text.
     var t = s
-        .replaceAll(RegExp(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'), '')
+        .replaceAll(RegExp(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)?'), '')
         .replaceAll(RegExp(r'\x1B\[[0-9;?]*[ -/]*[@-~]'), '')
         .replaceAll(RegExp(r'\x1B[()][0-9A-Za-z]'), '')
-        .replaceAll(RegExp(r'\x1B.'), '');
-    // Normalize newlines; drop CR alone
-    t = t.replaceAll('\r\n', '\n').replaceAll('\r', '');
-    // Drop leftover C0 controls except tab/newline (bell, backspace already handled by server usually)
+        .replaceAll(RegExp(r'\x1B.'), '')
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '');
     final out = StringBuffer();
-    for (final cu in t.runes) {
+    for (final cu in t.codeUnits) {
       if (cu == 0x09 || cu == 0x0A) {
         out.writeCharCode(cu);
-      } else if (cu < 0x20 || cu == 0x7F) {
-        // skip other controls that often render as tofu/box
+      } else if (cu == 0x08 || cu == 0x7F) {
+        final cur = out.toString();
+        if (cur.isNotEmpty && !cur.endsWith('\n')) {
+          out
+            ..clear()
+            ..write(cur.substring(0, cur.length - 1));
+        }
       } else if (cu == 0xFFFD) {
-        // skip replacement character
-      } else {
+        // replacement char
+      } else if (cu >= 0x80 && cu <= 0x9F) {
+        // C1 controls
+      } else if (cu >= 0x20 && cu != 0x7F) {
         out.writeCharCode(cu);
       }
     }

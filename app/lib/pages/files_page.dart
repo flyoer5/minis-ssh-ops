@@ -660,11 +660,17 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                 ? Row(
                     children: [
                       _pane(context, _left, 0),
-                      Container(width: 1, color: const Color(0xFF333333)),
+                      Container(width: 2, color: const Color(0xFF0A0A0A)),
                       _pane(context, _right, 1),
                     ],
                   )
-                : _pane(context, active, focus),
+                : Column(
+                    children: [
+                      Expanded(child: _pane(context, _left, 0)),
+                      Container(height: 2, color: const Color(0xFF0A0A0A)),
+                      Expanded(child: _pane(context, _right, 1)),
+                    ],
+                  ),
           ),
           // MT-like bottom bar operates on focused pane / cross-pane
           Material(

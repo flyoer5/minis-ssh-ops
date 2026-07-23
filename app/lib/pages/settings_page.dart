@@ -107,7 +107,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 28),
         children: [
           _section('关于', [
-            Text('SSH AI Agent 1.4.4', style: Theme.of(context).textTheme.titleMedium),
+            Text('SSH AI Agent 1.4.5', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             const Text('个人向 · arm64 · 固定签名可覆盖升级', style: TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
           ]),
