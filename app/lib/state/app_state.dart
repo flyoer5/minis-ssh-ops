@@ -392,8 +392,9 @@ class AppState extends ChangeNotifier {
       }
     }
     final now = DateTime.now();
-    final mm = now.minute < 10 ? '0${now.minute}' : '${now.minute}';
-    return '会话 ${now.hour}:$mm';
+    final hh = now.hour.toString().padLeft(2, '0');
+    final mm = now.minute.toString().padLeft(2, '0');
+    return '会话 $hh:$mm';
   }
 
   void openAgentSession(AgentSession s) {

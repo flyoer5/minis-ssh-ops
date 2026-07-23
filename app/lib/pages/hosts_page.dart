@@ -387,12 +387,18 @@ class _StatusCard extends StatelessWidget {
                   ),
                   if (loading)
                     const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  else
+                  else ...[
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       onPressed: onRefresh,
                       icon: const Icon(Icons.sync, size: 18, color: Color(0xFF8B949E)),
                     ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onMenu,
+                      icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF8B949E)),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 10),

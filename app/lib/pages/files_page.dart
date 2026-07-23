@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
@@ -184,6 +187,82 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     try {
       await s.api.fsRemove(id, p, recursive: isDir, confirmed: true);
       await _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _rename(String oldPath, String oldName, bool isDir) async {
+    final s = context.read<AppState>();
+    final id = s.selectedHostId;
+    if (id == null) return;
+    final ctrl = TextEditingController(text: oldName);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('重命名'),
+        content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: '新名称')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('确定')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty || name == oldName) return;
+    final slash = oldPath.lastIndexOf('/');
+    final parent = slash <= 0 ? '' : oldPath.substring(0, slash);
+    final newPath = parent.isEmpty ? name : '$parent/$name';
+    try {
+      await s.api.fsRename(id, oldPath, newPath, confirmed: true);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已重命名')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _download(String filePath) async {
+    final s = context.read<AppState>();
+    final id = s.selectedHostId;
+    if (id == null) return;
+    try {
+      final r = await s.api.fsDownload(id, filePath);
+      final name = r['name']?.toString() ?? 'file.bin';
+      final b64 = r['b64']?.toString() ?? '';
+      final size = r['size'] ?? 0;
+      if (!mounted) return;
+      final bytes = base64Decode(b64);
+      String asText;
+      try {
+        asText = utf8.decode(bytes, allowMalformed: true);
+      } catch (_) {
+        asText = '';
+      }
+      final looksText = asText.isNotEmpty && !asText.contains('\u0000') && size is int && size < 512 * 1024;
+      await showDialog(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text(name),
+          content: Text(looksText ? '已下载 $size 字节，可复制文本内容。' : '已下载 $size 字节（二进制）。可复制 base64。'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
+            FilledButton(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: looksText ? asText : b64));
+                if (c.mounted) Navigator.pop(c);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(looksText ? '已复制文本' : '已复制 base64')),
+                  );
+                }
+              },
+              child: Text(looksText ? '复制文本' : '复制 base64'),
+            ),
+          ],
+        ),
+      );
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
