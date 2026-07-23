@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -181,4 +182,82 @@ func Remove(p ConnectParams, remote string, recursive bool) error {
 		}
 		return walk(remote)
 	})
+}
+
+// Copy copies src to dest on the same remote (file or directory tree).
+// If dest exists as a directory, copies into dest/<basename(src)>.
+// Refuses to copy a directory into its own subdirectory.
+func Copy(p ConnectParams, src, dest string) (files int, dirs int, err error) {
+	if strings.TrimSpace(src) == "" || strings.TrimSpace(dest) == "" {
+		return 0, 0, fmt.Errorf("src and dest required")
+	}
+	err = withSFTP(p, func(sc *sftp.Client) error {
+		src = path.Clean(src)
+		dest = path.Clean(dest)
+		st, err := sc.Stat(src)
+		if err != nil {
+			return err
+		}
+		// if dest is existing dir, place inside it
+		if dstSt, err := sc.Stat(dest); err == nil && dstSt.IsDir() {
+			dest = path.Join(dest, path.Base(src))
+		} else {
+			// ensure parent
+			_ = sc.MkdirAll(path.Dir(dest))
+		}
+		if st.IsDir() {
+			// prevent copy into self
+			if dest == src || strings.HasPrefix(dest, src+"/") {
+				return fmt.Errorf("cannot copy directory into itself")
+			}
+			return copyDir(sc, src, dest, &files, &dirs)
+		}
+		if err := copyFile(sc, src, dest); err != nil {
+			return err
+		}
+		files++
+		return nil
+	})
+	return files, dirs, err
+}
+
+func copyFile(sc *sftp.Client, src, dest string) error {
+	in, err := sc.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := sc.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
+}
+
+func copyDir(sc *sftp.Client, src, dest string, files, dirs *int) error {
+	if err := sc.MkdirAll(dest); err != nil {
+		return err
+	}
+	*dirs++
+	entries, err := sc.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		s := path.Join(src, e.Name())
+		d := path.Join(dest, e.Name())
+		if e.IsDir() {
+			if err := copyDir(sc, s, d, files, dirs); err != nil {
+				return err
+			}
+		} else {
+			if err := copyFile(sc, s, d); err != nil {
+				return err
+			}
+			*files++
+		}
+	}
+	return nil
 }

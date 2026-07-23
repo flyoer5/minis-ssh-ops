@@ -60,6 +60,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/remove", s.handleFSRemove)
 	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/rename", s.handleFSRename)
 	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/download", s.handleFSDownload)
+	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/copy", s.handleFSCopy)
 	// Interactive PTY (auth handled inside; needed for WS upgrade path)
 	s.mux.HandleFunc("/v1/hosts/{id}/pty", s.handlePtyWSHost)
 	s.mux.HandleFunc("/v1/pty", s.handlePtyWS)
@@ -115,10 +116,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"service":   "ssh-ai-agent-backend",
-		"version":   "1.4.9",
+		"version":   "1.4.10",
 		"startedAt": s.StartedAt.Format(time.RFC3339),
 		"listenHint": "127.0.0.1 only",
-		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu","stream","models","longmem"},
+		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu","stream","models","longmem","fscopy"},
 	})
 }
 

@@ -6,6 +6,10 @@ class ApiClient {
   String baseUrl;
   String localToken;
 
+  /// Shared non-streaming client (connection reuse for health/probe/fs).
+  final http.Client _c = http.Client();
+  http.Client? _streamClient;
+
   ApiClient({
     this.baseUrl = 'http://127.0.0.1:17890',
     this.localToken = '',
@@ -19,7 +23,7 @@ class ApiClient {
   Uri _u(String path) => Uri.parse('$baseUrl$path');
 
   Future<Map<String, dynamic>> health() async {
-    final r = await http.get(_u('/v1/health')).timeout(const Duration(seconds: 3));
+    final r = await _c.get(_u('/v1/health')).timeout(const Duration(seconds: 3));
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
@@ -30,13 +34,13 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> getLlm() async {
-    final r = await http.get(_u('/v1/settings/llm'), headers: _headers).timeout(const Duration(seconds: 10));
+    final r = await _c.get(_u('/v1/settings/llm'), headers: _headers).timeout(const Duration(seconds: 10));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
   Future<List<String>> listModels() async {
-    final r = await http.get(_u('/v1/settings/llm/models'), headers: _headers).timeout(const Duration(seconds: 20));
+    final r = await _c.get(_u('/v1/settings/llm/models'), headers: _headers).timeout(const Duration(seconds: 20));
     _ensureOk(r);
     final m = jsonDecode(r.body) as Map<String, dynamic>;
     final list = m['models'];
@@ -45,39 +49,35 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> putLlm(Map<String, dynamic> body) async {
-    final r = await http.put(
-      _u('/v1/settings/llm'),
-      headers: _headers,
-      body: jsonEncode(body),
-    ).timeout(const Duration(seconds: 15));
+    final r = await _c
+        .put(_u('/v1/settings/llm'), headers: _headers, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
   Future<List<dynamic>> listHosts() async {
-    final r = await http.get(_u('/v1/hosts'), headers: _headers).timeout(const Duration(seconds: 10));
+    final r = await _c.get(_u('/v1/hosts'), headers: _headers).timeout(const Duration(seconds: 10));
     _ensureOk(r);
     final m = jsonDecode(r.body) as Map<String, dynamic>;
     return (m['hosts'] as List<dynamic>? ?? []);
   }
 
   Future<Map<String, dynamic>> createHost(Map<String, dynamic> body) async {
-    final r = await http.post(
-      _u('/v1/hosts'),
-      headers: _headers,
-      body: jsonEncode(body),
-    ).timeout(const Duration(seconds: 15));
+    final r = await _c
+        .post(_u('/v1/hosts'), headers: _headers, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
   Future<void> deleteHost(String id) async {
-    final r = await http.delete(_u('/v1/hosts/$id'), headers: _headers).timeout(const Duration(seconds: 10));
+    final r = await _c.delete(_u('/v1/hosts/$id'), headers: _headers).timeout(const Duration(seconds: 10));
     _ensureOk(r);
   }
 
   Future<Map<String, dynamic>> updateHost(String id, Map<String, dynamic> body) async {
-    final r = await http
+    final r = await _c
         .put(_u('/v1/hosts/$id'), headers: _headers, body: jsonEncode(body))
         .timeout(const Duration(seconds: 15));
     _ensureOk(r);
@@ -90,15 +90,17 @@ class ApiClient {
     bool confirmed = false,
     String sessionId = 'manual',
   }) async {
-    final r = await http.post(
-      _u('/v1/hosts/$id/exec'),
-      headers: _headers,
-      body: jsonEncode({
-        'command': command,
-        'confirmed': confirmed,
-        'sessionId': sessionId,
-      }),
-    ).timeout(const Duration(seconds: 60));
+    final r = await _c
+        .post(
+          _u('/v1/hosts/$id/exec'),
+          headers: _headers,
+          body: jsonEncode({
+            'command': command,
+            'confirmed': confirmed,
+            'sessionId': sessionId,
+          }),
+        )
+        .timeout(const Duration(seconds: 60));
     if (r.statusCode == 409) {
       final m = jsonDecode(r.body) as Map<String, dynamic>;
       throw ApiException(409, m['error']?.toString() ?? 'confirmation required', body: m);
@@ -108,7 +110,9 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> probe(String id) async {
-    final r = await http.post(_u('/v1/hosts/$id/probe'), headers: _headers, body: '{}').timeout(const Duration(seconds: 45));
+    final r = await _c
+        .post(_u('/v1/hosts/$id/probe'), headers: _headers, body: '{}')
+        .timeout(const Duration(seconds: 45));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -118,7 +122,7 @@ class ApiClient {
     required String goal,
     String? sessionId,
   }) async {
-    final r = await http
+    final r = await _c
         .post(
           _u('/v1/agent/plan'),
           headers: _headers,
@@ -139,7 +143,7 @@ class ApiClient {
     String? sessionId,
     bool confirmWrites = false,
   }) async {
-    final r = await http
+    final r = await _c
         .post(
           _u('/v1/agent/chat'),
           headers: _headers,
@@ -154,8 +158,6 @@ class ApiClient {
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
-
-  http.Client? _streamClient;
 
   void cancelAgentStream() {
     try {
@@ -231,7 +233,7 @@ class ApiClient {
     String sessionId = 'agent',
     int stepId = 0,
   }) async {
-    final r = await http.post(
+    final r = await _c.post(
       _u('/v1/agent/exec-step'),
       headers: _headers,
       body: jsonEncode({
@@ -251,14 +253,14 @@ class ApiClient {
   }
 
   Future<List<dynamic>> listAudit() async {
-    final r = await http.get(_u('/v1/audit'), headers: _headers).timeout(const Duration(seconds: 15));
+    final r = await _c.get(_u('/v1/audit'), headers: _headers).timeout(const Duration(seconds: 15));
     _ensureOk(r);
     final m = jsonDecode(r.body) as Map<String, dynamic>;
     return (m['entries'] as List<dynamic>? ?? []);
   }
 
   Future<Map<String, dynamic>> fsList(String hostId, String path) async {
-    final r = await http
+    final r = await _c
         .post(
           _u('/v1/hosts/$hostId/fs/list'),
           headers: _headers,
@@ -270,7 +272,7 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> fsRead(String hostId, String path) async {
-    final r = await http
+    final r = await _c
         .post(
           _u('/v1/hosts/$hostId/fs/read'),
           headers: _headers,
@@ -287,7 +289,7 @@ class ApiClient {
     String content, {
     bool confirmed = false,
   }) async {
-    final r = await http
+    final r = await _c
         .post(
           _u('/v1/hosts/$hostId/fs/write'),
           headers: _headers,
@@ -303,7 +305,7 @@ class ApiClient {
   }
 
   Future<void> fsMkdir(String hostId, String path, {bool confirmed = true}) async {
-    final r = await http
+    final r = await _c
         .post(
           _u('/v1/hosts/$hostId/fs/mkdir'),
           headers: _headers,
@@ -314,7 +316,7 @@ class ApiClient {
   }
 
   Future<void> fsRemove(String hostId, String path, {bool recursive = false, bool confirmed = true}) async {
-    final r = await http
+    final r = await _c
         .post(
           _u('/v1/hosts/$hostId/fs/remove'),
           headers: _headers,
@@ -325,7 +327,7 @@ class ApiClient {
   }
 
   Future<void> fsRename(String hostId, String oldPath, String newPath, {bool confirmed = true}) async {
-    final r = await http
+    final r = await _c
         .post(
           _u('/v1/hosts/$hostId/fs/rename'),
           headers: _headers,
@@ -335,8 +337,30 @@ class ApiClient {
     _ensureOk(r);
   }
 
+  /// Server-side SFTP copy (files + recursive dirs). Prefer over read+write.
+  Future<Map<String, dynamic>> fsCopy(
+    String hostId, {
+    required String src,
+    required String dest,
+    bool confirmed = true,
+  }) async {
+    final r = await _c
+        .post(
+          _u('/v1/hosts/$hostId/fs/copy'),
+          headers: _headers,
+          body: jsonEncode({
+            'src': src,
+            'dest': dest,
+            'confirmed': confirmed,
+          }),
+        )
+        .timeout(const Duration(seconds: 180));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> fsDownload(String hostId, String path, {int maxBytes = 8 * 1024 * 1024}) async {
-    final r = await http
+    final r = await _c
         .post(
           _u('/v1/hosts/$hostId/fs/download'),
           headers: _headers,
@@ -348,7 +372,7 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> listKnownHosts() async {
-    final r = await http.get(_u('/v1/known-hosts'), headers: _headers).timeout(const Duration(seconds: 10));
+    final r = await _c.get(_u('/v1/known-hosts'), headers: _headers).timeout(const Duration(seconds: 10));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -358,7 +382,7 @@ class ApiClient {
       'host': host,
       'port': '$port',
     });
-    final r = await http.delete(uri, headers: _headers).timeout(const Duration(seconds: 10));
+    final r = await _c.delete(uri, headers: _headers).timeout(const Duration(seconds: 10));
     _ensureOk(r);
   }
 

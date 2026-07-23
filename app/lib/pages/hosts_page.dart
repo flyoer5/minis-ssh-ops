@@ -116,6 +116,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                         selected: state.selectedHostId == id,
                         loading: _loading.contains(id),
                         summary: _summary[id],
+                        probedAt: state.probeCacheTime(id),
                         onSelect: () => state.selectHost(id),
                         onRefresh: () => _refreshProbe(state, id, force: true),
                         onMenu: () => _hostMenu(context, state, h),
@@ -314,6 +315,7 @@ class _StatusCard extends StatelessWidget {
   final bool selected;
   final bool loading;
   final ProbeSummary? summary;
+  final DateTime? probedAt;
   final VoidCallback onSelect;
   final VoidCallback onRefresh;
   final VoidCallback onMenu;
@@ -324,10 +326,24 @@ class _StatusCard extends StatelessWidget {
     required this.selected,
     required this.loading,
     required this.summary,
+    this.probedAt,
     required this.onSelect,
     required this.onRefresh,
     required this.onMenu,
   });
+
+  String get _ageText {
+    final at = probedAt;
+    if (at == null || summary == null) return '';
+    final sec = DateTime.now().difference(at).inSeconds;
+    if (sec < 5) return '刚刚';
+    if (sec < 60) return '${sec}s 前';
+    final min = sec ~/ 60;
+    if (min < 60) return '${min}m 前';
+    final h = min ~/ 60;
+    if (h < 48) return '${h}h 前';
+    return '${h ~/ 24}d 前';
+  }
 
   String _v(String label) {
     if (summary == null) return '—';
@@ -523,15 +539,27 @@ class _StatusCard extends StatelessWidget {
                   const Color(0xFF34D399),
                 ),
                 const SizedBox(height: 6),
-                // uptime + OS like server table footer
+                // uptime + OS + probe age
                 Text(
                   [
                     if (up != '—') '⏱ $up',
                     if (sys != '—') sys,
+                    if (_ageText.isNotEmpty) _ageText,
                   ].join('  ·  '),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontFamily: 'monospace', height: 1.25),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: () {
+                      final at = probedAt;
+                      if (at == null) return const Color(0xFF94A3B8);
+                      final sec = DateTime.now().difference(at).inSeconds;
+                      if (sec > 120) return const Color(0xFFF59E0B); // stale
+                      return const Color(0xFF94A3B8);
+                    }(),
+                    fontFamily: 'monospace',
+                    height: 1.25,
+                  ),
                 ),
               ],
             ],

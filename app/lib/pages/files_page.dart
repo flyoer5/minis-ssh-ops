@@ -264,7 +264,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     await _load(active);
   }
 
-  /// Copy selected (or one path) from focus pane into the other pane path via read+write (files only).
+  /// Copy selected (or one path) into the other pane via server-side SFTP copy (files + dirs).
   Future<void> _copyToOther({String? singlePath}) async {
     final s = context.read<AppState>();
     final id = s.selectedHostId;
@@ -274,27 +274,31 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('先选中文件（多选）')));
       return;
     }
-    final destDir = inactive.path;
-    var n = 0;
+    final destDir = inactive.path.isEmpty ? '/' : inactive.path;
+    var okN = 0;
+    var failN = 0;
+    var files = 0;
+    var dirs = 0;
     for (final src in srcs) {
-      final e = active.entries.cast<Map>().where((x) => x['path'] == src).cast<Map?>().firstWhere((_) => true, orElse: () => null);
-      if (e == null) continue;
-      if (e['isDir'] == true) {
-        // skip dirs for simple copy (no recursive copy API yet)
-        continue;
-      }
-      final name = e['name']?.toString() ?? src.split('/').last;
-      final dest = destDir.endsWith('/') || destDir.isEmpty ? '$destDir$name' : '$destDir/$name';
+      final name = src.split('/').where((e) => e.isNotEmpty).isEmpty
+          ? src
+          : src.split('/').where((e) => e.isNotEmpty).last;
+      final dest = destDir.endsWith('/') ? '$destDir$name' : '$destDir/$name';
       try {
-        final r = await s.api.fsRead(id, src);
-        final text = r['text']?.toString() ?? '';
-        await s.api.fsWrite(id, dest, text, confirmed: true);
-        n++;
-      } catch (_) {}
+        final r = await s.api.fsCopy(id, src: src, dest: dest, confirmed: true);
+        okN++;
+        files += (r['files'] as num?)?.toInt() ?? 0;
+        dirs += (r['dirs'] as num?)?.toInt() ?? 0;
+      } catch (_) {
+        failN++;
+      }
     }
     await _load(inactive);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已复制 $n 个文件到另一栏')));
+      final detail = files + dirs > 0 ? '（$files 文件${dirs > 0 ? " · $dirs 目录" : ""}）' : '';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(failN == 0 ? '已复制 $okN 项到另一栏$detail' : '复制完成：成功 $okN · 失败 $failN$detail'),
+      ));
     }
   }
 

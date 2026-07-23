@@ -183,6 +183,40 @@ func (s *Server) handleFSRename(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "oldPath": body.OldPath, "newPath": body.NewPath})
 }
 
+func (s *Server) handleFSCopy(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body struct {
+		Src       string `json:"src"`
+		Dest      string `json:"dest"`
+		Confirmed bool   `json:"confirmed"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Src) == "" || strings.TrimSpace(body.Dest) == "" {
+		writeErr(w, http.StatusBadRequest, "src and dest required")
+		return
+	}
+	if !body.Confirmed {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "confirmation required", "risk": "write", "src": body.Src, "dest": body.Dest})
+		return
+	}
+	p, err := s.connectParams(id)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	files, dirs, err := sshx.Copy(p, body.Src, body.Dest)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":    true,
+		"src":   body.Src,
+		"dest":  body.Dest,
+		"files": files,
+		"dirs":  dirs,
+	})
+}
+
 func (s *Server) handleFSDownload(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var body struct {

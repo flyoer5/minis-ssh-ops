@@ -1,3 +1,9 @@
+## 1.4.10
+
+- shared HTTP client
+- CPU probe 1s + Go percent + age
+- server SFTP fs/copy recursive
+
 ## 1.4.9
 
 - 设置页分区重做；终端/Agent/记录字号可调
