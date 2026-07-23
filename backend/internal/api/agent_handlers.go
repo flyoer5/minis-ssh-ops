@@ -145,7 +145,7 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	// Durable memory + recent window (does not hard-forget older turns).
 	history, _ := agent.BuildMemoryMessages(s.Store, body.SessionID, body.Message, 16)
 
-	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; r(){ awk '/^cpu /{print $5+$6, $2+$3+$4+$5+$6+$7+$8+$9+$10+$11}' /proc/stat 2>/dev/null; }; set -- $(r); i1=$1 t1=$2; sleep 0.5; set -- $(r); i2=$1 t2=$2; di=$((i2-i1)); dt=$((t2-t1)); if [ -n "$dt" ] && [ "$dt" -gt 0 ]; then echo $(( (100*(dt-di))/dt )); else echo 0; fi; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; grep -m1 '^cpu ' /proc/stat 2>/dev/null; sleep 1; grep -m1 '^cpu ' /proc/stat 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 
 	run := func(name string, args map[string]any) (string, error) {
 		switch name {
@@ -281,7 +281,7 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 	_ = s.Store.AddChat(body.SessionID, "user", body.Message)
 	history, _ := agent.BuildMemoryMessages(s.Store, body.SessionID, body.Message, 16)
 
-	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; r(){ awk '/^cpu /{print $5+$6, $2+$3+$4+$5+$6+$7+$8+$9+$10+$11}' /proc/stat 2>/dev/null; }; set -- $(r); i1=$1 t1=$2; sleep 0.5; set -- $(r); i2=$1 t2=$2; di=$((i2-i1)); dt=$((t2-t1)); if [ -n "$dt" ] && [ "$dt" -gt 0 ]; then echo $(( (100*(dt-di))/dt )); else echo 0; fi; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; grep -m1 '^cpu ' /proc/stat 2>/dev/null; sleep 1; grep -m1 '^cpu ' /proc/stat 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 	run := func(name string, args map[string]any) (string, error) {
 		switch name {
 		case "probe_host":
@@ -485,7 +485,7 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	// One SSH session / one compound command — much faster than 5 sequential dials.
-	const script = `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; r(){ awk '/^cpu /{print $5+$6, $2+$3+$4+$5+$6+$7+$8+$9+$10+$11}' /proc/stat 2>/dev/null; }; set -- $(r); i1=$1 t1=$2; sleep 0.5; set -- $(r); i2=$1 t2=$2; di=$((i2-i1)); dt=$((t2-t1)); if [ -n "$dt" ] && [ "$dt" -gt 0 ]; then echo $(( (100*(dt-di))/dt )); else echo 0; fi; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	const script = `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; grep -m1 '^cpu ' /proc/stat 2>/dev/null; sleep 1; grep -m1 '^cpu ' /proc/stat 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 	res, err := s.runSSH(id, script)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -499,6 +499,8 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	parts := splitProbe(res.Stdout)
+	// Compute real utilization % from two /proc/stat samples (shell arithmetic was unreliable).
+	parts["C"] = cpuUsageFromProcStat(parts["C"])
 	mk := func(s string) map[string]any {
 		return map[string]any{"exitCode": res.ExitCode, "stdout": strings.TrimSpace(s), "stderr": ""}
 	}
@@ -511,6 +513,74 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 		"memory": mk(parts["M"]),
 		"durationMs": res.DurationMs,
 	})
+}
+
+
+// cpuUsageFromProcStat parses two "cpu ..." lines from /proc/stat (sampled ~1s apart)
+// and returns utilization percent 0–100.
+// Field order after "cpu": user nice system idle iowait irq softirq steal guest guest_nice
+func cpuUsageFromProcStat(raw string) string {
+	var samples [][]uint64
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 5 || fields[0] != "cpu" {
+			continue // skip cpu0, cpu1, ...
+		}
+		nums := make([]uint64, 0, len(fields)-1)
+		ok := true
+		for _, f := range fields[1:] {
+			var v uint64
+			if _, err := fmt.Sscanf(f, "%d", &v); err != nil {
+				ok = false
+				break
+			}
+			nums = append(nums, v)
+		}
+		if !ok || len(nums) < 4 {
+			continue
+		}
+		samples = append(samples, nums)
+		if len(samples) >= 2 {
+			break
+		}
+	}
+	if len(samples) < 2 {
+		// keep raw so UI can show something; parse will fail → —
+		return strings.TrimSpace(raw)
+	}
+	a, b := samples[0], samples[1]
+	pad := func(s []uint64) []uint64 {
+		for len(s) < 8 {
+			s = append(s, 0)
+		}
+		return s
+	}
+	a, b = pad(a), pad(b)
+	// total = user+nice+system+idle+iowait+irq+softirq+steal
+	sum8 := func(s []uint64) uint64 {
+		var t uint64
+		for i := 0; i < 8; i++ {
+			t += s[i]
+		}
+		return t
+	}
+	// idle = idle + iowait
+	idleOf := func(s []uint64) uint64 { return s[3] + s[4] }
+	dt := sum8(b) - sum8(a)
+	di := idleOf(b) - idleOf(a)
+	if b[3]+b[4] < a[3]+a[4] || sum8(b) < sum8(a) || dt == 0 {
+		return "0"
+	}
+	busy := dt - di
+	pct := (busy * 100) / dt
+	if pct > 100 {
+		pct = 100
+	}
+	return fmt.Sprintf("%d", pct)
 }
 
 func splitProbe(stdout string) map[string]string {
