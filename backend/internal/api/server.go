@@ -46,6 +46,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/hosts/{id}/probe", s.handleProbe)
 	s.mux.HandleFunc("POST /v1/agent/plan", s.handleAgentPlan)
 	s.mux.HandleFunc("POST /v1/agent/chat", s.handleAgentChat)
+	s.mux.HandleFunc("POST /v1/agent/chat/stream", s.handleAgentChatStream)
 	s.mux.HandleFunc("POST /v1/agent/exec-step", s.handleAgentExecStep)
 	s.mux.HandleFunc("GET /v1/audit", s.handleAudit)
 	s.mux.HandleFunc("GET /v1/known-hosts", s.handleListKnownHosts)
@@ -53,6 +54,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/list", s.handleFSList)
 	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/read", s.handleFSRead)
 	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/write", s.handleFSWrite)
+	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/mkdir", s.handleFSMkdir)
+	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/remove", s.handleFSRemove)
 	// Interactive PTY (auth handled inside; needed for WS upgrade path)
 	s.mux.HandleFunc("/v1/hosts/{id}/pty", s.handlePtyWSHost)
 	s.mux.HandleFunc("/v1/pty", s.handlePtyWS)
@@ -111,7 +114,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"version":   "1.1.2",
 		"startedAt": s.StartedAt.Format(time.RFC3339),
 		"listenHint": "127.0.0.1 only",
-		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu"},
+		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu","stream"},
 	})
 }
 

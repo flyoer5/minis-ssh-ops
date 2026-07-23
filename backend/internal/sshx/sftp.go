@@ -50,17 +50,22 @@ func withSFTP(p ConnectParams, fn func(*sftp.Client) error) error {
 	return nil
 }
 
-func ListDir(p ConnectParams, remote string) ([]FileEntry, error) {
+func ListDir(p ConnectParams, remote string) (string, []FileEntry, error) {
 	var out []FileEntry
+	resolved := remote
 	err := withSFTP(p, func(sc *sftp.Client) error {
-		if remote == "" {
-			remote = "."
-		}
-		if remote[0] != '/' {
+		if remote == "" || remote == "." {
+			if wd, err := sc.Getwd(); err == nil {
+				remote = wd
+			} else {
+				remote = "/"
+			}
+		} else if remote[0] != '/' {
 			if wd, err := sc.Getwd(); err == nil {
 				remote = path.Join(wd, remote)
 			}
 		}
+		resolved = remote
 		infos, err := sc.ReadDir(remote)
 		if err != nil {
 			return err
@@ -80,7 +85,7 @@ func ListDir(p ConnectParams, remote string) ([]FileEntry, error) {
 	if out == nil {
 		out = []FileEntry{}
 	}
-	return out, err
+	return resolved, out, err
 }
 
 func ReadFile(p ConnectParams, remote string, maxBytes int64) ([]byte, error) {
@@ -123,5 +128,44 @@ func WriteFile(p ConnectParams, remote string, content []byte) error {
 		defer f.Close()
 		_, err = f.Write(content)
 		return err
+	})
+}
+
+func Mkdir(p ConnectParams, remote string) error {
+	return withSFTP(p, func(sc *sftp.Client) error {
+		return sc.MkdirAll(remote)
+	})
+}
+
+func Remove(p ConnectParams, remote string, recursive bool) error {
+	return withSFTP(p, func(sc *sftp.Client) error {
+		if remote == "" || remote == "/" || remote == "." {
+			return fmt.Errorf("refusing to remove path")
+		}
+		if !recursive {
+			return sc.Remove(remote)
+		}
+		// recursive walk
+		var walk func(string) error
+		walk = func(p string) error {
+			st, err := sc.Stat(p)
+			if err != nil {
+				return err
+			}
+			if !st.IsDir() {
+				return sc.Remove(p)
+			}
+			entries, err := sc.ReadDir(p)
+			if err != nil {
+				return err
+			}
+			for _, e := range entries {
+				if err := walk(path.Join(p, e.Name())); err != nil {
+					return err
+				}
+			}
+			return sc.RemoveDirectory(p)
+		}
+		return walk(remote)
 	})
 }

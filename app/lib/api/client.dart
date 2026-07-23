@@ -136,6 +136,59 @@ class ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
+  /// SSE progressive agent events (data: {...}\\n\\n).
+  Future<void> agentChatStream({
+    required String hostId,
+    required String message,
+    String? sessionId,
+    required void Function(Map<String, dynamic> event) onEvent,
+  }) async {
+    final client = http.Client();
+    try {
+      final req = http.Request('POST', _u('/v1/agent/chat/stream'));
+      req.headers.addAll(_headers);
+      req.body = jsonEncode({
+        'hostId': hostId,
+        'message': message,
+        if (sessionId != null) 'sessionId': sessionId,
+      });
+      final res = await client.send(req).timeout(const Duration(seconds: 180));
+      if (res.statusCode >= 400) {
+        final body = await res.stream.bytesToString();
+        throw ApiException(res.statusCode, body);
+      }
+      final buf = StringBuffer();
+      await for (final chunk in res.stream.transform(utf8.decoder)) {
+        buf.write(chunk);
+        var s = buf.toString();
+        while (true) {
+          final idx = s.indexOf('\n\n');
+          if (idx < 0) break;
+          final block = s.substring(0, idx);
+          s = s.substring(idx + 2);
+          for (final line in block.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            final raw = line.substring(6).trim();
+            if (raw.isEmpty) continue;
+            try {
+              final m = jsonDecode(raw);
+              if (m is Map<String, dynamic>) {
+                onEvent(m);
+              } else if (m is Map) {
+                onEvent(Map<String, dynamic>.from(m));
+              }
+            } catch (_) {}
+          }
+          buf
+            ..clear()
+            ..write(s);
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   Future<Map<String, dynamic>> agentExecStep({
     required String hostId,
     required String command,
@@ -212,6 +265,28 @@ class ApiClient {
         .timeout(const Duration(seconds: 60));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<void> fsMkdir(String hostId, String path, {bool confirmed = true}) async {
+    final r = await http
+        .post(
+          _u('/v1/hosts/$hostId/fs/mkdir'),
+          headers: _headers,
+          body: jsonEncode({'path': path, 'confirmed': confirmed}),
+        )
+        .timeout(const Duration(seconds: 30));
+    _ensureOk(r);
+  }
+
+  Future<void> fsRemove(String hostId, String path, {bool recursive = false, bool confirmed = true}) async {
+    final r = await http
+        .post(
+          _u('/v1/hosts/$hostId/fs/remove'),
+          headers: _headers,
+          body: jsonEncode({'path': path, 'recursive': recursive, 'confirmed': confirmed}),
+        )
+        .timeout(const Duration(seconds: 30));
+    _ensureOk(r);
   }
 
   Future<Map<String, dynamic>> listKnownHosts() async {

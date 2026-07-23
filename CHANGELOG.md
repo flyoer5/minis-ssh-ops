@@ -1,3 +1,8 @@
+## 1.2.0
+
+- Agent SSE 流式（tool/结果即时上屏）
+- SFTP：mkdir/删除/文本上传；列表解析绝对路径
+
 # Changelog
 
 ## 1.1.2

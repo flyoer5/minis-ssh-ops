@@ -74,9 +74,21 @@ type LoopEvent struct {
 // ToolRunner executes a tool and returns plain text output.
 type ToolRunner func(name string, args map[string]any) (string, error)
 
+// EventSink receives events as they happen (for SSE).
+type EventSink func(ev LoopEvent)
+
 func (c *Client) RunLoop(userText string, history []LoopMsg, run ToolRunner, maxRounds int) ([]LoopEvent, []LoopMsg, error) {
+	return c.RunLoopStream(userText, history, run, maxRounds, nil)
+}
+
+func (c *Client) RunLoopStream(userText string, history []LoopMsg, run ToolRunner, maxRounds int, sink EventSink) ([]LoopEvent, []LoopMsg, error) {
 	if maxRounds <= 0 {
 		maxRounds = 6
+	}
+	emit := func(ev LoopEvent) {
+		if sink != nil {
+			sink(ev)
+		}
 	}
 	msgs := make([]LoopMsg, 0, len(history)+4)
 	msgs = append(msgs, LoopMsg{Role: "system", Content: loopSystem})
@@ -84,28 +96,34 @@ func (c *Client) RunLoop(userText string, history []LoopMsg, run ToolRunner, max
 	msgs = append(msgs, LoopMsg{Role: "user", Content: userText})
 
 	var events []LoopEvent
+	push := func(ev LoopEvent) {
+		events = append(events, ev)
+		emit(ev)
+	}
+
 	for round := 0; round < maxRounds; round++ {
 		asst, err := c.chatTools(msgs)
 		if err != nil {
+			push(LoopEvent{Type: "error", Content: err.Error()})
 			return events, msgs, err
 		}
 		if len(asst.ToolCalls) == 0 {
 			text := strings.TrimSpace(asst.Content)
 			if text != "" {
-				events = append(events, LoopEvent{Type: "final", Content: text})
+				push(LoopEvent{Type: "final", Content: text})
 			}
 			msgs = append(msgs, asst)
 			return events, msgs, nil
 		}
 		msgs = append(msgs, asst)
 		if strings.TrimSpace(asst.Content) != "" {
-			events = append(events, LoopEvent{Type: "assistant", Content: strings.TrimSpace(asst.Content)})
+			push(LoopEvent{Type: "assistant", Content: strings.TrimSpace(asst.Content)})
 		}
 		for _, tc := range asst.ToolCalls {
 			args := map[string]any{}
 			_ = json.Unmarshal([]byte(tc.Function.Arguments), &args)
 			cmd, _ := args["command"].(string)
-			events = append(events, LoopEvent{
+			push(LoopEvent{
 				Type: "tool", Name: tc.Function.Name, Command: cmd, Content: "running",
 			})
 			out, err := run(tc.Function.Name, args)
@@ -115,7 +133,7 @@ func (c *Client) RunLoop(userText string, history []LoopMsg, run ToolRunner, max
 			if len(out) > 16000 {
 				out = out[:16000] + "\n...[truncated]"
 			}
-			events = append(events, LoopEvent{
+			push(LoopEvent{
 				Type: "tool_result", Name: tc.Function.Name, Command: cmd, Content: out,
 			})
 			msgs = append(msgs, LoopMsg{
@@ -123,7 +141,7 @@ func (c *Client) RunLoop(userText string, history []LoopMsg, run ToolRunner, max
 			})
 		}
 	}
-	events = append(events, LoopEvent{Type: "final", Content: "（达到工具轮次上限）"})
+	push(LoopEvent{Type: "final", Content: "（达到工具轮次上限）"})
 	return events, msgs, nil
 }
 

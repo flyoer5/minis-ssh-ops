@@ -361,44 +361,66 @@ class AppState extends ChangeNotifier {
       return;
     }
     _pushMsg(ChatMessage(role: 'user', content: userText));
+    notifyListeners();
     try {
-      final res = await api.agentChat(hostId: id, message: userText, sessionId: agentSessionId);
-      agentSessionId = res['sessionId'] as String? ?? agentSessionId;
-      final events = (res['events'] as List?) ?? [];
-      for (final raw in events) {
-        if (raw is! Map) continue;
-        final type = raw['type']?.toString() ?? '';
-        final content = (raw['content'] ?? '').toString();
-        final name = (raw['name'] ?? '').toString();
-        final command = (raw['command'] ?? '').toString();
-        if (type == 'assistant' && content.isNotEmpty) {
-          _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.text));
-        } else if (type == 'tool') {
-          final label = command.isNotEmpty ? (r'$ ' + command) : name;
-          _pushMsg(ChatMessage(
-            role: 'tool',
-            content: label,
-            kind: ChatKind.status,
-            meta: {'name': name, 'command': command},
-          ));
-        } else if (type == 'tool_result') {
-          final head = command.isNotEmpty ? (r'$ ' + command + '\n') : (name.isNotEmpty ? (name + '\n') : '');
-          _pushMsg(ChatMessage(
-            role: 'tool',
-            content: head + content,
-            kind: ChatKind.stepResult,
-            meta: {'name': name, 'command': command},
-          ));
-        } else if (type == 'final' && content.isNotEmpty) {
-          _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.text));
-        } else if (type == 'error' && content.isNotEmpty) {
-          _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.error));
+      // Prefer SSE progressive events; fall back to batch chat.
+      try {
+        await api.agentChatStream(
+          hostId: id,
+          message: userText,
+          sessionId: agentSessionId,
+          onEvent: (raw) {
+            final type = raw['type']?.toString() ?? '';
+            if (type == 'session') {
+              agentSessionId = raw['sessionId'] as String? ?? agentSessionId;
+              return;
+            }
+            if (type == 'done') return;
+            _ingestAgentEvent(raw);
+            notifyListeners();
+          },
+        );
+      } catch (_) {
+        final res = await api.agentChat(hostId: id, message: userText, sessionId: agentSessionId);
+        agentSessionId = res['sessionId'] as String? ?? agentSessionId;
+        for (final raw in (res['events'] as List?) ?? []) {
+          if (raw is Map) _ingestAgentEvent(Map<String, dynamic>.from(raw));
         }
       }
       notifyListeners();
     } catch (e) {
       _pushMsg(ChatMessage(role: 'assistant', content: _friendlyErr(e), kind: ChatKind.error));
       rethrow;
+    }
+  }
+
+  void _ingestAgentEvent(Map<String, dynamic> raw) {
+    final type = raw['type']?.toString() ?? '';
+    final content = (raw['content'] ?? '').toString();
+    final name = (raw['name'] ?? '').toString();
+    final command = (raw['command'] ?? '').toString();
+    if (type == 'assistant' && content.isNotEmpty) {
+      _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.text));
+    } else if (type == 'tool') {
+      final label = command.isNotEmpty ? (r'$ ' + command) : name;
+      _pushMsg(ChatMessage(
+        role: 'tool',
+        content: label,
+        kind: ChatKind.status,
+        meta: {'name': name, 'command': command},
+      ));
+    } else if (type == 'tool_result') {
+      final head = command.isNotEmpty ? (r'$ ' + command + '\n') : (name.isNotEmpty ? (name + '\n') : '');
+      _pushMsg(ChatMessage(
+        role: 'tool',
+        content: head + content,
+        kind: ChatKind.stepResult,
+        meta: {'name': name, 'command': command},
+      ));
+    } else if (type == 'final' && content.isNotEmpty) {
+      _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.text));
+    } else if (type == 'error' && content.isNotEmpty) {
+      _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.error));
     }
   }
 

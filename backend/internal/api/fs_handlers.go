@@ -40,12 +40,12 @@ func (s *Server) handleFSList(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	entries, err := sshx.ListDir(p, body.Path)
+	resolved, entries, err := sshx.ListDir(p, body.Path)
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"path": body.Path, "entries": entries})
+	writeJSON(w, http.StatusOK, map[string]any{"path": resolved, "entries": entries})
 }
 
 func (s *Server) handleFSRead(w http.ResponseWriter, r *http.Request) {
@@ -96,6 +96,63 @@ func (s *Server) handleFSWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "path": body.Path, "size": len(body.Content)})
+}
+
+func (s *Server) handleFSMkdir(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body struct {
+		Path      string `json:"path"`
+		Confirmed bool   `json:"confirmed"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Path) == "" {
+		writeErr(w, http.StatusBadRequest, "path required")
+		return
+	}
+	if !body.Confirmed {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "confirmation required", "risk": "write"})
+		return
+	}
+	p, err := s.connectParams(id)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := sshx.Mkdir(p, body.Path); err != nil {
+		writeErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "path": body.Path})
+}
+
+func (s *Server) handleFSRemove(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body struct {
+		Path      string `json:"path"`
+		Recursive bool   `json:"recursive"`
+		Confirmed bool   `json:"confirmed"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Path) == "" {
+		writeErr(w, http.StatusBadRequest, "path required")
+		return
+	}
+	if body.Path == "/" {
+		writeErr(w, http.StatusForbidden, "refusing to remove /")
+		return
+	}
+	if !body.Confirmed {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "confirmation required", "risk": "destructive", "path": body.Path})
+		return
+	}
+	p, err := s.connectParams(id)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := sshx.Remove(p, body.Path, body.Recursive); err != nil {
+		writeErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "path": body.Path})
 }
 
 func (s *Server) handleListKnownHosts(w http.ResponseWriter, r *http.Request) {

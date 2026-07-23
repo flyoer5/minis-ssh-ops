@@ -223,6 +223,133 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleAgentChatStream: same loop as chat, but NDJSON/SSE event stream for progressive UI.
+func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
+	var body chatBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if strings.TrimSpace(body.HostID) == "" || strings.TrimSpace(body.Message) == "" {
+		writeErr(w, http.StatusBadRequest, "hostId and message required")
+		return
+	}
+	if body.SessionID == "" {
+		body.SessionID = uuid.NewString()
+	}
+	if _, err := s.Store.GetHost(body.HostID); errors.Is(err, sql.ErrNoRows) {
+		writeErr(w, http.StatusNotFound, "host not found")
+		return
+	} else if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	llmCfg, err := s.Store.GetLLMFull()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if llmCfg.BaseURL == "" || llmCfg.Model == "" {
+		writeErr(w, http.StatusBadRequest, "configure LLM in settings first")
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeErr(w, http.StatusInternalServerError, "stream unsupported")
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	writeEv := func(v any) {
+		b, _ := json.Marshal(v)
+		fmt.Fprintf(w, "data: %s\n\n", b)
+		flusher.Flush()
+	}
+	writeEv(map[string]any{"type": "session", "sessionId": body.SessionID})
+
+	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
+	_ = s.Store.AddChat(body.SessionID, "user", body.Message)
+	histRows, _ := s.Store.ListChat(body.SessionID, 40)
+	var history []agent.LoopMsg
+	for _, row := range histRows {
+		role, _ := row["role"].(string)
+		content, _ := row["content"].(string)
+		if role == "user" || role == "assistant" {
+			history = append(history, agent.LoopMsg{Role: role, Content: content})
+		}
+	}
+	if n := len(history); n > 0 && history[n-1].Role == "user" && history[n-1].Content == body.Message {
+		history = history[:n-1]
+	}
+
+	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	run := func(name string, args map[string]any) (string, error) {
+		switch name {
+		case "probe_host":
+			res, err := s.runSSH(body.HostID, probeScript)
+			if err != nil {
+				return "", err
+			}
+			_ = s.Store.AddAudit(&store.AuditEntry{
+				HostID: body.HostID, SessionID: body.SessionID, Command: "probe_host",
+				Risk: "read", Confirmed: true, ExitCode: res.ExitCode, Stdout: truncate(res.Stdout, 8000),
+			})
+			return res.Stdout, nil
+		case "run_command":
+			cmd, _ := args["command"].(string)
+			cmd = strings.TrimSpace(cmd)
+			if cmd == "" {
+				return "", fmt.Errorf("empty command")
+			}
+			lvl := risk.Classify(cmd)
+			if lvl == risk.Blocked {
+				_ = s.Store.AddAudit(&store.AuditEntry{
+					HostID: body.HostID, SessionID: body.SessionID, Command: cmd,
+					Risk: string(lvl), Confirmed: false, ExitCode: -1, Stderr: "blocked",
+				})
+				return "", fmt.Errorf("blocked by policy: %s", cmd)
+			}
+			res, err := s.runSSH(body.HostID, cmd)
+			if err != nil {
+				return "", err
+			}
+			_ = s.Store.AddAudit(&store.AuditEntry{
+				HostID: body.HostID, SessionID: body.SessionID, Command: cmd,
+				Risk: string(lvl), Confirmed: true, ExitCode: res.ExitCode,
+				Stdout: truncate(res.Stdout, 8000), Stderr: truncate(res.Stderr, 4000),
+			})
+			out := res.Stdout
+			if res.Stderr != "" {
+				out = out + "\n" + res.Stderr
+			}
+			return strings.TrimSpace(out), nil
+		default:
+			return "", fmt.Errorf("unknown tool %s", name)
+		}
+	}
+
+	events, _, err := cli.RunLoopStream(body.Message, history, run, 6, func(ev agent.LoopEvent) {
+		writeEv(ev)
+	})
+	if err != nil {
+		writeEv(map[string]any{"type": "error", "content": err.Error()})
+	}
+	for i := len(events) - 1; i >= 0; i-- {
+		if events[i].Type == "final" || events[i].Type == "assistant" {
+			if events[i].Content != "" {
+				_ = s.Store.AddChat(body.SessionID, "assistant", events[i].Content)
+				break
+			}
+		}
+	}
+	writeEv(map[string]any{"type": "done", "sessionId": body.SessionID})
+}
+
 func (s *Server) handleAgentPlan(w http.ResponseWriter, r *http.Request) {
 	var body planBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

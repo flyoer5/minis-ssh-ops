@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
 class FilesPage extends StatefulWidget {
@@ -10,7 +9,7 @@ class FilesPage extends StatefulWidget {
 }
 
 class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixin {
-  String path = ''; // server Getwd when empty
+  String path = '';
   List<dynamic> entries = [];
   bool loading = false;
   String? err;
@@ -33,12 +32,16 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     final s = context.read<AppState>();
     final id = s.selectedHostId;
     if (id == null) return;
-    setState(() { loading = true; err = null; });
+    setState(() {
+      loading = true;
+      err = null;
+    });
     try {
       final r = await s.api.fsList(id, path);
       setState(() {
         entries = (r['entries'] as List?) ?? [];
-        path = (r['path'] as String?)?.isNotEmpty == true ? r['path'] as String : path;
+        final rp = r['path']?.toString();
+        if (rp != null && rp.isNotEmpty) path = rp;
       });
     } catch (e) {
       setState(() => err = '$e');
@@ -48,7 +51,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
   }
 
   void _up() {
-    if (path == '/' || path.isEmpty) return;
+    if (path.isEmpty || path == '/') return;
     final p = path.endsWith('/') ? path.substring(0, path.length - 1) : path;
     final i = p.lastIndexOf('/');
     setState(() => path = i <= 0 ? '/' : p.substring(0, i));
@@ -71,7 +74,12 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
           content: SizedBox(
             width: double.maxFinite,
             height: 360,
-            child: TextField(controller: ctrl, maxLines: null, expands: true, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+            child: TextField(
+              controller: ctrl,
+              maxLines: null,
+              expands: true,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('关闭')),
@@ -81,8 +89,101 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       );
       if (ok == true) {
         await s.api.fsWrite(id, p, ctrl.text, confirmed: true);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+        }
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  Future<void> _mkdir() async {
+    final s = context.read<AppState>();
+    final id = s.selectedHostId;
+    if (id == null) return;
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('新建目录'),
+        content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: '目录名')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('创建')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    final full = path.endsWith('/') || path.isEmpty ? '$path$name' : '$path/$name';
+    try {
+      await s.api.fsMkdir(id, full, confirmed: true);
+      await _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _uploadText() async {
+    final s = context.read<AppState>();
+    final id = s.selectedHostId;
+    if (id == null) return;
+    final nameCtrl = TextEditingController(text: 'note.txt');
+    final bodyCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('上传文本文件'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: '文件名')),
+              TextField(controller: bodyCtrl, maxLines: 8, decoration: const InputDecoration(labelText: '内容')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('上传')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final name = nameCtrl.text.trim();
+    if (name.isEmpty) return;
+    final full = path.endsWith('/') || path.isEmpty ? '$path$name' : '$path/$name';
+    try {
+      await s.api.fsWrite(id, full, bodyCtrl.text, confirmed: true);
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已上传')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _delete(String p, bool isDir) async {
+    final s = context.read<AppState>();
+    final id = s.selectedHostId;
+    if (id == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(isDir ? '删除目录？' : '删除文件？'),
+        content: Text(p),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('删除')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await s.api.fsRemove(id, p, recursive: isDir, confirmed: true);
+      await _load();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
@@ -100,6 +201,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
         title: const Text('文件'),
         actions: [
           IconButton(onPressed: _up, icon: const Icon(Icons.arrow_upward)),
+          IconButton(onPressed: _mkdir, icon: const Icon(Icons.create_new_folder_outlined)),
+          IconButton(onPressed: _uploadText, icon: const Icon(Icons.upload_file)),
           IconButton(onPressed: loading ? null : _load, icon: const Icon(Icons.refresh)),
         ],
       ),
@@ -109,36 +212,52 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
             color: const Color(0xFF161B22),
             child: ListTile(
               dense: true,
-              title: Text(path.isEmpty ? '~' : path, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+              title: Text(
+                path.isEmpty ? '~' : path,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              ),
               subtitle: Text(state.hostLabel, style: const TextStyle(fontSize: 11)),
             ),
           ),
-          if (err != null) Padding(padding: const EdgeInsets.all(12), child: Text(err!, style: const TextStyle(color: Color(0xFFF85149)))),
+          if (err != null)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(err!, style: const TextStyle(color: Color(0xFFF85149))),
+            ),
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
-                : ListView.separated(
-                    itemCount: entries.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (_, i) {
-                      final e = entries[i] as Map;
-                      final isDir = e['isDir'] == true;
-                      final name = e['name']?.toString() ?? '';
-                      final p = e['path']?.toString() ?? name;
-                      return ListTile(
-                        leading: Icon(isDir ? Icons.folder : Icons.insert_drive_file_outlined),
-                        title: Text(name),
-                        subtitle: Text('${e['mode'] ?? ''} · ${e['size'] ?? 0}', style: const TextStyle(fontSize: 11)),
-                        onTap: () {
-                          if (isDir) {
-                            setState(() => path = p);
-                            _load();
-                          } else {
-                            _openFile(p);
-                          }
-                        },
-                      );
-                    },
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView.separated(
+                      itemCount: entries.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final e = entries[i] as Map;
+                        final isDir = e['isDir'] == true;
+                        final name = e['name']?.toString() ?? '';
+                        final p = e['path']?.toString() ?? name;
+                        return ListTile(
+                          leading: Icon(isDir ? Icons.folder : Icons.insert_drive_file_outlined),
+                          title: Text(name),
+                          subtitle: Text('${e['mode'] ?? ''} · ${e['size'] ?? 0}', style: const TextStyle(fontSize: 11)),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            onPressed: () => _delete(p, isDir),
+                          ),
+                          onTap: () {
+                            if (isDir) {
+                              setState(() => path = p);
+                              _load();
+                            } else {
+                              _openFile(p);
+                            }
+                          },
+                        );
+                      },
+                    ),
                   ),
           ),
         ],
