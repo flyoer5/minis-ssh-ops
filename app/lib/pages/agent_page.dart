@@ -73,39 +73,60 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       context: context,
       showDragHandle: true,
       builder: (c) {
-        final onlyCurrent = true;
-        final list = state.sessionsForHost(state.selectedHostId, onlyCurrent: onlyCurrent);
-        if (list.isEmpty) {
-          return const SafeArea(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('暂无历史会话（点新会话会归档当前对话）'),
-            ),
-          );
-        }
-        return SafeArea(
-          child: ListView.builder(
-            itemCount: list.length,
-            itemBuilder: (_, i) {
-              final s = list[i];
-              final hostHint = s.hostId == null ? '' : state.hostLabelFor(s.hostId);
-              return ListTile(
-                title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text('${s.messages.length} 条${hostHint.isEmpty ? '' : ' · $hostHint'}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                onTap: () {
-                  state.openAgentSession(s);
-                  Navigator.pop(c);
-                },
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () {
-                    state.deleteAgentSession(s.id);
-                    Navigator.pop(c);
-                  },
-                ),
-              );
-            },
-          ),
+        return StatefulBuilder(
+          builder: (context, setModal) {
+            final list = state.sessionsForHost(state.selectedHostId, onlyCurrent: _onlyCurrentHost);
+            return SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SwitchListTile(
+                    title: const Text('仅当前主机'),
+                    value: _onlyCurrentHost,
+                    onChanged: (v) {
+                      setState(() => _onlyCurrentHost = v);
+                      setModal(() {});
+                    },
+                  ),
+                  if (list.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text('暂无历史会话（点新会话会归档当前对话）'),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: list.length,
+                        itemBuilder: (_, i) {
+                          final s = list[i];
+                          final hostHint = s.hostId == null ? '' : state.hostLabelFor(s.hostId);
+                          return ListTile(
+                            title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: Text(
+                              '${s.messages.length} 条${hostHint.isEmpty ? '' : ' · $hostHint'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onTap: () {
+                              state.openAgentSession(s);
+                              Navigator.pop(c);
+                            },
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () {
+                                state.deleteAgentSession(s.id);
+                                setModal(() {});
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
         );
       },
     );

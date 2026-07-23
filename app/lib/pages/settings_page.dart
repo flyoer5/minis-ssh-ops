@@ -215,6 +215,70 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             ),
           ),
           FilledButton.tonal(
+            onPressed: !state.backendOk
+                ? null
+                : () async {
+                    try {
+                      final json = await state.exportConfigJson();
+                      if (!context.mounted) return;
+                      await showDialog(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          title: const Text('导出配置'),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            height: 280,
+                            child: SelectableText(json, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: json));
+                                Navigator.pop(c);
+                                _toast('已复制');
+                              },
+                              child: const Text('复制'),
+                            ),
+                            TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
+                          ],
+                        ),
+                      );
+                    } catch (e) {
+                      _toast('$e');
+                    }
+                  },
+            child: const Text('导出配置'),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonal(
+            onPressed: !state.backendOk
+                ? null
+                : () async {
+                    final ctrl = TextEditingController();
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        title: const Text('导入配置 JSON'),
+                        content: TextField(controller: ctrl, maxLines: 12, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+                          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('导入')),
+                        ],
+                      ),
+                    );
+                    if (ok == true) {
+                      try {
+                        final msg = await state.importConfigJson(ctrl.text);
+                        _toast(msg);
+                      } catch (e) {
+                        _toast('$e');
+                      }
+                    }
+                  },
+            child: const Text('导入配置'),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonal(
             onPressed: () async {
               final log = await state.exportBackendLog();
               if (!context.mounted) return;

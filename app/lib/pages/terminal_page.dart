@@ -387,6 +387,15 @@ class _TerminalPageState extends State<TerminalPage>
                       },
                     ),
                     IconButton(
+                      tooltip: '清屏',
+                      icon: const Icon(Icons.delete_sweep, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _buf.clear();
+                        });
+                      },
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.refresh, size: 20),
                       onPressed: () => _connect(state),
                     ),
