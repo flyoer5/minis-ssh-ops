@@ -129,7 +129,7 @@ class AppState extends ChangeNotifier {
 
     if (NativeBackend.isAndroidNative) {
       Object? lastErr;
-      for (var i = 0; i < 3; i++) {
+      for (var i = 0; i < 2; i++) {
         try {
           final info = await NativeBackend.ensureStarted();
           if (info != null) {
@@ -145,9 +145,9 @@ class AppState extends ChangeNotifier {
           }
         } catch (e) {
           lastErr = e;
-          backendNote = '启动后端重试 ${i + 1}/3…';
+          backendNote = '启动后端重试 ${i + 1}/2…';
           notifyListeners();
-          await Future<void>.delayed(Duration(milliseconds: 600 * (i + 1)));
+          await Future<void>.delayed(Duration(milliseconds: 250 * (i + 1)));
         }
       }
       if (lastErr != null) {
@@ -155,18 +155,18 @@ class AppState extends ChangeNotifier {
       }
     }
 
-    for (var i = 0; i < 8; i++) {
+    // Fast path: short health polls (backend already waits until healthy).
+    for (var i = 0; i < 5; i++) {
       await refreshHealth();
       if (backendOk) break;
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
     }
 
     startingBackend = false;
     if (backendOk) {
       try {
-        await refreshHosts();
-        await refreshLlm();
-        await refreshAudit();
+        // Load hosts + llm in parallel; audit is not needed on cold start.
+        await Future.wait<void>([refreshHosts(), refreshLlm()]);
       } catch (e) {
         backendError = '加载数据失败: $e';
       }
@@ -868,6 +868,10 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       rethrow;
     }
+  }
+
+  Future<List<String>> fetchModels() async {
+    return api.listModels();
   }
 
   Future<void> saveLlm({

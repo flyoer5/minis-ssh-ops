@@ -166,3 +166,54 @@ func truncate(s string, n int) string {
 	}
 	return s[:n] + "..."
 }
+
+// ListModels calls OpenAI-compatible GET {base}/models and returns model ids.
+func ListModels(baseURL, apiKey string) ([]string, error) {
+	baseURL = strings.TrimRight(baseURL, "/")
+	if baseURL == "" {
+		return nil, fmt.Errorf("empty base url")
+	}
+	req, err := http.NewRequest(http.MethodGet, baseURL+"/models", nil)
+	if err != nil {
+		return nil, err
+	}
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	cli := &http.Client{
+		Timeout: 20 * time.Second,
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			ForceAttemptHTTP2:     false,
+			MaxIdleConns:          8,
+			IdleConnTimeout:       30 * time.Second,
+			TLSHandshakeTimeout:   8 * time.Second,
+			ResponseHeaderTimeout: 15 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
+	resp, err := cli.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("models http %d: %s", resp.StatusCode, truncate(string(raw), 200))
+	}
+	var out struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(out.Data))
+	for _, d := range out.Data {
+		if strings.TrimSpace(d.ID) != "" {
+			ids = append(ids, d.ID)
+		}
+	}
+	return ids, nil
+}

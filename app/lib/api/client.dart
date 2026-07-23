@@ -35,6 +35,15 @@ class ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
+  Future<List<String>> listModels() async {
+    final r = await http.get(_u('/v1/settings/llm/models'), headers: _headers).timeout(const Duration(seconds: 20));
+    _ensureOk(r);
+    final m = jsonDecode(r.body) as Map<String, dynamic>;
+    final list = m['models'];
+    if (list is! List) return <String>[];
+    return [for (final e in list) e.toString()];
+  }
+
   Future<Map<String, dynamic>> putLlm(Map<String, dynamic> body) async {
     final r = await http.put(
       _u('/v1/settings/llm'),

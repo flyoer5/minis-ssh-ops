@@ -25,7 +25,7 @@ type pooled struct {
 func NewPool() *Pool {
 	return &Pool{
 		clients: map[string]*pooled{},
-		ttl:     3 * time.Minute,
+		ttl:     8 * time.Minute,
 	}
 }
 
@@ -50,14 +50,17 @@ func (p *Pool) get(key string) *ssh.Client {
 		delete(p.clients, key)
 		return nil
 	}
-	// cheap liveness: open and close a session
-	s, err := e.cli.NewSession()
-	if err != nil {
-		_ = e.cli.Close()
-		delete(p.clients, key)
-		return nil
+	// cheap liveness without full session handshake cost
+	if _, _, err := e.cli.Conn.SendRequest("kevin@golang.org/keepalive@golang", true, nil); err != nil {
+		// fallback: try new session
+		s, err2 := e.cli.NewSession()
+		if err2 != nil {
+			_ = e.cli.Close()
+			delete(p.clients, key)
+			return nil
+		}
+		_ = s.Close()
 	}
-	_ = s.Close()
 	e.last = time.Now()
 	return e.cli
 }
@@ -97,7 +100,7 @@ func Dial(p ConnectParams) (*ssh.Client, bool, error) {
 		p.Port = 22
 	}
 	if p.Timeout == 0 {
-		p.Timeout = 20 * time.Second
+		p.Timeout = 12 * time.Second
 	}
 	cfg, err := clientConfig(p)
 	if err != nil {

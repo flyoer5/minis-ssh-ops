@@ -309,7 +309,7 @@ object BackendRuntime {
                     Log.i(TAG, "backend healthy")
                     return resultMap(finalTok, already = false)
                 }
-                Thread.sleep(250)
+                Thread.sleep(100)
             }
             val tail = try {
                 logFile.readText().takeLast(800)

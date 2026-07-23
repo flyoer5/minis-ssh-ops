@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flyoer5/ssh-ai-agent/backend/internal/agent"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/sshx"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/store"
 )
@@ -36,6 +37,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/health", s.handleHealth)
 	s.mux.HandleFunc("GET /v1/settings/llm", s.handleGetLLM)
 	s.mux.HandleFunc("PUT /v1/settings/llm", s.handlePutLLM)
+	s.mux.HandleFunc("GET /v1/settings/llm/models", s.handleListLLMModels)
 	s.mux.HandleFunc("GET /v1/hosts", s.handleListHosts)
 	s.mux.HandleFunc("POST /v1/hosts", s.handleCreateHost)
 	s.mux.HandleFunc("GET /v1/hosts/{id}", s.handleGetHost)
@@ -113,10 +115,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"service":   "ssh-ai-agent-backend",
-		"version":   "1.3.3",
+		"version":   "1.4.0",
 		"startedAt": s.StartedAt.Format(time.RFC3339),
 		"listenHint": "127.0.0.1 only",
-		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu","stream"},
+		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu","stream","models"},
 	})
 }
 
@@ -127,6 +129,25 @@ func (s *Server) handleGetLLM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, st)
+}
+
+// handleListLLMModels proxies OpenAI-compatible GET {base}/models using stored API key.
+func (s *Server) handleListLLMModels(w http.ResponseWriter, r *http.Request) {
+	full, err := s.Store.GetLLMFull()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if strings.TrimSpace(full.BaseURL) == "" {
+		writeErr(w, http.StatusBadRequest, "configure LLM baseUrl first")
+		return
+	}
+	ids, err := agent.ListModels(full.BaseURL, full.APIKey)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"models": ids})
 }
 
 func (s *Server) handlePutLLM(w http.ResponseWriter, r *http.Request) {

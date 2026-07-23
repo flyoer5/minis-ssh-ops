@@ -16,6 +16,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   int _i = 0;
   bool _busy = false;
   String? _err;
+  List<String> _modelIds = [];
 
   final llmBase = TextEditingController(text: 'http://cpa.lgh123.online/v1');
   final llmKey = TextEditingController();
@@ -107,7 +108,49 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       const Text('OpenAI 兼容接口（含 /v1）', style: TextStyle(color: Color(0xFF8B949E), fontSize: 13)),
                       TextField(controller: llmBase, decoration: const InputDecoration(labelText: 'Base URL')),
                       TextField(controller: llmKey, decoration: const InputDecoration(labelText: 'API Key'), obscureText: true),
-                      TextField(controller: llmModel, decoration: const InputDecoration(labelText: 'Model')),
+                      if (_modelIds.isEmpty)
+                        TextField(controller: llmModel, decoration: const InputDecoration(labelText: 'Model（可稍后在设置拉取列表）'))
+                      else
+                        DropdownButtonFormField<String>(
+                          value: _modelIds.contains(llmModel.text) ? llmModel.text : _modelIds.first,
+                          decoration: const InputDecoration(labelText: 'Model'),
+                          items: [for (final id in _modelIds) DropdownMenuItem(value: id, child: Text(id))],
+                          onChanged: (v) {
+                            if (v != null) setState(() => llmModel.text = v);
+                          },
+                        ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _busy
+                              ? null
+                              : () async {
+                                  final state = context.read<AppState>();
+                                  setState(() => _busy = true);
+                                  try {
+                                    if (!state.backendOk) await state.bootstrap();
+                                    await state.saveLlm(
+                                      baseUrl: llmBase.text.trim(),
+                                      model: llmModel.text.trim().isEmpty ? 'grok-4.5' : llmModel.text.trim(),
+                                      apiKey: llmKey.text.isEmpty ? null : llmKey.text,
+                                    );
+                                    final ids = await state.fetchModels();
+                                    if (!mounted) return;
+                                    setState(() {
+                                      _modelIds = ids;
+                                      if (ids.isNotEmpty && (llmModel.text.isEmpty || !ids.contains(llmModel.text))) {
+                                        llmModel.text = ids.first;
+                                      }
+                                    });
+                                  } catch (e) {
+                                    setState(() => _err = e.toString());
+                                  } finally {
+                                    if (mounted) setState(() => _busy = false);
+                                  }
+                                },
+                          child: const Text('拉取模型列表'),
+                        ),
+                      ),
                     ],
                   )),
                   _pad(Column(

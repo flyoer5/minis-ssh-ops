@@ -19,6 +19,8 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
   bool loaded = false;
   String? pingMsg;
   bool pinging = false;
+  List<String> _modelIds = [];
+  bool _loadingModels = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -35,6 +37,9 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     if (llm != null) {
       llmBase.text = (llm['baseUrl'] as String?) ?? '';
       llmModel.text = (llm['model'] as String?) ?? 'grok-4.5';
+    }
+    if (s.backendOk) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshModels(s));
     }
     // Soft prompt once if battery not ignored
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -55,6 +60,25 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     super.dispose();
   }
 
+  Future<void> _refreshModels(AppState state) async {
+    if (!state.backendOk || _loadingModels) return;
+    setState(() => _loadingModels = true);
+    try {
+      final ids = await state.fetchModels();
+      if (!mounted) return;
+      setState(() {
+        _modelIds = ids;
+        if (llmModel.text.isEmpty && ids.isNotEmpty) {
+          llmModel.text = ids.first;
+        }
+      });
+    } catch (e) {
+      if (mounted) _toast('拉取模型列表失败: $e');
+    } finally {
+      if (mounted) setState(() => _loadingModels = false);
+    }
+  }
+
   void _toast(String m) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m), behavior: SnackBarBehavior.floating));
   }
@@ -69,7 +93,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('SSH AI Agent 1.3.3', style: Theme.of(context).textTheme.titleMedium),
+          Text('SSH AI Agent 1.4.0', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text('个人向 · arm64 · 固定签名可覆盖升级', style: TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
           const Divider(height: 28),
@@ -99,7 +123,43 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           if (llm != null) Text('Key: ${llm['apiKeySet'] == true ? (llm['apiKeyMasked'] ?? '已设置') : '未设置'}', style: const TextStyle(fontSize: 12)),
           TextField(controller: llmBase, decoration: const InputDecoration(labelText: 'LLM Base URL', helperText: '含 /v1')),
           TextField(controller: llmKey, decoration: const InputDecoration(labelText: 'API Key（留空不改）'), obscureText: true),
-          TextField(controller: llmModel, decoration: const InputDecoration(labelText: '模型')),
+          Row(
+            children: [
+              Expanded(
+                child: _modelIds.isEmpty
+                    ? TextField(
+                        controller: llmModel,
+                        decoration: const InputDecoration(
+                          labelText: '模型',
+                          helperText: '可点右侧刷新从接口拉取列表',
+                        ),
+                      )
+                    : DropdownButtonFormField<String>(
+                        value: _modelIds.contains(llmModel.text) ? llmModel.text : null,
+                        decoration: const InputDecoration(labelText: '模型'),
+                        items: [
+                          for (final id in _modelIds) DropdownMenuItem(value: id, child: Text(id, overflow: TextOverflow.ellipsis)),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) setState(() => llmModel.text = v);
+                        },
+                      ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: '拉取模型列表',
+                onPressed: !state.backendOk || _loadingModels ? null : () => _refreshModels(state),
+                icon: _loadingModels
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+          if (_modelIds.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('共 ${_modelIds.length} 个模型', style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E))),
+            ),
           const SizedBox(height: 8),
           FilledButton.tonal(
             onPressed: !state.backendOk
@@ -108,6 +168,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                     try {
                       await state.saveLlm(baseUrl: llmBase.text.trim(), model: llmModel.text.trim(), apiKey: llmKey.text);
                       llmKey.clear();
+                      await _refreshModels(state);
                       _toast('LLM 已保存');
                     } catch (e) {
                       _toast('$e');

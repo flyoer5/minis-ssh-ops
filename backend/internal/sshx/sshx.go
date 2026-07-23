@@ -37,7 +37,7 @@ func Exec(p ConnectParams, command string) (ExecResult, error) {
 		p.Port = 22
 	}
 	if p.Timeout == 0 {
-		p.Timeout = 20 * time.Second
+		p.Timeout = 12 * time.Second
 	}
 
 	pool := DefaultPool

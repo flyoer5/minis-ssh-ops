@@ -25,7 +25,7 @@ func StartPty(p ConnectParams, cols, rows int) (*PtySession, error) {
 		p.Port = 22
 	}
 	if p.Timeout == 0 {
-		p.Timeout = 20 * time.Second
+		p.Timeout = 12 * time.Second
 	}
 	if cols <= 0 {
 		cols = 80
