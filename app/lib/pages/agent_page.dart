@@ -141,25 +141,30 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     return Scaffold(
       backgroundColor: const Color(0xFF0D1117),
       appBar: AppBar(
+        toolbarHeight: 44,
+        titleSpacing: 12,
         title: Text(
           state.selectedHostId == null ? 'Agent' : state.hostLabel,
-          style: const TextStyle(fontSize: 15),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
         actions: [
           if (_busy || state.agentBusy)
             TextButton(
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               onPressed: () {
                 state.cancelAgentChat();
                 setState(() => _busy = false);
               },
-              child: const Text('取消'),
+              child: const Text('取消', style: TextStyle(fontSize: 13)),
             ),
           IconButton(
+            visualDensity: VisualDensity.compact,
             tooltip: '历史会话',
             onPressed: () => _showSessions(state),
             icon: const Icon(Icons.history, size: 20),
           ),
           IconButton(
+            visualDensity: VisualDensity.compact,
             tooltip: '新会话',
             onPressed: (_busy || state.agentBusy)
                 ? null
@@ -200,7 +205,14 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                           ),
                         );
                       }
-                      return _Bubble(msg: state.agentMessages[i]);
+                      final m = state.agentMessages[i];
+                      // Key by tool id+part so toolUse→toolResult rebuilds fold state
+                      final id = m.meta?['id']?.toString() ?? '${m.at.microsecondsSinceEpoch}';
+                      final part = m.meta?['part']?.toString() ?? m.kind.name;
+                      return _Bubble(
+                        key: ValueKey('$id|$part|${m.role}|${m.content.hashCode}'),
+                        msg: m,
+                      );
                     },
                   ),
           ),
@@ -367,7 +379,7 @@ class _ConfirmPlanCard extends StatelessWidget {
 
 class _Bubble extends StatelessWidget {
   final ChatMessage msg;
-  const _Bubble({required this.msg});
+  const _Bubble({super.key, required this.msg});
 
   Future<void> _copy(BuildContext context, String text) async {
     await Clipboard.setData(ClipboardData(text: text));
@@ -378,6 +390,16 @@ class _Bubble extends StatelessWidget {
     }
   }
 
+  /// Minis part types we mirror: text | toolUse | toolResult
+  String get _part {
+    final p = msg.meta?['part']?.toString();
+    if (p != null && p.isNotEmpty) return p;
+    if (msg.kind == ChatKind.stepResult) return 'toolResult';
+    if (msg.role == 'tool' || msg.kind == ChatKind.status) return 'toolUse';
+    if (msg.kind == ChatKind.error) return 'error';
+    return 'text';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (msg.kind == ChatKind.plan) {
@@ -385,232 +407,272 @@ class _Bubble extends StatelessWidget {
     }
 
     final isUser = msg.role == 'user';
-    final isTool = msg.role == 'tool' || msg.kind == ChatKind.stepResult;
-    final isStatus = msg.kind == ChatKind.status;
-    final isErr = msg.kind == ChatKind.error;
+    final part = _part;
 
-    // —— USER (Minis-like right bubble) ——
+    // —— USER bubble ——
     if (isUser) {
       return Align(
         alignment: Alignment.centerRight,
         child: Container(
-          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.82),
-          margin: const EdgeInsets.only(bottom: 12, left: 36),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
+          margin: const EdgeInsets.only(bottom: 10, left: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: const BoxDecoration(
-            color: Color(0xFF2B5CFF),
+            color: Color(0xFF2563EB),
             borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-              bottomLeft: Radius.circular(16),
+              topLeft: Radius.circular(14),
+              topRight: Radius.circular(14),
+              bottomLeft: Radius.circular(14),
               bottomRight: Radius.circular(4),
             ),
           ),
           child: SelectableText(
             msg.content,
-            style: const TextStyle(height: 1.4, color: Colors.white, fontSize: 15),
+            style: const TextStyle(height: 1.4, color: Colors.white, fontSize: 14.5),
           ),
         ),
       );
     }
 
-    // —— STATUS (compact Minis "working" line) ——
-    if (isStatus && !isTool) {
+    // —— memory / generic status line ——
+    if (msg.kind == ChatKind.status && part != 'toolUse') {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 10, left: 4, right: 4),
-        child: Row(
-          children: [
-            const SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(strokeWidth: 1.6, color: Color(0xFFD97706)),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                msg.content,
-                style: const TextStyle(fontSize: 13, color: Color(0xFFD97706), height: 1.3),
-              ),
-            ),
-          ],
+        padding: const EdgeInsets.only(bottom: 8, left: 2),
+        child: Text(msg.content, style: const TextStyle(fontSize: 12.5, color: Color(0xFF8B949E))),
+      );
+    }
+
+    // —— toolUse / toolResult (Minis) ——
+    if (part == 'toolUse' || part == 'toolResult') {
+      return _MinisToolBlock(msg: msg, part: part, onCopy: () => _copy(context, _copyText));
+    }
+
+    // —— error ——
+    if (msg.kind == ChatKind.error || part == 'error') {
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2D1214),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF6E2A2E)),
+        ),
+        child: SelectableText(
+          msg.content,
+          style: const TextStyle(height: 1.45, fontSize: 14, color: Color(0xFFFFB4A9)),
         ),
       );
     }
 
-    // —— TOOL call / result (Minis tool block) ——
-    if (isTool || (isStatus && msg.meta != null)) {
-      final name = msg.meta?['name']?.toString() ?? 'tool';
-      final command = msg.meta?['command']?.toString() ?? '';
-      String headerCmd = command;
-      String body = msg.content;
-      if (msg.content.startsWith(r'$ ')) {
-        final nl = msg.content.indexOf('\n');
-        if (nl >= 0) {
-          headerCmd = msg.content.substring(2, nl);
-          body = msg.content.substring(nl + 1);
-        } else {
-          headerCmd = msg.content.substring(2);
-          body = '';
-        }
-      } else if (msg.kind == ChatKind.status) {
-        body = '';
-      }
-      final running = msg.kind == ChatKind.status || body.isEmpty && command.isNotEmpty;
-      final title = name == 'probe_host' ? 'probe_host' : (name.isEmpty ? 'run_command' : name);
+    // —— text (assistant): Minis plain prose, no avatar chrome ——
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, right: 4),
+      child: SelectableText(
+        msg.content,
+        style: const TextStyle(height: 1.55, fontSize: 15, color: Color(0xFFE6EDF3)),
+      ),
+    );
+  }
 
-      return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D1117),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF30363D)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // tool chrome — like Minis skill/tool strip
-            Container(
+  String get _copyText {
+    final cmd = msg.meta?['command']?.toString() ?? '';
+    if (cmd.isNotEmpty && msg.content.isNotEmpty) return '\$ $cmd\n${msg.content}';
+    if (cmd.isNotEmpty) return cmd;
+    return msg.content;
+  }
+}
+
+/// Mirrors Minis message parts:
+///   toolUse    → header: name + description, body: command (collapsed)
+///   toolResult → header: name + success, body: output (expandable)
+class _MinisToolBlock extends StatefulWidget {
+  final ChatMessage msg;
+  final String part;
+  final VoidCallback onCopy;
+  const _MinisToolBlock({required this.msg, required this.part, required this.onCopy});
+
+  @override
+  State<_MinisToolBlock> createState() => _MinisToolBlockState();
+}
+
+class _MinisToolBlockState extends State<_MinisToolBlock> {
+  late bool _open;
+  bool _userToggled = false;
+
+  /// Minis-like density:
+  /// - toolUse (running): collapsed (header only: name + description)
+  /// - toolResult success: collapsed by default (tap to see output)
+  /// - toolResult failure: expanded so errors are visible
+  bool _defaultOpen() {
+    if (widget.part != 'toolResult') return false;
+    final s = widget.msg.meta?['success'];
+    final failed = s == false || s?.toString() == 'false';
+    return failed;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _open = _defaultOpen();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MinisToolBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // When stream merges toolUse → toolResult, re-apply default unless user toggled
+    if (!_userToggled &&
+        (oldWidget.part != widget.part ||
+            oldWidget.msg.meta?['success'] != widget.msg.meta?['success'] ||
+            oldWidget.msg.content != widget.msg.content)) {
+      _open = _defaultOpen();
+    }
+  }
+
+  String get _name => (widget.msg.meta?['name'] ?? 'tool').toString();
+  String get _desc {
+    final d = widget.msg.meta?['description']?.toString();
+    if (d != null && d.isNotEmpty) return d;
+    final c = widget.msg.meta?['command']?.toString() ?? '';
+    if (c.isNotEmpty) return c.trim().split('\n').first;
+    return widget.msg.content;
+  }
+
+  String get _command => (widget.msg.meta?['command'] ?? '').toString();
+
+  bool? get _success {
+    final s = widget.msg.meta?['success'];
+    if (s is bool) return s;
+    if (s == null) return null;
+    return s.toString() == 'true';
+  }
+
+  String get _body {
+    if (widget.part == 'toolUse') {
+      // show command as body when present
+      return _command;
+    }
+    // toolResult: content is pure output
+    return widget.msg.content;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final running = widget.part == 'toolUse' || widget.msg.kind == ChatKind.status;
+    final success = _success;
+    final Color accent;
+    if (running && widget.part == 'toolUse') {
+      accent = const Color(0xFFD29922);
+    } else if (success == false) {
+      accent = const Color(0xFFF85149);
+    } else if (success == true) {
+      accent = const Color(0xFF3FB950);
+    } else {
+      accent = const Color(0xFF79C0FF);
+    }
+
+    final body = _body.trim();
+    final hasBody = body.isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161B22),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF30363D)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: hasBody
+                ? () => setState(() {
+                      _userToggled = true;
+                      _open = !_open;
+                    })
+                : null,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
               padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-              color: const Color(0xFF161B22),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1F6FEB).withAlpha(0x33),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF1F6FEB).withAlpha(0x66)),
-                    ),
-                    child: Text(
-                      title,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF79C0FF), fontFamily: 'monospace'),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(
+                      running
+                          ? Icons.play_circle_outline
+                          : (success == false ? Icons.error_outline : Icons.check_circle_outline),
+                      size: 15,
+                      color: accent,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      headerCmd.isEmpty ? (running ? 'running…' : '') : headerCmd,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF8B949E)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // line1: tool name (like Minis shell_execute)
+                        Text(
+                          _name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: accent,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        // line2: tool_title / description (Minis description)
+                        if (_desc.isNotEmpty && _desc != _name) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            _desc,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12.5, color: Color(0xFFC9D1D9), height: 1.3),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (msg.content.trim().isNotEmpty)
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                      onPressed: () => _copy(context, msg.content),
-                      icon: const Icon(Icons.copy_all, size: 14, color: Color(0xFF8B949E)),
+                  GestureDetector(
+                    onTap: widget.onCopy,
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.copy_all, size: 14, color: Color(0xFF8B949E)),
+                    ),
+                  ),
+                  if (hasBody)
+                    Icon(
+                      _open ? Icons.expand_less : Icons.expand_more,
+                      size: 18,
+                      color: const Color(0xFF8B949E),
                     ),
                 ],
               ),
             ),
-            if (body.trim().isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                color: const Color(0xFF0D1117),
-                child: SelectableText(
-                  body,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 12.5,
-                    height: 1.4,
-                    color: Color(0xFFC9D1D9),
-                  ),
-                ),
-              )
-            else if (running)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(12, 8, 12, 10),
-                child: Text('…', style: TextStyle(color: Color(0xFF8B949E), fontFamily: 'monospace')),
+          ),
+          if (hasBody && _open)
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: Color(0xFF0D1117),
+                border: Border(top: BorderSide(color: Color(0xFF21262D))),
               ),
-          ],
-        ),
-      );
-    }
-
-    // —— ASSISTANT / ERROR (Minis prose, minimal chrome) ——
-    if (isErr) {
-      return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2D1214),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF6E2A2E)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.error_outline, size: 14, color: Color(0xFFF85149)),
-                const SizedBox(width: 6),
-                const Text('error', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFF85149))),
-                const Spacer(),
-                InkWell(
-                  onTap: () => _copy(context, msg.content),
-                  child: const Icon(Icons.copy_all, size: 14, color: Color(0xFF8B949E)),
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: SelectableText(
+                body,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  height: 1.35,
+                  color: Color(0xFFC9D1D9),
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 8),
-            SelectableText(
-              msg.content,
-              style: const TextStyle(height: 1.45, fontSize: 14.5, color: Color(0xFFFFB4A9)),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // plain assistant — Minis style: avatar-less, clean left text block
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            margin: const EdgeInsets.only(right: 10, top: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFF21262D),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF30363D)),
-            ),
-            child: const Center(
-              child: Text('A', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF3FB950))),
-            ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text('Assistant', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF8B949E))),
-                    const Spacer(),
-                    InkWell(
-                      onTap: () => _copy(context, msg.content),
-                      child: const Icon(Icons.copy_all, size: 14, color: Color(0xFF8B949E)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                SelectableText(
-                  msg.content,
-                  style: const TextStyle(height: 1.5, fontSize: 15, color: Color(0xFFE6EDF3)),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

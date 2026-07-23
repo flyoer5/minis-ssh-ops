@@ -619,6 +619,142 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Stable id for pairing toolUse → toolResult across SSE events.
+  String _newToolId() => 't${DateTime.now().microsecondsSinceEpoch}';
+
+  /// Minis-like: consecutive assistant/final text chunks append into one bubble.
+  void _pushOrMergeAssistantText(String content, {String part = 'text'}) {
+    final t = content.trimRight();
+    if (t.isEmpty) return;
+    if (agentMessages.isNotEmpty) {
+      final last = agentMessages.last;
+      final lastPart = last.meta?['part']?.toString();
+      final isText = last.role == 'assistant' &&
+          last.kind == ChatKind.text &&
+          (lastPart == null || lastPart == 'text' || lastPart == 'text_delta');
+      if (isText) {
+        // avoid exact duplicate final after assistant
+        if (last.content == t) return;
+        if (t.startsWith(last.content) && t.length > last.content.length) {
+          agentMessages[agentMessages.length - 1] = ChatMessage(
+            role: 'assistant',
+            content: t,
+            kind: ChatKind.text,
+            meta: {'part': part},
+            at: last.at,
+          );
+          return;
+        }
+        // append with blank line if both are non-empty sentences
+        final merged = last.content.endsWith('\n') || t.startsWith('\n')
+            ? '${last.content}$t'
+            : '${last.content}\n$t';
+        agentMessages[agentMessages.length - 1] = ChatMessage(
+          role: 'assistant',
+          content: merged,
+          kind: ChatKind.text,
+          meta: {'part': part},
+          at: last.at,
+        );
+        return;
+      }
+    }
+    agentMessages.add(ChatMessage(
+      role: 'assistant',
+      content: t,
+      kind: ChatKind.text,
+      meta: {'part': part},
+    ));
+  }
+
+  /// Find last open toolUse to complete (same name, prefer same command).
+  int _findOpenToolUse({required String name, required String command}) {
+    for (var i = agentMessages.length - 1; i >= 0; i--) {
+      final m = agentMessages[i];
+      if (m.meta?['part']?.toString() != 'toolUse') continue;
+      final n = (m.meta?['name'] ?? '').toString();
+      if (name.isNotEmpty && n.isNotEmpty && n != name) continue;
+      final c = (m.meta?['command'] ?? '').toString();
+      if (command.isNotEmpty && c.isNotEmpty && c != command) {
+        // allow name-only match when command differs only by whitespace
+        if (c.trim() != command.trim()) continue;
+      }
+      // still running / no success yet
+      if (m.meta?['success'] != null) continue;
+      return i;
+    }
+    // fallback: last toolUse with same name ignoring command
+    for (var i = agentMessages.length - 1; i >= 0; i--) {
+      final m = agentMessages[i];
+      if (m.meta?['part']?.toString() != 'toolUse') continue;
+      if (m.meta?['success'] != null) continue;
+      final n = (m.meta?['name'] ?? '').toString();
+      if (name.isEmpty || n == name) return i;
+    }
+    return -1;
+  }
+
+  void _pushToolUse({
+    required String name,
+    required String command,
+    required String description,
+  }) {
+    final id = _newToolId();
+    agentMessages.add(ChatMessage(
+      role: 'tool',
+      content: description,
+      kind: ChatKind.status,
+      meta: {
+        'part': 'toolUse',
+        'id': id,
+        'name': name,
+        'command': command,
+        'description': description,
+        'success': null,
+      },
+    ));
+  }
+
+  /// Merge tool_result into the matching toolUse card (Minis stream pairing).
+  void _completeToolResult({
+    required String name,
+    required String command,
+    required String output,
+    required bool success,
+    required String description,
+  }) {
+    final idx = _findOpenToolUse(name: name, command: command);
+    final id = idx >= 0
+        ? (agentMessages[idx].meta?['id']?.toString() ?? _newToolId())
+        : _newToolId();
+    final prev = idx >= 0 ? agentMessages[idx] : null;
+    final desc = description.isNotEmpty
+        ? description
+        : (prev?.meta?['description']?.toString() ??
+            (command.isNotEmpty ? command.trim().split('\n').first : name));
+    final cmd = command.isNotEmpty ? command : (prev?.meta?['command']?.toString() ?? '');
+    final toolName = name.isNotEmpty ? name : (prev?.meta?['name']?.toString() ?? 'tool');
+    final msg = ChatMessage(
+      role: 'tool',
+      content: output,
+      kind: ChatKind.stepResult,
+      meta: {
+        'part': 'toolResult',
+        'id': id,
+        'name': toolName,
+        'command': cmd,
+        'description': desc,
+        'success': success,
+      },
+      at: prev?.at,
+    );
+    if (idx >= 0) {
+      agentMessages[idx] = msg;
+    } else {
+      agentMessages.add(msg);
+    }
+  }
+
   Future<void> agentChat(String userText) async {
     final id = selectedHostId;
     if (id == null) {
@@ -685,26 +821,47 @@ class AppState extends ChangeNotifier {
         _pushMsg(ChatMessage(role: 'system', content: note, kind: ChatKind.status));
       }
     } else if (type == 'assistant' && content.isNotEmpty) {
-      _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.text));
+      // Minis text part — merge consecutive assistant chunks into one bubble
+      _pushOrMergeAssistantText(content, part: 'text');
     } else if (type == 'tool') {
-      String label;
+      // Minis toolUse — one open card; later tool_result completes same card
+      String title;
       if (name == 'probe_host') {
-        label = '探测主机状态';
+        title = '探测主机状态';
       } else if (command.isNotEmpty) {
-        label = r'$ ' + command;
+        final one = command.trim().split('\n').first;
+        title = one.length > 80 ? '${one.substring(0, 80)}…' : one;
+      } else if (name.isNotEmpty) {
+        title = name;
       } else {
-        label = name;
+        title = 'tool';
       }
-      _pushMsg(ChatMessage(
-        role: 'tool',
-        content: label,
-        kind: ChatKind.status,
-        meta: {'name': name, 'command': command},
-      ));
+      final toolName = name.isEmpty ? (command.isEmpty ? 'tool' : 'run_command') : name;
+      // If same toolUse already open (duplicate SSE), don't stack another
+      final open = _findOpenToolUse(name: toolName, command: command);
+      if (open >= 0) {
+        final m = agentMessages[open];
+        agentMessages[open] = ChatMessage(
+          role: 'tool',
+          content: title,
+          kind: ChatKind.status,
+          meta: {
+            ...?m.meta,
+            'part': 'toolUse',
+            'name': toolName,
+            'command': command.isNotEmpty ? command : (m.meta?['command'] ?? ''),
+            'description': title,
+            'success': null,
+          },
+          at: m.at,
+        );
+        return;
+      }
+      _pushToolUse(name: toolName, command: command, description: title);
     } else if (type == 'tool_result') {
+      // Minis toolResult — complete matching toolUse (stream merge)
       if (content.startsWith('error: NEEDS_CONFIRM:') || content.startsWith('NEEDS_CONFIRM:')) {
         final rest = content.replaceFirst('error: ', '').replaceFirst('NEEDS_CONFIRM:', '');
-        // risk:cmd
         final colon = rest.indexOf(':');
         final risk = colon > 0 ? rest.substring(0, colon) : 'write';
         final cmd = colon > 0 ? rest.substring(colon + 1) : rest;
@@ -728,15 +885,25 @@ class AppState extends ChangeNotifier {
         _lastPlanMsgIndex = agentMessages.length - 1;
         return;
       }
-      final head = command.isNotEmpty ? (r'$ ' + command + '\n') : (name.isNotEmpty ? (name + '\n') : '');
-      _pushMsg(ChatMessage(
-        role: 'tool',
-        content: head + content,
-        kind: ChatKind.stepResult,
-        meta: {'name': name, 'command': command},
-      ));
+      final toolName = name.isEmpty ? (command.isEmpty ? 'tool' : 'run_command') : name;
+      final failed = content.startsWith('error:') ||
+          content.contains('Command timed out') ||
+          (content.contains('(exit code') && !RegExp(r'\(exit code 0\)').hasMatch(content));
+      final desc = command.isNotEmpty
+          ? (command.trim().split('\n').first.length > 80
+              ? '${command.trim().split('\n').first.substring(0, 80)}…'
+              : command.trim().split('\n').first)
+          : toolName;
+      _completeToolResult(
+        name: toolName,
+        command: command,
+        output: content,
+        success: !failed,
+        description: desc,
+      );
     } else if (type == 'final' && content.isNotEmpty) {
-      _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.text));
+      // final often repeats last assistant text — merge / dedupe
+      _pushOrMergeAssistantText(content, part: 'text');
     } else if (type == 'error' && content.isNotEmpty) {
       _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.error));
     }
@@ -980,16 +1147,26 @@ class ProbeSummary {
           : loadParts[0];
     }
 
-    // disk: find root %
+    // disk: df -h root line → Filesystem Size Used Avail Use% /
     String diskHint = '—';
     String diskSub = '';
     for (final line in disk.split('\n')) {
       final cols = line.trim().split(RegExp(r'\s+'));
-      if (cols.length >= 5 && cols.last == '/') {
+      if (cols.length >= 6 && cols.last == '/') {
+        // last-2 is Use%, size=cols[1], used=cols[2] (when FS has no spaces)
         final pct = cols[cols.length - 2];
         diskHint = pct.contains('%') ? pct : '$pct%';
-        // used/total if present Size Used
-        if (cols.length >= 4) diskSub = '${cols[2]}/${cols[1]}';
+        if (cols.length >= 5) {
+          // Prefer Size/Used from fixed positions when possible
+          final size = cols[1];
+          final used = cols[2];
+          if (RegExp(r'^\d').hasMatch(size) && RegExp(r'^\d').hasMatch(used)) {
+            diskSub = '$used/$size';
+          } else {
+            // long FS name: Use% is still last-2; skip size
+            diskSub = '';
+          }
+        }
         break;
       }
     }
@@ -998,18 +1175,43 @@ class ProbeSummary {
       if (m != null) diskHint = '${m.group(1)}%';
     }
 
-    // memory: free -h "Mem: total used free ..." or meminfo
+    // memory: free -h often starts with a header line, then "Mem: total used free ..."
     String memHint = '—';
     String memSub = '';
-    final memFirst = firstLine(memory);
-    if (memFirst.toLowerCase().startsWith('mem:')) {
-      final cols = memFirst.split(RegExp(r'\s+'));
+    String? memLine;
+    for (final line in memory.split('\n')) {
+      final t = line.trim();
+      if (t.toLowerCase().startsWith('mem:')) {
+        memLine = t;
+        break;
+      }
+    }
+    if (memLine != null) {
+      final cols = memLine.split(RegExp(r'\s+'));
       // Mem: total used free shared buff/cache available
       if (cols.length >= 3) {
-        memSub = '${cols[2]}/${cols[1]}';
-        memHint = cols[2]; // used as display
-        // derive percent from used/total if human sizes not parseable; keep used string
-        // free -h doesn't give %; leave memHint as used, card uses free text
+        final total = cols[1];
+        final used = cols[2];
+        memSub = '$used/$total';
+        // percent from human sizes when possible
+        double? toMi(String x) {
+          final m = RegExp(r'([\d.]+)\s*([KMGT])?', caseSensitive: false).firstMatch(x.trim());
+          if (m == null) return null;
+          var n = double.tryParse(m.group(1)!) ?? 0;
+          final u = (m.group(2) ?? '').toUpperCase();
+          if (u == 'T') n *= 1024 * 1024;
+          else if (u == 'G') n *= 1024;
+          else if (u == 'K') n /= 1024;
+          // M or bare: Mi already
+          return n;
+        }
+        final u = toMi(used);
+        final t = toMi(total);
+        if (u != null && t != null && t > 0) {
+          memHint = '${(u * 100 / t).round()}%';
+        } else {
+          memHint = used;
+        }
       }
     } else {
       // MemTotal / MemAvailable kB
@@ -1023,7 +1225,11 @@ class ProbeSummary {
         memHint = '$pct%';
         memSub = '${(used / 1024 / 1024).toStringAsFixed(1)}G/${(total / 1024 / 1024).toStringAsFixed(1)}G';
       } else {
-        memHint = memFirst;
+        memHint = firstLine(memory);
+        // avoid showing free(1) header as value
+        if (memHint.toLowerCase().contains('total') && memHint.toLowerCase().contains('used')) {
+          memHint = '—';
+        }
       }
     }
 

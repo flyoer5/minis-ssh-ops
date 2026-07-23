@@ -77,17 +77,21 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     final state = context.watch<AppState>();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('主机'),
+        toolbarHeight: 44,
+        titleSpacing: 12,
+        title: const Text('主机', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         actions: [
           IconButton(
+            visualDensity: VisualDensity.compact,
             onPressed: state.backendOk ? () => _refreshAll(state) : null,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, size: 20),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: state.backendOk ? () => _showAdd(context, state) : null,
+            icon: const Icon(Icons.add, size: 22),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: state.backendOk ? () => _showAdd(context, state) : null,
-        child: const Icon(Icons.add),
       ),
       body: !state.backendOk
           ? Center(child: FilledButton(onPressed: () => state.bootstrap(), child: const Text('连接后端')))
@@ -96,9 +100,9 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
               : RefreshIndicator(
                   onRefresh: () => _refreshAll(state),
                   child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 88),
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 16),
                     itemCount: state.hosts.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (_, i) {
                       final h = state.hosts[i] as Map<String, dynamic>;
                       final id = h['id'] as String;
@@ -392,7 +396,7 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ServerStatus-like fields
+    // CPU (load) + MEM + HDD
     final load1 = _v('负载1');
     final loadAll = _v('负载');
     final diskPctS = _v('磁盘%');
@@ -404,7 +408,7 @@ class _StatusCard extends StatelessWidget {
 
     final diskP = _pct(diskPctS) ?? _pct(diskFull);
     final memP = _pct(memMain) ?? _pct(memFull);
-    // load as relative bar (cap at 4 for visual)
+    // load bar: 1m load / 4 (visual only, not utilization %)
     double? loadP;
     final loadN = double.tryParse(load1);
     if (loadN != null) loadP = (loadN / 4.0).clamp(0.0, 1.0);
@@ -423,16 +427,16 @@ class _StatusCard extends StatelessWidget {
         onTap: onSelect,
         onLongPress: onMenu,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 6, 12),
+          padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // name row — like ServerStatus node header
+              // compact header: dot · name · status · actions
               Row(
                 children: [
                   Container(
-                    width: 9,
-                    height: 9,
+                    width: 8,
+                    height: 8,
                     decoration: BoxDecoration(color: _status, shape: BoxShape.circle, boxShadow: [
                       BoxShadow(color: _status.withAlpha(0x66), blurRadius: 6),
                     ]),
@@ -474,40 +478,74 @@ class _StatusCard extends StatelessWidget {
                 ],
               ),
               Padding(
-                padding: const EdgeInsets.only(left: 17, top: 2),
-                child: Text(addr, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontFamily: 'monospace')),
+                padding: const EdgeInsets.only(left: 16, top: 1),
+                child: Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontFamily: 'monospace')),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               if (summary == null && !loading)
                 const Padding(
                   padding: EdgeInsets.only(left: 4),
                   child: Text('下拉或点同步获取探针数据', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
                 )
               else ...[
-                // ServerStatus style metric rows: label | bar | value
-                _metricRow('CPU', loadAll == '—' ? load1 : loadAll, loadP, const Color(0xFF38BDF8)),
-                const SizedBox(height: 8),
-                _metricRow('MEM', memMain == '—' ? memFull : '$memMain  $memFull'.trim(), memP, const Color(0xFFA78BFA)),
-                const SizedBox(height: 8),
-                _metricRow('HDD', diskPctS == '—' ? diskFull : '$diskPctS  $diskFull'.trim(), diskP, const Color(0xFF34D399)),
-                const SizedBox(height: 10),
-                // uptime + OS like server table footer
-                Row(
-                  children: [
-                    const Icon(Icons.schedule, size: 13, color: Color(0xFFFBBF24)),
-                    const SizedBox(width: 4),
-                    Text('Uptime $up', style: const TextStyle(fontSize: 11, color: Color(0xFFCBD5E1), fontFamily: 'monospace')),
-                  ],
+                // ServerStatus style: label | value (no duplicate %) | bar
+                // CPU row shows loadavg; bar is 1m load / 4 (visual only)
+                _metricRow(
+                  'CPU',
+                  loadAll == '—' ? load1 : loadAll,
+                  loadP,
+                  const Color(0xFF38BDF8),
+                  showPct: false, // loadavg, not utilization %
                 ),
-                if (sys != '—') ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    sys,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontFamily: 'monospace'),
-                  ),
-                ],
+                const SizedBox(height: 5),
+                // MEM: prefer "used/total" only; % comes from bar + optional once
+                _metricRow(
+                  'MEM',
+                  () {
+                    // memFull like "42% (1.2Gi/3.7Gi)" or memMain "42%" / "1.2Gi"
+                    final full = memFull;
+                    final m = RegExp(r'\(([^)]+)\)').firstMatch(full);
+                    if (m != null) return m.group(1)!; // used/total
+                    if (memMain.contains('/') ) return memMain;
+                    if (full.contains('/')) {
+                      final parts = full.split(RegExp(r'\s+'));
+                      for (final p in parts) {
+                        if (p.contains('/') && !p.contains('%')) return p;
+                      }
+                    }
+                    return memMain == '—' ? full : memMain;
+                  }(),
+                  memP,
+                  const Color(0xFFA78BFA),
+                ),
+                const SizedBox(height: 5),
+                _metricRow(
+                  'HDD',
+                  () {
+                    final full = diskFull;
+                    final m = RegExp(r'\(([^)]+)\)').firstMatch(full);
+                    if (m != null) return m.group(1)!;
+                    if (diskPctS != '—' && full != '—' && full != diskPctS) {
+                      // strip leading "51% " if present
+                      final cleaned = full.replaceFirst(RegExp(r'^\d+%\s*'), '').replaceAll(RegExp(r'[()]'), '');
+                      if (cleaned.contains('/')) return cleaned;
+                    }
+                    return diskPctS == '—' ? full : diskPctS;
+                  }(),
+                  diskP,
+                  const Color(0xFF34D399),
+                ),
+                const SizedBox(height: 6),
+                // uptime + OS like server table footer
+                Text(
+                  [
+                    if (up != '—') '⏱ $up',
+                    if (sys != '—') sys,
+                  ].join('  ·  '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontFamily: 'monospace'),
+                ),
               ],
             ],
           ),
@@ -516,9 +554,13 @@ class _StatusCard extends StatelessWidget {
     );
   }
 
-  Widget _metricRow(String label, String value, double? progress, Color accent) {
+  Widget _metricRow(String label, String value, double? progress, Color accent, {bool showPct = true}) {
     final c = progress == null ? accent : _barColor(progress);
-    final pctText = progress == null ? '' : '  ${(progress * 100).toStringAsFixed(0)}%';
+    // Only append % when value itself has none (avoids "51% 51% (19G/40G) 51%")
+    final hasPct = value.contains('%');
+    final pctText = (showPct && progress != null && !hasPct)
+        ? '  ${(progress * 100).toStringAsFixed(0)}%'
+        : '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -544,7 +586,7 @@ class _StatusCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(3),
           child: LinearProgressIndicator(
             value: progress?.clamp(0.0, 1.0) ?? 0,
-            minHeight: 6,
+            minHeight: 4,
             backgroundColor: const Color(0xFF1E293B),
             color: progress == null ? const Color(0xFF334155) : c,
           ),

@@ -374,62 +374,93 @@ class _TerminalPageState extends State<TerminalPage>
       body: SafeArea(
         child: Column(
           children: [
+            // Single slim bar: ● host · status | A-/A+ | 键盘 | ⋯
             Material(
               color: _bar,
-              child: ListTile(
-                dense: true,
-                leading: Icon(Icons.circle, size: 10, color: _connected ? _green : Colors.redAccent),
-                title: Text(
-                  state.hostLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13),
+              child: Container(
+                height: 36,
+                padding: const EdgeInsets.only(left: 10, right: 2),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFF21262D))),
                 ),
-                subtitle: Text(_status, style: const TextStyle(fontSize: 11, color: _muted)),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
                   children: [
+                    Icon(Icons.circle, size: 8, color: _connected ? _green : Colors.redAccent),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: state.hostLabel,
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _fg),
+                            ),
+                            if (_status.isNotEmpty)
+                              TextSpan(
+                                text: '  ${_status}',
+                                style: const TextStyle(fontSize: 11, color: _muted, fontWeight: FontWeight.w400),
+                              ),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                     IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       tooltip: '减小字体',
-                      icon: const Icon(Icons.text_decrease, size: 18),
+                      icon: const Icon(Icons.text_decrease, size: 16, color: _muted),
                       onPressed: () => context.read<AppState>().setTermFontSize(state.termFontSize - 1),
                     ),
                     IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       tooltip: '增大字体',
-                      icon: const Icon(Icons.text_increase, size: 18),
+                      icon: const Icon(Icons.text_increase, size: 16, color: _muted),
                       onPressed: () => context.read<AppState>().setTermFontSize(state.termFontSize + 1),
                     ),
                     IconButton(
-                      tooltip: _focus.hasFocus ? '收起键盘' : '打开键盘',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      tooltip: _focus.hasFocus ? '收起键盘' : '键盘',
                       icon: Icon(
                         _focus.hasFocus ? Icons.keyboard_hide : Icons.keyboard,
-                        size: 20,
+                        size: 18,
+                        color: _focus.hasFocus ? _green : _muted,
                       ),
                       onPressed: _toggleKb,
                     ),
-                    IconButton(
-                      tooltip: '粘贴',
-                      icon: const Icon(Icons.content_paste, size: 18),
-                      onPressed: () async {
-                        final data = await Clipboard.getData(Clipboard.kTextPlain);
-                        final text = data?.text;
-                        if (text == null || text.isEmpty) return;
-                        _send(text.replaceAll('\n', '\r'));
-                        _openKb();
+                    PopupMenuButton<String>(
+                      tooltip: '更多',
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.more_vert, size: 18, color: _muted),
+                      color: const Color(0xFF161B22),
+                      onSelected: (v) async {
+                        switch (v) {
+                          case 'paste':
+                            final data = await Clipboard.getData(Clipboard.kTextPlain);
+                            final text = data?.text;
+                            if (text == null || text.isEmpty) return;
+                            _send(text.replaceAll('\n', '\r'));
+                            _openKb();
+                            break;
+                          case 'clear':
+                            setState(() => _buf.clear());
+                            break;
+                          case 'reconnect':
+                            _connect(state);
+                            break;
+                        }
                       },
-                    ),
-                    IconButton(
-                      tooltip: '清屏',
-                      icon: const Icon(Icons.delete_sweep, size: 20),
-                      onPressed: () {
-                        setState(() {
-                          _buf.clear();
-                        });
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh, size: 20),
-                      onPressed: () => _connect(state),
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'paste', child: Text('粘贴')),
+                        PopupMenuItem(value: 'clear', child: Text('清屏')),
+                        PopupMenuItem(value: 'reconnect', child: Text('重连')),
+                      ],
                     ),
                   ],
                 ),

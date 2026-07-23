@@ -110,6 +110,8 @@ class _HomeShellState extends State<HomeShell> {
         ],
       ),
       bottomNavigationBar: NavigationBar(
+        height: 64,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         selectedIndex: index,
         onDestinationSelected: (i) => setState(() => index = i),
         destinations: const [
