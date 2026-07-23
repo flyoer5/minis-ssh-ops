@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -153,6 +154,73 @@ func (s *Server) handleFSRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "path": body.Path})
+}
+
+func (s *Server) handleFSRename(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body struct {
+		OldPath   string `json:"oldPath"`
+		NewPath   string `json:"newPath"`
+		Confirmed bool   `json:"confirmed"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.OldPath == "" || body.NewPath == "" {
+		writeErr(w, http.StatusBadRequest, "oldPath and newPath required")
+		return
+	}
+	if !body.Confirmed {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "confirmation required", "risk": "write"})
+		return
+	}
+	p, err := s.connectParams(id)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := sshx.Rename(p, body.OldPath, body.NewPath); err != nil {
+		writeErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "oldPath": body.OldPath, "newPath": body.NewPath})
+}
+
+func (s *Server) handleFSDownload(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body struct {
+		Path     string `json:"path"`
+		MaxBytes int64  `json:"maxBytes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Path) == "" {
+		writeErr(w, http.StatusBadRequest, "path required")
+		return
+	}
+	if body.MaxBytes <= 0 {
+		body.MaxBytes = 8 << 20 // 8MiB
+	}
+	p, err := s.connectParams(id)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	data, err := sshx.ReadFile(p, body.Path, body.MaxBytes)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	// base64 for binary-safe transport over JSON API
+	writeJSON(w, http.StatusOK, map[string]any{
+		"path": body.Path,
+		"size": len(data),
+		"b64":  base64.StdEncoding.EncodeToString(data),
+		"name": pathBase(body.Path),
+	})
+}
+
+func pathBase(p string) string {
+	i := strings.LastIndex(p, "/")
+	if i < 0 {
+		return p
+	}
+	return p[i+1:]
 }
 
 func (s *Server) handleListKnownHosts(w http.ResponseWriter, r *http.Request) {

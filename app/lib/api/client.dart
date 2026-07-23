@@ -63,8 +63,16 @@ class ApiClient {
   }
 
   Future<void> deleteHost(String id) async {
-    final r = await http.delete(_u('/v1/hosts/$id'), headers: _headers);
+    final r = await http.delete(_u('/v1/hosts/$id'), headers: _headers).timeout(const Duration(seconds: 10));
     _ensureOk(r);
+  }
+
+  Future<Map<String, dynamic>> updateHost(String id, Map<String, dynamic> body) async {
+    final r = await http
+        .put(_u('/v1/hosts/$id'), headers: _headers, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 15));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> exec(
@@ -136,6 +144,15 @@ class ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
+  http.Client? _streamClient;
+
+  void cancelAgentStream() {
+    try {
+      _streamClient?.close();
+    } catch (_) {}
+    _streamClient = null;
+  }
+
   /// SSE progressive agent events (data: {...}\\n\\n).
   Future<void> agentChatStream({
     required String hostId,
@@ -143,7 +160,9 @@ class ApiClient {
     String? sessionId,
     required void Function(Map<String, dynamic> event) onEvent,
   }) async {
+    cancelAgentStream();
     final client = http.Client();
+    _streamClient = client;
     try {
       final req = http.Request('POST', _u('/v1/agent/chat/stream'));
       req.headers.addAll(_headers);
@@ -185,6 +204,9 @@ class ApiClient {
         }
       }
     } finally {
+      if (identical(_streamClient, client)) {
+        _streamClient = null;
+      }
       client.close();
     }
   }
@@ -287,6 +309,29 @@ class ApiClient {
         )
         .timeout(const Duration(seconds: 30));
     _ensureOk(r);
+  }
+
+  Future<void> fsRename(String hostId, String oldPath, String newPath, {bool confirmed = true}) async {
+    final r = await http
+        .post(
+          _u('/v1/hosts/$hostId/fs/rename'),
+          headers: _headers,
+          body: jsonEncode({'oldPath': oldPath, 'newPath': newPath, 'confirmed': confirmed}),
+        )
+        .timeout(const Duration(seconds: 30));
+    _ensureOk(r);
+  }
+
+  Future<Map<String, dynamic>> fsDownload(String hostId, String path, {int maxBytes = 8 * 1024 * 1024}) async {
+    final r = await http
+        .post(
+          _u('/v1/hosts/$hostId/fs/download'),
+          headers: _headers,
+          body: jsonEncode({'path': path, 'maxBytes': maxBytes}),
+        )
+        .timeout(const Duration(seconds: 120));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> listKnownHosts() async {

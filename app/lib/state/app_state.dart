@@ -4,6 +4,18 @@ import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 
+class AgentSession {
+  AgentSession({required this.id, required this.title, required this.hostId, List<ChatMessage>? messages})
+      : messages = messages ?? <ChatMessage>[],
+        updatedAt = DateTime.now();
+
+  String id;
+  String title;
+  String? hostId;
+  final List<ChatMessage> messages;
+  DateTime updatedAt;
+}
+
 class AppState extends ChangeNotifier {
   AppState(this.api);
 
@@ -24,6 +36,8 @@ class AppState extends ChangeNotifier {
   final List<ChatMessage> agentMessages = [];
   /// Index of last plan message in agentMessages (for attaching step outputs).
   int? _lastPlanMsgIndex;
+  final List<AgentSession> agentSessions = [];
+  bool agentBusy = false;
 
   // --- Terminal ---
   final StringBuffer _termBuf = StringBuffer();
@@ -205,6 +219,11 @@ class AppState extends ChangeNotifier {
     await refreshHosts();
   }
 
+  Future<void> updateHost(String id, Map<String, dynamic> body) async {
+    await api.updateHost(id, body);
+    await refreshHosts();
+  }
+
   void selectHost(String? id) {
     selectedHostId = id;
     notifyListeners();
@@ -341,11 +360,81 @@ class AppState extends ChangeNotifier {
   // ---------- Agent chat ----------
 
   void clearAgentChat() {
+    // Archive current transcript if non-empty
+    if (agentMessages.isNotEmpty) {
+      final title = _sessionTitleFromMessages(agentMessages);
+      agentSessions.insert(
+        0,
+        AgentSession(
+          id: agentSessionId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          title: title,
+          hostId: selectedHostId,
+          messages: List<ChatMessage>.from(agentMessages),
+        ),
+      );
+      if (agentSessions.length > 30) {
+        agentSessions.removeRange(30, agentSessions.length);
+      }
+    }
     agentMessages.clear();
     lastPlan = null;
     stepOutputs.clear();
     agentSessionId = null;
     _lastPlanMsgIndex = null;
+    notifyListeners();
+  }
+
+  String _sessionTitleFromMessages(List<ChatMessage> msgs) {
+    for (final m in msgs) {
+      if (m.role == 'user' && m.content.trim().isNotEmpty) {
+        final t = m.content.trim().replaceAll('\n', ' ');
+        return t.length > 28 ? '${t.substring(0, 28)}…' : t;
+      }
+    }
+    final now = DateTime.now();
+    final mm = now.minute < 10 ? '0${now.minute}' : '${now.minute}';
+    return '会话 ${now.hour}:$mm';
+  }
+
+  void openAgentSession(AgentSession s) {
+    // Save current transcript into sessions if needed
+    if (agentMessages.isNotEmpty) {
+      final curId = agentSessionId ?? '';
+      if (curId != s.id) {
+        final existing = agentSessions.indexWhere((e) => e.id == curId);
+        final snap = AgentSession(
+          id: curId.isEmpty ? DateTime.now().millisecondsSinceEpoch.toString() : curId,
+          title: _sessionTitleFromMessages(agentMessages),
+          hostId: selectedHostId,
+          messages: List<ChatMessage>.from(agentMessages),
+        );
+        if (existing >= 0) {
+          agentSessions[existing] = snap;
+        } else {
+          agentSessions.insert(0, snap);
+        }
+      }
+    }
+    agentMessages
+      ..clear()
+      ..addAll(s.messages);
+    agentSessionId = s.id;
+    if (s.hostId != null) selectedHostId = s.hostId;
+    lastPlan = null;
+    stepOutputs.clear();
+    _lastPlanMsgIndex = null;
+    notifyListeners();
+  }
+
+  void deleteAgentSession(String id) {
+    agentSessions.removeWhere((e) => e.id == id);
+    notifyListeners();
+  }
+
+  void cancelAgentChat() {
+    api.cancelAgentStream();
+    agentBusy = false;
+    _pushMsg(ChatMessage(role: 'assistant', content: '已取消', kind: ChatKind.status));
     notifyListeners();
   }
 
@@ -360,6 +449,11 @@ class AppState extends ChangeNotifier {
       _pushMsg(ChatMessage(role: 'assistant', content: '先选主机', kind: ChatKind.error));
       return;
     }
+    if (agentBusy) {
+      _pushMsg(ChatMessage(role: 'assistant', content: '上一轮还在进行，可点取消', kind: ChatKind.status));
+      return;
+    }
+    agentBusy = true;
     _pushMsg(ChatMessage(role: 'user', content: userText));
     notifyListeners();
     try {
@@ -389,8 +483,15 @@ class AppState extends ChangeNotifier {
       }
       notifyListeners();
     } catch (e) {
-      _pushMsg(ChatMessage(role: 'assistant', content: _friendlyErr(e), kind: ChatKind.error));
-      rethrow;
+      final msg = e.toString();
+      if (msg.contains('ClientException') || msg.contains('Connection closed') || msg.contains('Cancel')) {
+        // cancelled stream
+      } else {
+        _pushMsg(ChatMessage(role: 'assistant', content: _friendlyErr(e), kind: ChatKind.error));
+      }
+    } finally {
+      agentBusy = false;
+      notifyListeners();
     }
   }
 

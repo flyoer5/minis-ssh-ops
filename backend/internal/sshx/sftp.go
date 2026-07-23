@@ -137,6 +137,19 @@ func Mkdir(p ConnectParams, remote string) error {
 	})
 }
 
+func Rename(p ConnectParams, oldPath, newPath string) error {
+	return withSFTP(p, func(sc *sftp.Client) error {
+		if oldPath == "" || newPath == "" {
+			return fmt.Errorf("path required")
+		}
+		dir := path.Dir(newPath)
+		if dir != "" && dir != "." {
+			_ = sc.MkdirAll(dir)
+		}
+		return sc.Rename(oldPath, newPath)
+	})
+}
+
 func Remove(p ConnectParams, remote string, recursive bool) error {
 	return withSFTP(p, func(sc *sftp.Client) error {
 		if remote == "" || remote == "/" || remote == "." {

@@ -243,9 +243,29 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                           leading: Icon(isDir ? Icons.folder : Icons.insert_drive_file_outlined),
                           title: Text(name),
                           subtitle: Text('${e['mode'] ?? ''} · ${e['size'] ?? 0}', style: const TextStyle(fontSize: 11)),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 18),
-                            onPressed: () => _delete(p, isDir),
+                          trailing: PopupMenuButton<String>(
+                            onSelected: (a) async {
+                              if (a == 'open') {
+                                if (isDir) {
+                                  setState(() => path = p);
+                                  _load();
+                                } else {
+                                  await _openFile(p);
+                                }
+                              } else if (a == 'rename') {
+                                await _rename(p, name, isDir);
+                              } else if (a == 'download') {
+                                await _download(p);
+                              } else if (a == 'delete') {
+                                await _delete(p, isDir);
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              PopupMenuItem(value: 'open', child: Text(isDir ? '打开' : '查看/编辑')),
+                              const PopupMenuItem(value: 'rename', child: Text('重命名')),
+                              if (!isDir) const PopupMenuItem(value: 'download', child: Text('下载到本机')),
+                              const PopupMenuItem(value: 'delete', child: Text('删除')),
+                            ],
                           ),
                           onTap: () {
                             if (isDir) {

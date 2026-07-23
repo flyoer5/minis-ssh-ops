@@ -63,6 +63,48 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     }
   }
 
+  Future<void> _showSessions(AppState state) async {
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) {
+        final list = state.agentSessions;
+        if (list.isEmpty) {
+          return const SafeArea(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('暂无历史会话（点新会话会归档当前对话）'),
+            ),
+          );
+        }
+        return SafeArea(
+          child: ListView.builder(
+            itemCount: list.length,
+            itemBuilder: (_, i) {
+              final s = list[i];
+              return ListTile(
+                title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text('${s.messages.length} 条'),
+                onTap: () {
+                  state.openAgentSession(s);
+                  Navigator.pop(c);
+                },
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () {
+                    state.deleteAgentSession(s.id);
+                    Navigator.pop(c);
+                  },
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -74,11 +116,31 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
           style: const TextStyle(fontSize: 15),
         ),
         actions: [
-          if (state.agentMessages.isNotEmpty)
-            IconButton(
-              onPressed: _busy ? null : () => state.clearAgentChat(),
-              icon: const Icon(Icons.add_comment_outlined, size: 20),
+          if (_busy || state.agentBusy)
+            TextButton(
+              onPressed: () {
+                state.cancelAgentChat();
+                setState(() => _busy = false);
+              },
+              child: const Text('取消'),
             ),
+          IconButton(
+            tooltip: '历史会话',
+            onPressed: () => _showSessions(state),
+            icon: const Icon(Icons.history, size: 20),
+          ),
+          IconButton(
+            tooltip: '新会话',
+            onPressed: (_busy || state.agentBusy)
+                ? null
+                : () {
+                    state.clearAgentChat();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已开新会话'), duration: Duration(seconds: 1)),
+                    );
+                  },
+            icon: const Icon(Icons.add_comment_outlined, size: 20),
+          ),
         ],
       ),
       body: Column(

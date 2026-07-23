@@ -114,27 +114,140 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                         summary: _summary[id],
                         onSelect: () => state.selectHost(id),
                         onRefresh: () => _refreshProbe(state, id, force: true),
-                        onDelete: () async {
-                          final ok = await showDialog<bool>(
-                            context: context,
-                            builder: (c) => AlertDialog(
-                              title: Text('删除 $name？'),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-                                TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('删除')),
-                              ],
-                            ),
-                          );
-                          if (ok == true) {
-                            await state.removeHost(id);
-                            setState(() => _summary.remove(id));
-                          }
-                        },
+                        onMenu: () => _hostMenu(context, state, h),
                       );
                     },
                   ),
                 ),
     );
+  }
+
+  Future<void> _hostMenu(BuildContext context, AppState state, Map<String, dynamic> h) async {
+    final id = h['id'] as String;
+    final name = (h['name'] as String?)?.isNotEmpty == true ? h['name'] as String : '${h['host']}';
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('编辑'),
+              onTap: () => Navigator.pop(c, 'edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.refresh),
+              title: const Text('刷新状态'),
+              onTap: () => Navigator.pop(c, 'probe'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Color(0xFFF85149)),
+              title: const Text('删除', style: TextStyle(color: Color(0xFFF85149))),
+              onTap: () => Navigator.pop(c, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    if (action == 'probe') {
+      await _refreshProbe(state, id, force: true);
+      return;
+    }
+    if (action == 'edit') {
+      await _showEdit(context, state, h);
+      return;
+    }
+    if (action == 'delete') {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text('删除 $name？'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('删除')),
+          ],
+        ),
+      );
+      if (ok == true) {
+        await state.removeHost(id);
+        setState(() => _summary.remove(id));
+      }
+    }
+  }
+
+  Future<void> _showEdit(BuildContext context, AppState state, Map<String, dynamic> h) async {
+    final id = h['id'] as String;
+    final name = TextEditingController(text: (h['name'] as String?) ?? '');
+    final host = TextEditingController(text: (h['host'] as String?) ?? '');
+    final port = TextEditingController(text: '${h['port'] ?? 22}');
+    final user = TextEditingController(text: (h['username'] as String?) ?? 'root');
+    final password = TextEditingController();
+    final form = GlobalKey<FormState>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('编辑主机'),
+        content: Form(
+          key: form,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(controller: name, decoration: const InputDecoration(labelText: '名称')),
+                TextFormField(
+                  controller: host,
+                  decoration: const InputDecoration(labelText: '地址'),
+                  validator: (v) => v == null || v.isEmpty ? '必填' : null,
+                ),
+                TextFormField(
+                  controller: port,
+                  decoration: const InputDecoration(labelText: '端口'),
+                  keyboardType: TextInputType.number,
+                ),
+                TextFormField(controller: user, decoration: const InputDecoration(labelText: '用户')),
+                TextFormField(
+                  controller: password,
+                  decoration: const InputDecoration(labelText: '密码（留空不改）'),
+                  obscureText: true,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState?.validate() != true) return;
+              Navigator.pop(c, true);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final body = <String, dynamic>{
+      'name': name.text.trim(),
+      'host': host.text.trim(),
+      'port': int.tryParse(port.text.trim()) ?? 22,
+      'username': user.text.trim(),
+      if (password.text.isNotEmpty) 'password': password.text,
+    };
+    try {
+      await state.updateHost(id, body);
+      await _refreshProbe(state, id, force: true);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
   }
 
   Future<void> _showAdd(BuildContext context, AppState state) async {
@@ -208,7 +321,7 @@ class _StatusCard extends StatelessWidget {
   final ProbeSummary? summary;
   final VoidCallback onSelect;
   final VoidCallback onRefresh;
-  final VoidCallback onDelete;
+  final VoidCallback onMenu;
 
   const _StatusCard({
     required this.name,
@@ -218,7 +331,7 @@ class _StatusCard extends StatelessWidget {
     required this.summary,
     required this.onSelect,
     required this.onRefresh,
-    required this.onDelete,
+    required this.onMenu,
   });
 
   Color get _dot {
@@ -253,7 +366,7 @@ class _StatusCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onSelect,
-        onLongPress: onDelete,
+        onLongPress: onMenu,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
           child: Column(
