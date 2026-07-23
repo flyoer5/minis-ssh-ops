@@ -368,6 +368,16 @@ class _TerminalPageState extends State<TerminalPage>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
+                      tooltip: '减小字体',
+                      icon: const Icon(Icons.text_decrease, size: 18),
+                      onPressed: () => context.read<AppState>().setTermFontSize(state.termFontSize - 1),
+                    ),
+                    IconButton(
+                      tooltip: '增大字体',
+                      icon: const Icon(Icons.text_increase, size: 18),
+                      onPressed: () => context.read<AppState>().setTermFontSize(state.termFontSize + 1),
+                    ),
+                    IconButton(
                       tooltip: _focus.hasFocus ? '收起键盘' : '打开键盘',
                       icon: Icon(
                         _focus.hasFocus ? Icons.keyboard_hide : Icons.keyboard,
@@ -420,10 +430,10 @@ class _TerminalPageState extends State<TerminalPage>
                             _buf.isEmpty
                                 ? (_connecting ? 'connecting…\n' : 'tap to type\n')
                                 : _buf.toString(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: _fg,
                               fontFamily: 'monospace',
-                              fontSize: 13,
+                              fontSize: fontSize,
                               height: 1.28,
                             ),
                           ),

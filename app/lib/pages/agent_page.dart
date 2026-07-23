@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
@@ -346,43 +347,102 @@ class _Bubble extends StatelessWidget {
     if (msg.kind == ChatKind.plan) {
       return _ConfirmPlanCard(msg: msg);
     }
-    if (msg.kind == ChatKind.status) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(
-          '› ${msg.content}',
-          style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E), fontFamily: 'monospace'),
+
+    final isUser = msg.role == 'user';
+    final isTool = msg.role == 'tool' || msg.kind == ChatKind.stepResult || msg.kind == ChatKind.status;
+    final isErr = msg.kind == ChatKind.error;
+
+    if (isUser) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10, left: 36),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1F6FEB),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: SelectableText(msg.content, style: const TextStyle(height: 1.35, color: Colors.white)),
         ),
       );
     }
-    if (msg.kind == ChatKind.stepResult) {
-      return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF161B22),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF30363D)),
-        ),
-        child: SelectableText(
-          msg.content,
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.35, color: Color(0xFFC9D1D9)),
-        ),
-      );
+
+    // Minis-like: left rail + block
+    Color rail = const Color(0xFF3FB950);
+    Color bg = const Color(0xFF161B22);
+    String tag = 'assistant';
+    if (isErr) {
+      rail = const Color(0xFFF85149);
+      tag = 'error';
+    } else if (msg.kind == ChatKind.status) {
+      rail = const Color(0xFFD29922);
+      tag = 'status';
+      bg = const Color(0xFF1C1912);
+    } else if (isTool || msg.kind == ChatKind.stepResult) {
+      rail = const Color(0xFF79C0FF);
+      tag = 'tool';
+      bg = const Color(0xFF0D1117);
     }
-    final user = msg.role == 'user';
-    return Align(
-      alignment: user ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.9),
-        decoration: BoxDecoration(
-          color: user ? const Color(0xFF1F6FEB) : const Color(0xFF21262D),
-          borderRadius: BorderRadius.circular(14),
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF30363D)),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: rail,
+                borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(tag, style: TextStyle(fontSize: 11, color: rail, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
+                        const Spacer(),
+                        if (msg.content.trim().isNotEmpty)
+                          InkWell(
+                            onTap: () async {
+                              await Clipboard.setData(ClipboardData(text: msg.content));
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
+                                );
+                              }
+                            },
+                            child: const Icon(Icons.copy, size: 14, color: Color(0xFF8B949E)),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    SelectableText(
+                      msg.content,
+                      style: TextStyle(
+                        height: 1.4,
+                        fontSize: isTool ? 12.5 : 14,
+                        fontFamily: isTool ? 'monospace' : null,
+                        color: isErr ? const Color(0xFFFFB4A9) : const Color(0xFFE6EDF3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-        child: SelectableText(msg.content, style: const TextStyle(fontSize: 15, height: 1.35)),
       ),
     );
   }

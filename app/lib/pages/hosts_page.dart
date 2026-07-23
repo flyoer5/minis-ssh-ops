@@ -346,47 +346,74 @@ class _StatusCard extends StatelessWidget {
       if (l.label == label) {
         final t = l.value.trim();
         if (t.isEmpty || t == '-') return '—';
-        return t.length > 28 ? '${t.substring(0, 28)}…' : t;
+        return t;
       }
     }
     return '—';
   }
 
+  String _short(String s, int n) {
+    final t = s.trim();
+    if (t.length <= n) return t;
+    return '${t.substring(0, n)}…';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final sys = _short(_v('系统'), 42);
+    final load = _short(_v('负载'), 18);
+    final disk = _short(_v('磁盘'), 18);
+    final mem = _short(_v('内存'), 18);
+    final up = _short(_v('运行'), 18);
+
     return Material(
-      color: selected ? const Color(0xFF161B22) : const Color(0xFF0D1117),
+      color: const Color(0xFF11161D),
+      elevation: selected ? 2 : 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: selected ? const Color(0xFF2F81F7) : const Color(0xFF30363D),
-          width: selected ? 1.5 : 1,
+          color: selected ? const Color(0xFF388BFD) : const Color(0xFF2A313C),
+          width: selected ? 1.4 : 1,
         ),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: onSelect,
         onLongPress: onMenu,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Container(width: 8, height: 8, decoration: BoxDecoration(color: _dot, shape: BoxShape.circle)),
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: _dot,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: _dot.withOpacity(0.45), blurRadius: 6, spread: 1),
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
+                        const SizedBox(height: 2),
                         Text(addr, style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E), fontFamily: 'monospace')),
                       ],
                     ),
                   ),
                   if (loading)
-                    const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    const Padding(
+                      padding: EdgeInsets.only(right: 10),
+                      child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
                   else ...[
                     IconButton(
                       visualDensity: VisualDensity.compact,
@@ -404,17 +431,28 @@ class _StatusCard extends StatelessWidget {
               const SizedBox(height: 10),
               if (summary == null && !loading)
                 const Text('下拉或点同步刷新状态', style: TextStyle(fontSize: 12, color: Color(0xFF6E7681)))
-              else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+              else ...[
+                if (sys != '—')
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(sys, style: const TextStyle(fontSize: 12, color: Color(0xFFC9D1D9), fontFamily: 'monospace', height: 1.3)),
+                  ),
+                Row(
                   children: [
-                    _chip(Icons.memory, '负载', _v('负载')),
-                    _chip(Icons.storage_outlined, '磁盘', _v('磁盘')),
-                    _chip(Icons.sd_card_outlined, '内存', _v('内存')),
-                    _chip(Icons.schedule, '运行', _v('运行')),
+                    Expanded(child: _metric('负载', load, const Color(0xFF79C0FF))),
+                    const SizedBox(width: 8),
+                    Expanded(child: _metric('磁盘', disk, const Color(0xFFD2A8FF))),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _metric('内存', mem, const Color(0xFF7EE787))),
+                    const SizedBox(width: 8),
+                    Expanded(child: _metric('运行', up, const Color(0xFFFFA657))),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -422,27 +460,24 @@ class _StatusCard extends StatelessWidget {
     );
   }
 
-  Widget _chip(IconData icon, String k, String v) {
+  Widget _metric(String k, String v, Color accent) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF21262D),
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFF161B22),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF30363D)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 14, color: const Color(0xFF8B949E)),
-          const SizedBox(width: 6),
-          Text(k, style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E))),
-          const SizedBox(width: 6),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 120),
-            child: Text(
-              v,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'monospace'),
-            ),
+          Text(k, style: TextStyle(fontSize: 11, color: accent.withOpacity(0.9), fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text(
+            v,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, fontFamily: 'monospace'),
           ),
         ],
       ),
