@@ -16,6 +16,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   final _scroll = ScrollController();
   final _focus = FocusNode();
   bool _busy = false;
+  bool _onlyCurrentHost = true;
 
   @override
   bool get wantKeepAlive => true;
