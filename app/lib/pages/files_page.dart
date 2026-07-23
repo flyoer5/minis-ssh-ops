@@ -289,15 +289,39 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
         children: [
           Material(
             color: const Color(0xFF161B22),
-            child: ListTile(
-              dense: true,
-              title: Text(
-                path.isEmpty ? '~' : path,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-              ),
-              subtitle: Text(state.hostLabel, style: const TextStyle(fontSize: 11)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  dense: true,
+                  title: Text(
+                    path.isEmpty ? '~' : path,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                  ),
+                  subtitle: Text(state.hostLabel, style: const TextStyle(fontSize: 11)),
+                ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  child: Row(
+                    children: [
+                      for (final b in const ['', '/etc', '/var/log', '/tmp', '/home'])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ActionChip(
+                            label: Text(b.isEmpty ? '~' : b, style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+                            onPressed: () {
+                              setState(() => path = b);
+                              _load();
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
           if (err != null)

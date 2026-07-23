@@ -176,6 +176,15 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             child: const Text('打开电池优化列表'),
           ),
           const Divider(height: 28),
+          Text('Agent', style: Theme.of(context).textTheme.titleMedium),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('写操作需确认'),
+            subtitle: const Text('开启后，Agent 的写/破坏类命令需点运行'),
+            value: state.confirmWrites,
+            onChanged: (v) => state.setConfirmWrites(v),
+          ),
+          const Divider(height: 28),
           Text('终端', style: Theme.of(context).textTheme.titleMedium),
           Row(
             children: [

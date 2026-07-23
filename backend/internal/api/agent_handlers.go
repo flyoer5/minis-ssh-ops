@@ -101,9 +101,10 @@ type planBody struct {
 }
 
 type chatBody struct {
-	HostID    string `json:"hostId"`
-	Message   string `json:"message"`
-	SessionID string `json:"sessionId"`
+	HostID         string `json:"hostId"`
+	Message        string `json:"message"`
+	SessionID      string `json:"sessionId"`
+	ConfirmWrites  bool   `json:"confirmWrites"`
 }
 
 // handleAgentChat: OpenClaw-style multi-turn tool loop (model decides tools).
@@ -183,6 +184,13 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 					Risk: string(lvl), Confirmed: false, ExitCode: -1, Stderr: "blocked",
 				})
 				return "", fmt.Errorf("blocked by policy: %s", cmd)
+			}
+			if body.ConfirmWrites && (lvl == risk.Write || lvl == risk.Destructive) {
+				_ = s.Store.AddAudit(&store.AuditEntry{
+					HostID: body.HostID, SessionID: body.SessionID, Command: cmd,
+					Risk: string(lvl), Confirmed: false, ExitCode: -1, Stderr: "needs_confirm",
+				})
+				return "", fmt.Errorf("NEEDS_CONFIRM:%s:%s", lvl, cmd)
 			}
 			res, err := s.runSSH(body.HostID, cmd)
 			if err != nil {
@@ -313,6 +321,13 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 					Risk: string(lvl), Confirmed: false, ExitCode: -1, Stderr: "blocked",
 				})
 				return "", fmt.Errorf("blocked by policy: %s", cmd)
+			}
+			if body.ConfirmWrites && (lvl == risk.Write || lvl == risk.Destructive) {
+				_ = s.Store.AddAudit(&store.AuditEntry{
+					HostID: body.HostID, SessionID: body.SessionID, Command: cmd,
+					Risk: string(lvl), Confirmed: false, ExitCode: -1, Stderr: "needs_confirm",
+				})
+				return "", fmt.Errorf("NEEDS_CONFIRM:%s:%s", lvl, cmd)
 			}
 			res, err := s.runSSH(body.HostID, cmd)
 			if err != nil {

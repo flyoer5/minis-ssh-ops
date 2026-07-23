@@ -128,6 +128,7 @@ class ApiClient {
     required String hostId,
     required String message,
     String? sessionId,
+    bool confirmWrites = false,
   }) async {
     final r = await http
         .post(
@@ -137,6 +138,7 @@ class ApiClient {
             'hostId': hostId,
             'message': message,
             if (sessionId != null) 'sessionId': sessionId,
+            'confirmWrites': confirmWrites,
           }),
         )
         .timeout(const Duration(seconds: 180));
@@ -158,6 +160,7 @@ class ApiClient {
     required String hostId,
     required String message,
     String? sessionId,
+    bool confirmWrites = false,
     required void Function(Map<String, dynamic> event) onEvent,
   }) async {
     cancelAgentStream();
@@ -170,6 +173,7 @@ class ApiClient {
         'hostId': hostId,
         'message': message,
         if (sessionId != null) 'sessionId': sessionId,
+        'confirmWrites': confirmWrites,
       });
       final res = await client.send(req).timeout(const Duration(seconds: 180));
       if (res.statusCode >= 400) {

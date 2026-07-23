@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ssh_ai_agent/api/client.dart';
@@ -99,6 +100,8 @@ class AppState extends ChangeNotifier {
     termFontSize = prefs.getDouble('termFontSize') ?? 13;
     selectedHostId = prefs.getString('selectedHostId') ?? selectedHostId;
     onboarded = prefs.getBool('onboarded') ?? false;
+    confirmWrites = prefs.getBool('confirmWrites') ?? false;
+    _loadSessionsFromPrefs(prefs);
 
     if (NativeBackend.isAndroidNative) {
       Object? lastErr;
@@ -382,6 +385,7 @@ class AppState extends ChangeNotifier {
     agentSessionId = null;
     _lastPlanMsgIndex = null;
     notifyListeners();
+    _saveSessionsToPrefs();
   }
 
   String _sessionTitleFromMessages(List<ChatMessage> msgs) {
@@ -425,17 +429,80 @@ class AppState extends ChangeNotifier {
     stepOutputs.clear();
     _lastPlanMsgIndex = null;
     notifyListeners();
+    _saveSessionsToPrefs();
   }
 
   void deleteAgentSession(String id) {
     agentSessions.removeWhere((e) => e.id == id);
     notifyListeners();
+    _saveSessionsToPrefs();
   }
 
   void cancelAgentChat() {
     api.cancelAgentStream();
     agentBusy = false;
     _pushMsg(ChatMessage(role: 'assistant', content: '已取消', kind: ChatKind.status));
+    notifyListeners();
+  }
+
+
+  void _loadSessionsFromPrefs(SharedPreferences prefs) {
+    final raw = prefs.getString('agentSessionsJson');
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final list = jsonDecode(raw);
+      if (list is! List) return;
+      agentSessions.clear();
+      for (final e in list) {
+        if (e is! Map) continue;
+        final msgs = <ChatMessage>[];
+        final ml = e['messages'];
+        if (ml is List) {
+          for (final m in ml) {
+            if (m is! Map) continue;
+            final kindStr = m['kind']?.toString() ?? 'text';
+            var kind = ChatKind.text;
+            for (final k in ChatKind.values) {
+              if (k.name == kindStr) kind = k;
+            }
+            msgs.add(ChatMessage(
+              role: m['role']?.toString() ?? 'assistant',
+              content: m['content']?.toString() ?? '',
+              kind: kind,
+            ));
+          }
+        }
+        agentSessions.add(AgentSession(
+          id: e['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          title: e['title']?.toString() ?? '会话',
+          hostId: e['hostId']?.toString(),
+          messages: msgs,
+        ));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveSessionsToPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = <Map<String, dynamic>>[];
+    for (final s in agentSessions.take(20)) {
+      list.add({
+        'id': s.id,
+        'title': s.title,
+        'hostId': s.hostId,
+        'messages': [
+          for (final m in s.messages.take(80))
+            {'role': m.role, 'content': m.content, 'kind': m.kind.name},
+        ],
+      });
+    }
+    await prefs.setString('agentSessionsJson', jsonEncode(list));
+  }
+
+  Future<void> setConfirmWrites(bool v) async {
+    confirmWrites = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('confirmWrites', v);
     notifyListeners();
   }
 
@@ -464,6 +531,7 @@ class AppState extends ChangeNotifier {
           hostId: id,
           message: userText,
           sessionId: agentSessionId,
+          confirmWrites: confirmWrites,
           onEvent: (raw) {
             final type = raw['type']?.toString() ?? '';
             if (type == 'session') {
@@ -476,7 +544,7 @@ class AppState extends ChangeNotifier {
           },
         );
       } catch (_) {
-        final res = await api.agentChat(hostId: id, message: userText, sessionId: agentSessionId);
+        final res = await api.agentChat(hostId: id, message: userText, sessionId: agentSessionId, confirmWrites: confirmWrites);
         agentSessionId = res['sessionId'] as String? ?? agentSessionId;
         for (final raw in (res['events'] as List?) ?? []) {
           if (raw is Map) _ingestAgentEvent(Map<String, dynamic>.from(raw));
@@ -512,6 +580,32 @@ class AppState extends ChangeNotifier {
         meta: {'name': name, 'command': command},
       ));
     } else if (type == 'tool_result') {
+      if (content.startsWith('error: NEEDS_CONFIRM:') || content.startsWith('NEEDS_CONFIRM:')) {
+        final rest = content.replaceFirst('error: ', '').replaceFirst('NEEDS_CONFIRM:', '');
+        // risk:cmd
+        final colon = rest.indexOf(':');
+        final risk = colon > 0 ? rest.substring(0, colon) : 'write';
+        final cmd = colon > 0 ? rest.substring(colon + 1) : rest;
+        final step = {
+          'id': (lastPlan == null ? 1 : (((lastPlan!['steps'] as List?)?.length ?? 0) + 1)),
+          'title': '需确认',
+          'command': cmd,
+          'risk': risk,
+        };
+        final steps = <Map<String, dynamic>>[step];
+        if (lastPlan != null && lastPlan!['steps'] is List) {
+          steps.insertAll(0, [for (final e in (lastPlan!['steps'] as List)) if (e is Map) Map<String, dynamic>.from(e)]);
+        }
+        lastPlan = {'summary': '待确认', 'steps': steps};
+        agentMessages.add(ChatMessage(
+          role: 'assistant',
+          content: '待确认',
+          kind: ChatKind.plan,
+          meta: {'plan': lastPlan, 'outputs': <String, String>{}},
+        ));
+        _lastPlanMsgIndex = agentMessages.length - 1;
+        return;
+      }
       final head = command.isNotEmpty ? (r'$ ' + command + '\n') : (name.isNotEmpty ? (name + '\n') : '');
       _pushMsg(ChatMessage(
         role: 'tool',
