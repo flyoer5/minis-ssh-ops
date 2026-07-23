@@ -30,6 +30,9 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
   int focus = 0;
   String? hostId;
   bool dualPane = true;
+  /// name | size | mtime
+  String sortBy = 'name';
+  bool sortAsc = true;
 
   _Pane get active => focus == 0 ? _left : _right;
   _Pane get inactive => focus == 0 ? _right : _left;
@@ -61,14 +64,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     try {
       final r = await s.api.fsList(id, pane.path);
       final list = List<dynamic>.from((r['entries'] as List?) ?? []);
-      list.sort((a, b) {
-        final am = a as Map, bm = b as Map;
-        final ad = am['isDir'] == true, bd = bm['isDir'] == true;
-        if (ad != bd) return ad ? -1 : 1;
-        return (am['name']?.toString() ?? '')
-            .toLowerCase()
-            .compareTo((bm['name']?.toString() ?? '').toLowerCase());
-      });
+      _sortEntries(list);
       setState(() {
         pane.entries = list;
         final rp = r['path']?.toString();
@@ -92,6 +88,92 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
   void _go(_Pane pane, String p) {
     setState(() => pane.path = p);
     _load(pane);
+  }
+
+  void _sortEntries(List<dynamic> list) {
+    int cmp(dynamic a, dynamic b) {
+      final am = a as Map, bm = b as Map;
+      final ad = am['isDir'] == true, bd = bm['isDir'] == true;
+      if (ad != bd) return ad ? -1 : 1; // dirs first always
+      int c = 0;
+      switch (sortBy) {
+        case 'size':
+          final asz = (am['size'] as num?)?.toInt() ?? 0;
+          final bsz = (bm['size'] as num?)?.toInt() ?? 0;
+          c = asz.compareTo(bsz);
+          break;
+        case 'mtime':
+          final at = am['modTime']?.toString() ?? am['mtime']?.toString() ?? am['time']?.toString() ?? '';
+          final bt = bm['modTime']?.toString() ?? bm['mtime']?.toString() ?? bm['time']?.toString() ?? '';
+          c = at.compareTo(bt);
+          break;
+        case 'name':
+        default:
+          c = (am['name']?.toString() ?? '').toLowerCase().compareTo((bm['name']?.toString() ?? '').toLowerCase());
+      }
+      if (c == 0) {
+        c = (am['name']?.toString() ?? '').toLowerCase().compareTo((bm['name']?.toString() ?? '').toLowerCase());
+      }
+      return sortAsc ? c : -c;
+    }
+
+    list.sort(cmp);
+  }
+
+  void _resortOpenPanes() {
+    setState(() {
+      _sortEntries(_left.entries);
+      _sortEntries(_right.entries);
+    });
+  }
+
+  Future<void> _pickSort() async {
+    final a = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(sortBy == 'name' ? Icons.check : null, size: 18),
+              title: const Text('按名称'),
+              onTap: () => Navigator.pop(c, 'name'),
+            ),
+            ListTile(
+              leading: Icon(sortBy == 'size' ? Icons.check : null, size: 18),
+              title: const Text('按大小'),
+              onTap: () => Navigator.pop(c, 'size'),
+            ),
+            ListTile(
+              leading: Icon(sortBy == 'mtime' ? Icons.check : null, size: 18),
+              title: const Text('按修改时间'),
+              onTap: () => Navigator.pop(c, 'mtime'),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: Icon(sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 18),
+              title: Text(sortAsc ? '当前：升序（点此改降序）' : '当前：降序（点此改升序）'),
+              onTap: () => Navigator.pop(c, 'toggle'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (a == null) return;
+    setState(() {
+      if (a == 'toggle') {
+        sortAsc = !sortAsc;
+      } else {
+        if (sortBy == a) {
+          sortAsc = !sortAsc;
+        } else {
+          sortBy = a;
+          sortAsc = true;
+        }
+      }
+    });
+    _resortOpenPanes();
   }
 
   Future<void> _openFile(String p) async {
@@ -711,33 +793,80 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
             ),
           ]
         : [
-            IconButton(tooltip: '新建文件夹', onPressed: _mkdir, icon: const Icon(Icons.create_new_folder_outlined, size: 20)),
-            IconButton(tooltip: '新建文件', onPressed: _newFile, icon: const Icon(Icons.note_add_outlined, size: 20)),
-            IconButton(tooltip: '多选', onPressed: () => setState(() => active.selecting = true), icon: const Icon(Icons.checklist, size: 20)),
+            // Primary actions (keep sparse)
+            IconButton(
+              tooltip: '新建',
+              onPressed: () async {
+                final a = await showModalBottomSheet<String>(
+                  context: context,
+                  backgroundColor: const Color(0xFF1E1E1E),
+                  builder: (c) => SafeArea(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.create_new_folder_outlined),
+                          title: const Text('新建文件夹'),
+                          onTap: () => Navigator.pop(c, 'dir'),
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.note_add_outlined),
+                          title: const Text('新建文件'),
+                          onTap: () => Navigator.pop(c, 'file'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+                if (a == 'dir') await _mkdir();
+                if (a == 'file') await _newFile();
+              },
+              icon: const Icon(Icons.add, size: 22),
+            ),
+            IconButton(
+              tooltip: '多选',
+              onPressed: () => setState(() => active.selecting = true),
+              icon: const Icon(Icons.checklist, size: 20),
+            ),
             IconButton(
               tooltip: dualPane ? '单栏' : '双栏',
               onPressed: () => setState(() => dualPane = !dualPane),
               icon: Icon(dualPane ? Icons.view_agenda_outlined : Icons.view_column_outlined, size: 20),
             ),
             IconButton(
-              tooltip: '切换焦点栏',
-              onPressed: dualPane ? () => setState(() => focus = 1 - focus) : null,
-              icon: const Icon(Icons.swap_horiz, size: 20),
-            ),
-            IconButton(
-              tooltip: '刷新当前栏',
+              tooltip: '刷新',
               onPressed: active.loading ? null : () => _load(active),
               icon: const Icon(Icons.refresh, size: 20),
             ),
-            IconButton(
-              tooltip: '交换左右路径',
-              onPressed: dualPane ? swapPanes : null,
-              icon: const Icon(Icons.swap_vert, size: 20),
-            ),
-            IconButton(
-              tooltip: '回到 /',
-              onPressed: () => _go(active, '/'),
-              icon: const Icon(Icons.home_outlined, size: 20),
+            PopupMenuButton<String>(
+              tooltip: '更多',
+              icon: const Icon(Icons.more_vert, size: 20),
+              color: const Color(0xFF1E1E1E),
+              onSelected: (v) {
+                switch (v) {
+                  case 'focus':
+                    if (dualPane) setState(() => focus = 1 - focus);
+                    break;
+                  case 'swap':
+                    if (dualPane) swapPanes();
+                    break;
+                  case 'root':
+                    _go(active, '/');
+                    break;
+                  case 'sort':
+                    _pickSort();
+                    break;
+                }
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'sort',
+                  child: Text('排序 · ${sortBy == 'name' ? '名称' : sortBy == 'size' ? '大小' : '时间'}${sortAsc ? '↑' : '↓'}'),
+                ),
+                if (dualPane) const PopupMenuItem(value: 'focus', child: Text('切换焦点栏')),
+                if (dualPane) const PopupMenuItem(value: 'swap', child: Text('交换左右路径')),
+                const PopupMenuItem(value: 'root', child: Text('回到 /')),
+              ],
             ),
           ];
 
@@ -745,7 +874,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
-        toolbarHeight: 48,
+        toolbarHeight: 44,
         titleSpacing: 8,
         title: Text(
           active.selecting

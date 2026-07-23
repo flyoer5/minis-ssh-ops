@@ -1,3 +1,7 @@
+## 1.4.12
+
+- D: files top bar compact + sort; plan card font; friendly probe errors
+
 ## 1.4.11
 
 - A: server fs/move (rename or copy+delete)

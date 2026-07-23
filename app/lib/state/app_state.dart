@@ -1114,10 +1114,63 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return summary;
     } catch (e) {
-      lastExecOutput = '探测失败: $e';
+      final friendly = friendlyProbeError(e);
+      lastExecOutput = '探测失败: ${friendly['short']}\n${friendly['detail']}';
+      final summary = ProbeSummary(
+        ok: false,
+        oneLine: friendly['short']!,
+        lines: [
+          ProbeLine('错误', friendly['short']!),
+          if ((friendly['detail'] ?? '').isNotEmpty) ProbeLine('详情', friendly['detail']!),
+        ],
+        detail: e.toString(),
+      );
+      // do not cache failures as success; still return for UI
       notifyListeners();
-      rethrow;
+      return summary;
     }
+  }
+
+  /// Map probe exceptions to short Chinese labels for host cards.
+  Map<String, String> friendlyProbeError(Object e) {
+    final raw = e.toString();
+    final s = raw.toLowerCase();
+    String short;
+    if (s.contains('timeout') || s.contains('deadline') || s.contains('timed out')) {
+      short = '超时';
+    } else if (s.contains('auth') ||
+        s.contains('password') ||
+        s.contains('permission denied') ||
+        s.contains('unable to authenticate') ||
+        s.contains('handshake failed') ||
+        s.contains('publickey') ||
+        s.contains('keyboard-interactive')) {
+      short = '认证失败';
+    } else if (s.contains('connection refused')) {
+      short = '连接拒绝';
+    } else if (s.contains('no route') ||
+        s.contains('network is unreachable') ||
+        s.contains('network unreachable') ||
+        s.contains('host is down')) {
+      short = '网络不可达';
+    } else if (s.contains('connection reset') || s.contains('broken pipe')) {
+      short = '连接中断';
+    } else if (s.contains('unknown host') ||
+        s.contains('no such host') ||
+        s.contains('name or service not known') ||
+        s.contains('temporary failure in name resolution') ||
+        s.contains('failed host lookup')) {
+      short = '域名解析失败';
+    } else if (s.contains('host key') || s.contains('hostkey') || s.contains('tofu')) {
+      short = 'HostKey 异常';
+    } else if (s.contains('socketexception')) {
+      short = '无法连接';
+    } else {
+      short = '探测失败';
+    }
+    var detail = raw.replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
+    if (detail.length > 120) detail = '${detail.substring(0, 120)}…';
+    return {'short': short, 'detail': detail};
   }
 
   Future<List<String>> fetchModels() async {

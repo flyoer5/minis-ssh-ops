@@ -311,7 +311,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
 
 class _ConfirmPlanCard extends StatelessWidget {
   final ChatMessage msg;
-  const _ConfirmPlanCard({required this.msg});
+  final double fontSize;
+  const _ConfirmPlanCard({required this.msg, this.fontSize = 15});
 
   @override
   Widget build(BuildContext context) {
@@ -320,10 +321,11 @@ class _ConfirmPlanCard extends StatelessWidget {
     final steps = plan is Map ? (plan['steps'] as List?) ?? [] : <dynamic>[];
     final outputs = (msg.meta?['outputs'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {};
     if (steps.isEmpty) return const SizedBox.shrink();
+    final fs = fontSize;
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
         color: const Color(0xFF161B22),
         borderRadius: BorderRadius.circular(10),
@@ -332,8 +334,8 @@ class _ConfirmPlanCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('需要确认的命令', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFD29922))),
-          const SizedBox(height: 8),
+          Text('需要确认的命令', style: TextStyle(fontWeight: FontWeight.w700, fontSize: fs - 2, color: const Color(0xFFD29922))),
+          const SizedBox(height: 6),
           for (final raw in steps)
             if (raw is Map)
               Builder(
@@ -344,18 +346,22 @@ class _ConfirmPlanCard extends StatelessWidget {
                   final risk = raw['risk']?.toString() ?? 'write';
                   final out = outputs['step_$stepId'];
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 6),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('[$risk] $cmd', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                        Text('[$risk] $cmd', style: TextStyle(fontFamily: 'monospace', fontSize: fs - 3, color: const Color(0xFFC9D1D9))),
                         if (out != null) ...[
-                          const SizedBox(height: 4),
-                          Text(out, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF8B949E))),
+                          const SizedBox(height: 3),
+                          Text(out, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 4, color: const Color(0xFF8B949E))),
                         ] else
                           Align(
                             alignment: Alignment.centerRight,
                             child: FilledButton(
+                              style: FilledButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              ),
                               onPressed: () async {
                                 try {
                                   await state.runAgentStep(stepId: stepId, command: cmd, confirmed: true);
@@ -365,7 +371,7 @@ class _ConfirmPlanCard extends StatelessWidget {
                                   }
                                 }
                               },
-                              child: const Text('运行'),
+                              child: Text('运行', style: TextStyle(fontSize: fs - 3)),
                             ),
                           ),
                       ],
@@ -408,7 +414,7 @@ class _Bubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final fs = fontSize;
     if (msg.kind == ChatKind.plan) {
-      return _ConfirmPlanCard(msg: msg);
+      return _ConfirmPlanCard(msg: msg, fontSize: fs);
     }
 
     final isUser = msg.role == 'user';

@@ -53,14 +53,18 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     try {
       final s = await state.runProbeSummary(id, force);
       if (mounted) setState(() => _summary[id] = s);
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
+        final f = state.friendlyProbeError(e);
         setState(() {
           _summary[id] = ProbeSummary(
             ok: false,
-            oneLine: '离线',
-            lines: [ProbeLine('状态', '探测失败')],
-            detail: '',
+            oneLine: f['short']!,
+            lines: [
+              ProbeLine('错误', f['short']!),
+              if ((f['detail'] ?? '').isNotEmpty) ProbeLine('详情', f['detail']!),
+            ],
+            detail: '$e',
           );
         });
       }
@@ -466,7 +470,11 @@ class _StatusCard extends StatelessWidget {
   String get _statusText {
     if (loading) return '探测中';
     if (summary == null) return '未探测';
-    return summary!.ok ? 'Online' : 'Offline';
+    if (summary!.ok) return 'Online';
+    // prefer short friendly oneLine (超时/认证失败/…) over generic Offline
+    final o = summary!.oneLine.trim();
+    if (o.isNotEmpty && o != '离线' && o != '—') return o;
+    return 'Offline';
   }
 
   @override
