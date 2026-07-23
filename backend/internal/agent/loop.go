@@ -13,7 +13,7 @@ import (
 )
 
 // Matches <think>…</think>, <thinking>…</thinking>, <reasoning>…</reasoning>.
-var thinkTagRe = regexp.MustCompile(`(?is)<(think|thinking|reasoning)>(.*?)</\1>`)
+var thinkTagRe = regexp.MustCompile(`(?is)<think>(.*?)</think>|<thinking>(.*?)</thinking>|<reasoning>(.*?)</reasoning>`)
 
 // OpenClaw-style tools (Minis-like short descriptions).
 var defaultTools = []map[string]any{
@@ -303,10 +303,11 @@ func splitThinkTags(content string) (clean string, reason string) {
 	var reasons []string
 	clean = thinkTagRe.ReplaceAllStringFunc(content, func(m string) string {
 		sub := thinkTagRe.FindStringSubmatch(m)
-		if len(sub) >= 3 {
-			inner := strings.TrimSpace(sub[2])
+		for i := 1; i < len(sub); i++ {
+			inner := strings.TrimSpace(sub[i])
 			if inner != "" {
 				reasons = append(reasons, inner)
+				break
 			}
 		}
 		return ""
