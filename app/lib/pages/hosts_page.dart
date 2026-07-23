@@ -394,7 +394,7 @@ class _StatusCard extends StatelessWidget {
                       color: _dot,
                       shape: BoxShape.circle,
                       boxShadow: [
-                        BoxShadow(color: _dot.withOpacity(0.45), blurRadius: 6, spread: 1),
+                        BoxShadow(color: _dot.withAlpha(0x73), blurRadius: 6, spreadRadius: 1),
                       ],
                     ),
                   ),
@@ -471,7 +471,7 @@ class _StatusCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(k, style: TextStyle(fontSize: 11, color: accent.withOpacity(0.9), fontWeight: FontWeight.w600)),
+          Text(k, style: TextStyle(fontSize: 11, color: accent.withAlpha(0xE6), fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
           Text(
             v,
