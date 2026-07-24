@@ -26,13 +26,16 @@ class ProbeSummary {
         final e = (v['stderr'] ?? '').toString().trim();
         if (s.isNotEmpty) return s;
         if (e.isNotEmpty) return e;
-        // Empty stdout/stderr: missing data → '-' so ok stays false for uname.
-        // Only surface exit code when non-zero (real command failure without body).
+        // Empty stdout/stderr: missing data → '-'.
+        // Non-zero exit without body → 错误: so hasErr / offline detection works.
         final code = v['exitCode'];
-        if (code is int && code != 0) return 'exit $code';
-        if (code != null && code.toString() != '0' && code.toString().isNotEmpty && code.toString() != 'null') {
-          return 'exit $code';
+        int? n;
+        if (code is int) {
+          n = code;
+        } else if (code != null) {
+          n = int.tryParse(code.toString());
         }
+        if (n != null && n != 0) return '错误: exit $n';
         return '-';
       }
       if (v == null) return '-';
