@@ -8,6 +8,7 @@ import 'package:ssh_ai_agent/pages/records_page.dart';
 import 'package:ssh_ai_agent/pages/settings_page.dart';
 import 'package:ssh_ai_agent/pages/terminal_page.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
+import 'package:ssh_ai_agent/theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,11 +24,7 @@ class SshAiAgentApp extends StatelessWidget {
       create: (_) => AppState(ApiClient())..bootstrap(),
       child: MaterialApp(
         title: 'SSH AI Agent',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2F81F7), brightness: Brightness.dark),
-          useMaterial3: true,
-          scaffoldBackgroundColor: const Color(0xFF0D1117),
-        ),
+        theme: buildAppTheme(),
         home: const RootGate(),
       ),
     );

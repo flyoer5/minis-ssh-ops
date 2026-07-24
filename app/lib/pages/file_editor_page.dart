@@ -35,6 +35,8 @@ class _FileEditorPageState extends State<FileEditorPage> {
   bool _saving = false;
   bool _showFind = false;
   bool _wrap = true;
+  bool _readOnly = false;
+  static const String _encoding = 'UTF-8';
   double _fontSize = 13;
   int _ln = 1;
   int _col = 1;
@@ -110,7 +112,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
   }
 
   Future<void> _save() async {
-    if (_saving) return;
+    if (_saving || _readOnly) return;
     setState(() => _saving = true);
     try {
       await widget.onSave(_ctrl.text);
@@ -312,6 +314,15 @@ class _FileEditorPageState extends State<FileEditorPage> {
               onPressed: () => setState(() => _wrap = !_wrap),
             ),
             IconButton(
+              tooltip: _readOnly ? '只读（点切换）' : '可编辑（点切换只读）',
+              icon: Icon(
+                _readOnly ? Icons.lock_outline : Icons.lock_open_outlined,
+                size: 18,
+                color: _readOnly ? const Color(0xFFD29922) : null,
+              ),
+              onPressed: () => setState(() => _readOnly = !_readOnly),
+            ),
+            IconButton(
               tooltip: '减小字号',
               icon: const Icon(Icons.text_decrease, size: 18),
               onPressed: () => setState(() => _fontSize = (_fontSize - 1).clamp(10, 22)),
@@ -334,10 +345,16 @@ class _FileEditorPageState extends State<FileEditorPage> {
               },
             ),
             TextButton(
-              onPressed: (!_dirty || _saving) ? null : _save,
+              onPressed: (!_dirty || _saving || _readOnly) ? null : _save,
               child: _saving
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text('保存', style: TextStyle(color: _dirty ? const Color(0xFF3FB950) : const Color(0xFF484F58), fontWeight: FontWeight.w700)),
+                  : Text(
+                      _readOnly ? '只读' : '保存',
+                      style: TextStyle(
+                        color: (!_dirty || _readOnly) ? const Color(0xFF484F58) : const Color(0xFF3FB950),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ],
         ),
@@ -435,6 +452,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
                     child: TextField(
                       controller: _ctrl,
                       focusNode: _focus,
+                      readOnly: _readOnly,
                       maxLines: null,
                       expands: true,
                       keyboardType: TextInputType.multiline,
@@ -443,7 +461,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
                         fontFamily: 'monospace',
                         fontSize: _fontSize,
                         height: 1.45,
-                        color: const Color(0xFFE6EDF3),
+                        color: _readOnly ? const Color(0xFF8B949E) : const Color(0xFFE6EDF3),
                       ),
                       cursorColor: const Color(0xFF58A6FF),
                       decoration: const InputDecoration(
@@ -452,8 +470,6 @@ class _FileEditorPageState extends State<FileEditorPage> {
                         isCollapsed: true,
                       ),
                       scrollController: _scroll,
-                      // soft wrap toggle: when false use no wrap via single long line behaviour limited;
-                      // Flutter TextField always wraps unless maxLines fixed; use scroll horizontally via scrollPhysics
                     ),
                   ),
                 ],
@@ -466,7 +482,15 @@ class _FileEditorPageState extends State<FileEditorPage> {
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Row(
                 children: [
-                  Text(_dirty ? '已修改' : '未修改', style: TextStyle(fontSize: 11, color: _dirty ? const Color(0xFFFBBF24) : const Color(0xFF8B949E))),
+                  Text(
+                    _readOnly ? '只读' : (_dirty ? '已修改' : '未修改'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _readOnly
+                          ? const Color(0xFFD29922)
+                          : (_dirty ? const Color(0xFFFBBF24) : const Color(0xFF8B949E)),
+                    ),
+                  ),
                   const SizedBox(width: 12),
                   Text('Ln $_ln, Col $_col', style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
                   const SizedBox(width: 12),
@@ -474,7 +498,10 @@ class _FileEditorPageState extends State<FileEditorPage> {
                   const Spacer(),
                   Text(_lang, style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
                   const SizedBox(width: 10),
-                  const Text('UTF-8', style: TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                  Tooltip(
+                    message: '按 UTF-8 解码/保存；其它编码请在服务端转换',
+                    child: Text(_encoding, style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                  ),
                   const SizedBox(width: 10),
                   if (widget.remoteMode != null && widget.remoteMode!.isNotEmpty) ...[
                     Text(widget.remoteMode!, style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),

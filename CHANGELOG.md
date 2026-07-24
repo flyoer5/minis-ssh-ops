@@ -1,3 +1,9 @@
+## 1.4.16
+
+- H: agent session rename/delete sheet polish
+- H: editor read-only + UTF-8 status
+- H: shared AppColors + buildAppTheme
+
 ## 1.4.15
 
 - G: denser multi-select bar; audit CSV export; settings show derived backend port

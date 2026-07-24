@@ -476,6 +476,25 @@ class AppState extends ChangeNotifier {
 
   void deleteAgentSession(String id) {
     agentSessions.removeWhere((e) => e.id == id);
+    // If deleting the open session, clear the live transcript
+    if (agentSessionId == id) {
+      agentMessages.clear();
+      agentSessionId = null;
+      lastPlan = null;
+      stepOutputs.clear();
+      _lastPlanMsgIndex = null;
+    }
+    notifyListeners();
+    _saveSessionsToPrefs();
+  }
+
+  void renameAgentSession(String id, String title) {
+    final t = title.trim();
+    if (t.isEmpty) return;
+    final i = agentSessions.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    agentSessions[i].title = t.length > 48 ? '${t.substring(0, 48)}…' : t;
+    agentSessions[i].updatedAt = DateTime.now();
     notifyListeners();
     _saveSessionsToPrefs();
   }
