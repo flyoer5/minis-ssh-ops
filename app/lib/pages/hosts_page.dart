@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:provider/provider.dart';
+import 'package:ssh_ai_agent/pages/host_editor.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
+import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 /// Host status cards (probe metrics). State kept in page + IndexedStack.
 class HostsPage extends StatefulWidget {
@@ -198,6 +199,9 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                     ? h['name'] as String
                                     : '${h['host']}';
                                 final addr = '${h['username']}@${h['host']}:${h['port']}';
+                                final auth = h['hasPrivateKey'] == true
+                                    ? 'key'
+                                    : (h['hasPassword'] == true ? 'password' : '');
                                 return _StatusCard(
                                   name: name,
                                   addr: addr,
@@ -207,6 +211,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                   probedAt: state.probeCacheTime(id),
                                   fontSize: state.uiFontSize,
                                   compact: state.hostCardCompact,
+                                  authKind: auth,
                                   onSelect: () => state.selectHost(id),
                                   onRefresh: () => _refreshProbe(state, id, force: true),
                                   onMenu: () => _hostMenu(context, state, h),
@@ -369,65 +374,10 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
 
   Future<void> _showEdit(BuildContext context, AppState state, Map<String, dynamic> h) async {
     final id = h['id'] as String;
-    final name = TextEditingController(text: (h['name'] as String?) ?? '');
-    final host = TextEditingController(text: (h['host'] as String?) ?? '');
-    final port = TextEditingController(text: '${h['port'] ?? 22}');
-    final user = TextEditingController(text: (h['username'] as String?) ?? 'root');
-    final password = TextEditingController();
-    final form = GlobalKey<FormState>();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('编辑主机'),
-        content: Form(
-          key: form,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(controller: name, decoration: const InputDecoration(labelText: '名称')),
-                TextFormField(
-                  controller: host,
-                  decoration: const InputDecoration(labelText: '地址'),
-                  validator: (v) => v == null || v.isEmpty ? '必填' : null,
-                ),
-                TextFormField(
-                  controller: port,
-                  decoration: const InputDecoration(labelText: '端口'),
-                  keyboardType: TextInputType.number,
-                ),
-                TextFormField(controller: user, decoration: const InputDecoration(labelText: '用户')),
-                TextFormField(
-                  controller: password,
-                  decoration: const InputDecoration(labelText: '密码（留空不改）'),
-                  obscureText: true,
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-          FilledButton(
-            onPressed: () {
-              if (form.currentState?.validate() != true) return;
-              Navigator.pop(c, true);
-            },
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-    final body = <String, dynamic>{
-      'name': name.text.trim(),
-      'host': host.text.trim(),
-      'port': int.tryParse(port.text.trim()) ?? 22,
-      'username': user.text.trim(),
-      if (password.text.isNotEmpty) 'password': password.text,
-    };
+    final result = await showHostEditor(context, title: '编辑主机', existing: h);
+    if (result == null || !context.mounted) return;
     try {
-      await state.updateHost(id, body);
+      await state.updateHost(id, result.body);
       await _refreshProbe(state, id, force: true);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
@@ -440,55 +390,10 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   }
 
   Future<void> _showAdd(BuildContext context, AppState state) async {
-    final name = TextEditingController();
-    final host = TextEditingController();
-    final port = TextEditingController(text: '22');
-    final user = TextEditingController(text: 'root');
-    final password = TextEditingController();
-    final form = GlobalKey<FormState>();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('添加主机'),
-        content: Form(
-          key: form,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(controller: name, decoration: const InputDecoration(labelText: '名称')),
-              TextFormField(
-                controller: host,
-                decoration: const InputDecoration(labelText: '地址'),
-                validator: (v) => v == null || v.isEmpty ? '必填' : null,
-              ),
-              TextFormField(controller: port, decoration: const InputDecoration(labelText: '端口'), keyboardType: TextInputType.number),
-              TextFormField(controller: user, decoration: const InputDecoration(labelText: '用户')),
-              TextFormField(controller: password, decoration: const InputDecoration(labelText: '密码'), obscureText: true),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-          FilledButton(
-            onPressed: () {
-              if (form.currentState?.validate() != true) return;
-              Navigator.pop(c, true);
-            },
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-    final body = <String, dynamic>{
-      'name': name.text.trim(),
-      'host': host.text.trim(),
-      'port': int.tryParse(port.text.trim()) ?? 22,
-      'username': user.text.trim(),
-      if (password.text.isNotEmpty) 'password': password.text,
-    };
+    final result = await showHostEditor(context, title: '添加主机');
+    if (result == null || !context.mounted) return;
     try {
-      await state.addHost(body);
+      await state.addHost(result.body);
       String? id;
       for (final h in state.hosts) {
         if (h is Map && h['id'] is String) id = h['id'] as String;
@@ -512,6 +417,8 @@ class _StatusCard extends StatelessWidget {
   final double fontSize;
   /// When true, only MEM + HDD rows (no CPU / uptime footer).
   final bool compact;
+  /// `password` | `key` | empty
+  final String authKind;
   final VoidCallback onSelect;
   final VoidCallback onRefresh;
   final VoidCallback onMenu;
@@ -526,6 +433,7 @@ class _StatusCard extends StatelessWidget {
     this.probedAt,
     this.fontSize = 14,
     this.compact = false,
+    this.authKind = '',
     required this.onSelect,
     required this.onRefresh,
     required this.onMenu,
@@ -696,7 +604,27 @@ class _StatusCard extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.only(left: 16, top: 1),
-                child: Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: AppColors.slate, fontFamily: 'monospace')),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        addr,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 10, color: AppColors.slate, fontFamily: 'monospace'),
+                      ),
+                    ),
+                    if (authKind == 'key' || authKind == 'password')
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6, right: 4),
+                        child: Icon(
+                          authKind == 'key' ? Icons.vpn_key : Icons.password,
+                          size: 12,
+                          color: AppColors.slateMuted,
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(height: 6),
               if (summary == null && !loading)

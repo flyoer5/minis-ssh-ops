@@ -1,3 +1,13 @@
+## 1.4.31
+
+- Hosts: password **or PEM private key** (+ optional passphrase) in add/edit sheet; card shows key/password icon
+- Structure: `agent_widgets.dart` / `settings_widgets.dart` parts; `host_editor.dart`
+- Settings & Records: `wantKeepAlive: false` to free memory off-tab
+- Slim backend status strip (replace tall MaterialBanner)
+- Test: host auth body assembly unit test
+- Structure: extract `AgentChatController` mixin (~850 lines streaming/session/tool pairing)
+- AppState slimmed to bootstrap/hosts/probe/LLM/config (~500 lines)
+
 ## 1.4.30
 
 - Perf: throttle Agent stream UI notifies (~33ms) for assistant/reasoning deltas

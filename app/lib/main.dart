@@ -87,21 +87,46 @@ class _HomeShellState extends State<HomeShell> {
         body: Column(
           children: [
             if (!state.backendOk || state.startingBackend)
-              MaterialBanner(
-                content: Text(
-                  state.startingBackend
-                      ? (state.backendNote ?? '启动后端…')
-                      : (state.backendError ?? '后端未连接'),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                leading: Icon(state.startingBackend ? Icons.hourglass_top : Icons.warning_amber),
-                actions: [
-                  TextButton(
-                    onPressed: state.startingBackend ? null : () => state.bootstrap(),
-                    child: const Text('重试'),
+              Material(
+                color: state.startingBackend ? AppColors.surface2 : AppColors.errorPanel,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+                    child: Row(
+                      children: [
+                        Icon(
+                          state.startingBackend ? Icons.hourglass_top : Icons.warning_amber,
+                          size: 16,
+                          color: state.startingBackend ? AppColors.textMuted : AppColors.dangerSoft,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            state.startingBackend
+                                ? (state.backendNote ?? '启动后端…')
+                                : (state.backendError ?? '后端未连接'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: state.startingBackend ? AppColors.textMuted : AppColors.dangerSoft,
+                            ),
+                          ),
+                        ),
+                        if (!state.startingBackend)
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                            ),
+                            onPressed: () => state.bootstrap(),
+                            child: const Text('重试', style: TextStyle(fontSize: 12)),
+                          ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
             Expanded(
               child: IndexedStack(

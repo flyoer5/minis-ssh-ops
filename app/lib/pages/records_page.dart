@@ -20,7 +20,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
   String hostFilter = 'all';
 
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => false;
 
   String _fmtLocal(String raw) {
     final s = raw.trim();
