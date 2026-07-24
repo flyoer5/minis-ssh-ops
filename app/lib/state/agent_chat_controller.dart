@@ -212,81 +212,24 @@ mixin AgentChatController on ChangeNotifier {
   }
 
 
-  Future<String> exportConfigJson({bool includeSecrets = false}) async {
-    final hostsOut = <Map<String, dynamic>>[];
-    for (final h in hosts) {
-      if (h is! Map) continue;
-      final m = <String, dynamic>{
-        'name': h['name'],
-        'host': h['host'],
-        'port': h['port'],
-        'username': h['username'],
-      };
-      hostsOut.add(m);
-    }
-    final llmOut = <String, dynamic>{
-      'baseUrl': llm?['baseUrl'],
-      'model': llm?['model'],
-      'apiKeySet': llm?['apiKeySet'] == true,
-    };
-    final obj = {
-      'version': 1,
-      'exportedAt': DateTime.now().toIso8601String(),
-      'hosts': hostsOut,
-      'llm': llmOut,
-      'prefs': uiPrefsExport(),
-      'note': includeSecrets
-          ? 'secrets not exported via this path'
-          : 'passwords/keys not included',
-    };
-    return JsonEncoder.withIndent('  ').convert(obj);
-  }
+  // exportConfigJson / importConfigJson live on AppState (hosts/llm/uiPrefs).
 
-  Future<String> importConfigJson(String raw) async {
-    final obj = jsonDecode(raw);
-    if (obj is! Map) throw StateError('invalid json');
-    var added = 0;
-    final hl = obj['hosts'];
-    if (hl is List) {
-      for (final e in hl) {
-        if (e is! Map) continue;
-        final host = e['host']?.toString() ?? '';
-        if (host.isEmpty) continue;
-        // skip if same host:port:user exists
-        final port = e['port'] is int ? e['port'] as int : int.tryParse('${e['port']}') ?? 22;
-        final user = e['username']?.toString() ?? 'root';
-        final exists = hosts.any((h) =>
-            h is Map &&
-            h['host']?.toString() == host &&
-            (h['port'] is int ? h['port'] as int : int.tryParse('${h['port']}') ?? 22) == port &&
-            h['username']?.toString() == user);
-        if (exists) continue;
-        await api.createHost({
-          'name': e['name']?.toString() ?? host,
-          'host': host,
-          'port': port,
-          'username': user,
-        });
-        added++;
-      }
+  String _friendlyErr(Object e) {
+    final s = e.toString();
+    final low = s.toLowerCase();
+    if (low.contains('connection abort') || low.contains('connection reset') || low.contains('broken pipe')) {
+      return '模型网关连接中断，请重试';
     }
-    final l = obj['llm'];
-    if (l is Map) {
-      final base = l['baseUrl']?.toString() ?? '';
-      final model = l['model']?.toString() ?? '';
-      if (base.isNotEmpty && model.isNotEmpty) {
-        await saveLlm(baseUrl: base, model: model);
-      }
+    if (low.contains('timeout') || low.contains('timed out')) {
+      return '模型请求超时，请重试';
     }
-    final pr = obj['prefs'];
-    if (pr is Map) {
-      await applyUiPrefsImport(pr);
+    if (low.contains('401') || low.contains('403')) {
+      return '模型鉴权失败，请检查设置';
     }
-    await refreshHosts();
-    await refreshLlm();
-    return '导入主机 +$added';
+    final m = RegExp(r'ApiException\(\d+\):\s*(.*)').firstMatch(s);
+    if (m != null) return m.group(1)!;
+    return s;
   }
-
 
   void _pushMsg(ChatMessage m) {
     agentMessages.add(m);
