@@ -676,7 +676,6 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                           const SizedBox(width: 4),
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => setState(() => focus = idx),
                               onTap: () async {
                                 setState(() => focus = idx);
                                 await _editPath(pane);
