@@ -1,4 +1,4 @@
-/// One line in the Agent chat transcript (CLI-style agent session).
+/// One line in the Agent chat transcript (Minis-style session).
 class ChatMessage {
   ChatMessage({
     required this.role,
@@ -12,7 +12,7 @@ class ChatMessage {
   final String role;
   final String content;
   final ChatKind kind;
-  /// Optional structured payload (plan steps, exec result, etc.)
+  /// Optional structured payload (plan steps, tool name/command/success, etc.)
   final Map<String, dynamic>? meta;
   final DateTime at;
 }
@@ -20,7 +20,12 @@ class ChatMessage {
 enum ChatKind {
   text,
   plan,
+  /// Completed tool output (legacy name; same as toolResult).
   stepResult,
+  /// Tool started (Minis toolUse part).
+  toolUse,
+  /// Tool finished (Minis toolResult part).
+  toolResult,
   error,
   status,
   reasoning,

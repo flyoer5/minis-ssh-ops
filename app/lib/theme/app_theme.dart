@@ -115,7 +115,7 @@ ThemeData buildAppTheme() {
           color: selected ? AppColors.accentSoft : AppColors.textMuted,
         );
       }),
-      height: 64,
+      height: 56,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
@@ -968,6 +969,9 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       appBar: AppBar(
         backgroundColor: AppColors.darkBar,
         toolbarHeight: 44,
+        leading: NavMenuButton.leadingOf(context),
+        leadingWidth: NavMenuButton.leadingWidthOf(context),
+        titleSpacing: 4,
         bottom: _transferring
             ? PreferredSize(
                 preferredSize: const Size.fromHeight(34),
@@ -996,7 +1000,6 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                 ),
               )
             : null,
-        titleSpacing: 8,
         title: Text(
           active.selecting
               ? '已选 ${active.selected.length}'

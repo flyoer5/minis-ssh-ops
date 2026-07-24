@@ -9,6 +9,7 @@ import 'package:ssh_ai_agent/pages/settings_page.dart';
 import 'package:ssh_ai_agent/pages/terminal_page.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,7 +66,6 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int index = 0;
 
-  // Keep State alive across tab switches (terminal session, chat, probes).
   final _pages = const <Widget>[
     HostsPage(),
     AgentPage(),
@@ -78,47 +78,55 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    return Scaffold(
-      body: Column(
-        children: [
-          if (!state.backendOk || state.startingBackend)
-            MaterialBanner(
-              content: Text(
-                state.startingBackend
-                    ? (state.backendNote ?? '启动后端…')
-                    : (state.backendError ?? '后端未连接'),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              leading: Icon(state.startingBackend ? Icons.hourglass_top : Icons.warning_amber),
-              actions: [
-                TextButton(
-                  onPressed: state.startingBackend ? null : () => state.bootstrap(),
-                  child: const Text('重试'),
+    final menu = state.navIsMenu;
+    return NavScope(
+      index: index,
+      go: (i) => setState(() => index = i),
+      menuMode: menu,
+      child: Scaffold(
+        body: Column(
+          children: [
+            if (!state.backendOk || state.startingBackend)
+              MaterialBanner(
+                content: Text(
+                  state.startingBackend
+                      ? (state.backendNote ?? '启动后端…')
+                      : (state.backendError ?? '后端未连接'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
+                leading: Icon(state.startingBackend ? Icons.hourglass_top : Icons.warning_amber),
+                actions: [
+                  TextButton(
+                    onPressed: state.startingBackend ? null : () => state.bootstrap(),
+                    child: const Text('重试'),
+                  ),
+                ],
+              ),
+            Expanded(
+              child: IndexedStack(
+                index: index,
+                children: _pages,
+              ),
             ),
-          Expanded(
-            child: IndexedStack(
-              index: index,
-              children: _pages,
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        height: 64,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        selectedIndex: index,
-        onDestinationSelected: (i) => setState(() => index = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.dns_outlined), label: '主机'),
-          NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: 'Agent'),
-          NavigationDestination(icon: Icon(Icons.terminal), label: '终端'),
-          NavigationDestination(icon: Icon(Icons.folder_outlined), label: '文件'),
-          NavigationDestination(icon: Icon(Icons.history), label: '记录'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), label: '设置'),
-        ],
+          ],
+        ),
+        bottomNavigationBar: menu
+            ? null
+            : NavigationBar(
+                height: 56,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                selectedIndex: index,
+                onDestinationSelected: (i) => setState(() => index = i),
+                destinations: [
+                  for (var i = 0; i < AppNav.labels.length; i++)
+                    NavigationDestination(
+                      icon: Icon(AppNav.icons[i], size: 22),
+                      selectedIcon: Icon(AppNav.selectedIcons[i], size: 22),
+                      label: AppNav.labels[i],
+                    ),
+                ],
+              ),
       ),
     );
   }

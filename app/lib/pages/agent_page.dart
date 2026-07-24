@@ -5,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
+import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 /// OpenClaw-style agent: chat + tool results (model-driven tool loop).
 class AgentPage extends StatefulWidget {
@@ -306,7 +307,9 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         toolbarHeight: 44,
-        titleSpacing: 12,
+        leading: NavMenuButton.leadingOf(context),
+        leadingWidth: NavMenuButton.leadingWidthOf(context),
+        titleSpacing: 4,
         title: Text(
           state.selectedHostId == null ? 'Agent' : state.hostLabel,
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
@@ -618,15 +621,29 @@ class _Bubble extends StatelessWidget {
     }
   }
 
-  /// Minis part types we mirror: text | toolUse | toolResult | reasoning
+  /// Minis part types: text | toolUse | toolResult | reasoning (kind first, meta legacy).
   String get _part {
-    final p = msg.meta?['part']?.toString();
-    if (p != null && p.isNotEmpty) return p;
-    if (msg.kind == ChatKind.reasoning) return 'reasoning';
-    if (msg.kind == ChatKind.stepResult) return 'toolResult';
-    if (msg.role == 'tool' || msg.kind == ChatKind.status) return 'toolUse';
-    if (msg.kind == ChatKind.error) return 'error';
-    return 'text';
+    switch (msg.kind) {
+      case ChatKind.toolUse:
+        return 'toolUse';
+      case ChatKind.toolResult:
+      case ChatKind.stepResult:
+        return 'toolResult';
+      case ChatKind.reasoning:
+        return 'reasoning';
+      case ChatKind.error:
+        return 'error';
+      case ChatKind.plan:
+        return 'plan';
+      case ChatKind.status:
+        final p = msg.meta?['part']?.toString();
+        if (p == 'toolUse' || p == 'toolResult') return p!;
+        return 'status';
+      case ChatKind.text:
+        final p = msg.meta?['part']?.toString();
+        if (p == 'toolUse' || p == 'toolResult' || p == 'reasoning') return p!;
+        return 'text';
+    }
   }
 
   @override
@@ -664,14 +681,6 @@ class _Bubble extends StatelessWidget {
       );
     }
 
-    // —— memory / generic status line ——
-    if (msg.kind == ChatKind.status && part != 'toolUse') {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 6, left: 2),
-        child: Text(msg.content, style: TextStyle(fontSize: fs - 2.5, color: AppColors.textMuted)),
-      );
-    }
-
     // —— toolUse / toolResult (Minis) ——
     if (part == 'toolUse' || part == 'toolResult') {
       return _MinisToolBlock(
@@ -679,6 +688,14 @@ class _Bubble extends StatelessWidget {
         part: part,
         fontSize: fs,
         onCopy: () => _copy(context, _copyText),
+      );
+    }
+
+    // —— memory / generic status line ——
+    if (part == 'status' || msg.kind == ChatKind.status) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6, left: 2),
+        child: Text(msg.content, style: TextStyle(fontSize: fs - 2.5, color: AppColors.textMuted)),
       );
     }
 
@@ -813,7 +830,7 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
 
   @override
   Widget build(BuildContext context) {
-    final running = widget.part == 'toolUse' || widget.msg.kind == ChatKind.status;
+    final running = widget.part == 'toolUse' || widget.msg.kind == ChatKind.toolUse;
     final success = _success;
     final Color accent;
     if (running && widget.part == 'toolUse') {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -92,7 +93,9 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 44,
-        titleSpacing: 12,
+        leading: NavMenuButton.leadingOf(context),
+        leadingWidth: NavMenuButton.leadingWidthOf(context),
+        titleSpacing: 4,
         title: const Text('主机', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         actions: [
           IconButton(

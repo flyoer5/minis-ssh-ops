@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
@@ -92,6 +93,8 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         toolbarHeight: 44,
+        leading: NavMenuButton.leadingOf(context),
+        leadingWidth: NavMenuButton.leadingWidthOf(context),
         titleSpacing: 12,
         backgroundColor: AppColors.bg,
         title: Text('记录', style: TextStyle(fontSize: fs + 1, fontWeight: FontWeight.w700)),
