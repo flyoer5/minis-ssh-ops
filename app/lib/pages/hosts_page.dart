@@ -393,15 +393,54 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     final result = await showHostEditor(context, title: '添加主机');
     if (result == null || !context.mounted) return;
     try {
-      await state.addHost(result.body);
-      String? id;
-      for (final h in state.hosts) {
-        if (h is Map && h['id'] is String) id = h['id'] as String;
+      final id = await state.addHost(result.body);
+      if (!context.mounted) return;
+      if (id == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('主机已添加，但未拿到 ID；请下拉刷新')),
+        );
+        return;
       }
-      if (id != null) await _refreshProbe(state, id);
+      // Probe must never leave the page — failures show on the card / snackbar only.
+      await _refreshProbe(state, id, force: true);
+      if (!context.mounted) return;
+      final s = _summary[id];
+      if (s != null && !s.ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已添加，但暂时连不上：${s.oneLine}'),
+            action: SnackBarAction(
+              label: '详情',
+              onPressed: () {
+                final h = state.hosts.cast<dynamic>().whereType<Map>().cast<Map<String, dynamic>>().firstWhere(
+                      (e) => e['id'] == id,
+                      orElse: () => <String, dynamic>{'id': id, 'host': result.body['host'], 'username': result.body['username'], 'port': result.body['port']},
+                    );
+                final name = (h['name'] as String?)?.isNotEmpty == true ? h['name'] as String : '${h['host']}';
+                final addr = '${h['username']}@${h['host']}:${h['port']}';
+                _showProbeDetail(
+                  context,
+                  name,
+                  addr,
+                  s,
+                  hostId: id,
+                  onRetry: () => _refreshProbe(state, id, force: true),
+                );
+              },
+            ),
+          ),
+        );
+      } else if (s != null && s.ok) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已添加并探测成功')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已添加主机')));
+      }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        final msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('添加失败：$msg'), duration: const Duration(seconds: 4)),
+        );
       }
     }
   }

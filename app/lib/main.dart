@@ -13,7 +13,77 @@ import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Never leave the user stuck on the default red/yellow ErrorWidget.
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return _AppErrorSurface(details: details);
+  };
   runApp(const SshAiAgentApp());
+}
+
+/// In-app recovery UI when a build/layout throws (instead of full-screen red).
+class _AppErrorSurface extends StatelessWidget {
+  const _AppErrorSurface({required this.details});
+  final FlutterErrorDetails details;
+
+  @override
+  Widget build(BuildContext context) {
+    final msg = details.exceptionAsString();
+    return Material(
+      color: AppColors.bg,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 24),
+              const Icon(Icons.error_outline, size: 48, color: AppColors.danger),
+              const SizedBox(height: 12),
+              const Text(
+                '界面出错了',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.text),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '通常是某次操作触发了异常。可返回继续用；若反复出现请到设置导出日志。',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      msg,
+                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.dangerSoft),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () {
+                  // Best-effort: pop if possible; otherwise user can switch tabs via process restart.
+                  final nav = Navigator.maybeOf(context);
+                  if (nav != null && nav.canPop()) {
+                    nav.pop();
+                  }
+                },
+                child: const Text('关闭此页'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class SshAiAgentApp extends StatelessWidget {
@@ -26,6 +96,13 @@ class SshAiAgentApp extends StatelessWidget {
       child: MaterialApp(
         title: 'SSH AI Agent',
         theme: buildAppTheme(),
+        builder: (context, child) {
+          // Keep ErrorWidget theme-consistent even outside routes.
+          ErrorWidget.builder = (FlutterErrorDetails details) {
+            return _AppErrorSurface(details: details);
+          };
+          return child ?? const SizedBox.shrink();
+        },
         home: const RootGate(),
       ),
     );

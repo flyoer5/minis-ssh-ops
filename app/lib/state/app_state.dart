@@ -198,9 +198,31 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
     notifyListeners();
   }
 
-  Future<void> addHost(Map<String, dynamic> body) async {
-    await api.createHost(body);
+  /// Creates host and returns its id (when API provides one).
+  Future<String?> addHost(Map<String, dynamic> body) async {
+    final created = await api.createHost(body);
     await refreshHosts();
+    final id = created['id']?.toString();
+    if (id != null && id.isNotEmpty) {
+      selectHost(id);
+      return id;
+    }
+    // Fallback: match last list entry by host:port:user
+    final host = body['host']?.toString();
+    final port = body['port'] is int ? body['port'] as int : int.tryParse('${body['port']}') ?? 22;
+    final user = body['username']?.toString() ?? 'root';
+    for (final h in hosts.reversed) {
+      if (h is! Map) continue;
+      final hid = h['id']?.toString();
+      if (hid == null) continue;
+      if (h['host']?.toString() == host &&
+          (h['port'] is int ? h['port'] as int : int.tryParse('${h['port']}') ?? 22) == port &&
+          h['username']?.toString() == user) {
+        selectHost(hid);
+        return hid;
+      }
+    }
+    return null;
   }
 
   Future<void> removeHost(String id) async {

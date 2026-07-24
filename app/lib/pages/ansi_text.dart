@@ -80,11 +80,17 @@ class AnsiPainter {
     TextStyle style() {
       var color = fg ?? defaultFg;
       if (dim) {
+        // Portable dim without Color.red/green/blue (deprecated / channel scale differs).
+        final v = color.value;
+        final a = (v >> 24) & 0xff;
+        final r = (v >> 16) & 0xff;
+        final g = (v >> 8) & 0xff;
+        final b = v & 0xff;
         color = Color.fromARGB(
-          color.alpha,
-          (color.red * 0.65).round(),
-          (color.green * 0.65).round(),
-          (color.blue * 0.65).round(),
+          a,
+          (r * 0.65).round().clamp(0, 255),
+          (g * 0.65).round().clamp(0, 255),
+          (b * 0.65).round().clamp(0, 255),
         );
       }
       return TextStyle(

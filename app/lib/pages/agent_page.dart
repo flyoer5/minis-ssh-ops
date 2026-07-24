@@ -54,6 +54,10 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('先选主机')));
       return;
     }
+    if (state.agentBusy) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('上一轮还在进行，可点停止')));
+      return;
+    }
     _input.clear();
     setState(() {
       _busy = true;
@@ -65,6 +69,13 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       final msg = e.toString();
       if (msg.contains('HOSTKEY_MISMATCH') || msg.toLowerCase().contains('hostkey_mismatch')) {
         if (mounted) await _handleHostKeyMismatch(state);
+      } else if (mounted) {
+        final short = msg
+            .replaceFirst(RegExp(r'^Exception:\s*'), '')
+            .replaceFirst(RegExp(r'^ApiException\(\d+\):\s*'), '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(short.length > 160 ? '${short.substring(0, 160)}…' : short)),
+        );
       }
     } finally {
       if (mounted) {
@@ -356,9 +367,39 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
           Expanded(
             child: state.agentMessages.isEmpty
                 ? Center(
-                    child: Text(
-                      state.selectedHostId == null ? '先选主机' : '发消息',
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            state.selectedHostId == null ? Icons.dns_outlined : Icons.auto_awesome,
+                            size: 40,
+                            color: AppColors.textFaint,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            state.selectedHostId == null ? '先选一台主机' : '向 Agent 发消息',
+                            style: TextStyle(
+                              fontSize: state.agentFontSize,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            state.selectedHostId == null
+                                ? '在「主机」页点选卡片，或添加主机后再回来。'
+                                : '当前：${state.hostLabel}\n可让它查状态、改配置、排错。生成中可点停止。',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: state.agentFontSize - 2,
+                              color: AppColors.textFaint,
+                              height: 1.45,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : ListView.builder(

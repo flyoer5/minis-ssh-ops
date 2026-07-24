@@ -1,3 +1,10 @@
+## 1.4.35
+
+- Fix: friendly ErrorWidget instead of stuck red crash screen
+- Fix: add-host uses new host id; probe failure stays on list with snackbar + detail
+- Fix: ANSI dim uses Color.value (no Color.red crash path)
+- Agent: richer empty state; surface send errors; block send while busy
+
 ## 1.4.34
 
 - Files: path favorites (star + chips, long-press copy still)
