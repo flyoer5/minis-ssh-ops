@@ -707,6 +707,30 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                            tooltip: '收藏路径',
+                            icon: Icon(
+                              context.watch<AppState>().pathFavorites.contains(pane.path.isEmpty ? '/' : pane.path)
+                                  ? Icons.star
+                                  : Icons.star_border,
+                              size: 18,
+                              color: context.watch<AppState>().pathFavorites.contains(pane.path.isEmpty ? '/' : pane.path)
+                                  ? AppColors.warnBright
+                                  : null,
+                            ),
+                            onPressed: () async {
+                              final s = context.read<AppState>();
+                              final path = pane.path.isEmpty ? '/' : pane.path;
+                              if (s.pathFavorites.contains(path)) {
+                                await s.removePathFavorite(path);
+                              } else {
+                                await s.addPathFavorite(path);
+                              }
+                            },
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                             tooltip: '上级',
                             icon: const Icon(Icons.arrow_upward, size: 18),
                             onPressed: () {
@@ -728,6 +752,39 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                           ),
                         ],
                       ),
+                    ),
+                    // Path favorites shortcuts
+                    Builder(
+                      builder: (context) {
+                        final favs = context.watch<AppState>().pathFavorites;
+                        if (favs.isEmpty) return const SizedBox.shrink();
+                        return SizedBox(
+                          height: 32,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
+                            itemCount: favs.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 4),
+                            itemBuilder: (_, i) {
+                              final p = favs[i];
+                              final short = p == '/'
+                                  ? '/'
+                                  : (p.length > 18 ? '…${p.substring(p.length - 16)}' : p);
+                              return InputChip(
+                                visualDensity: VisualDensity.compact,
+                                label: Text(short, style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
+                                onPressed: () {
+                                  setState(() => focus = idx);
+                                  _go(pane, p);
+                                },
+                                onDeleted: () => context.read<AppState>().removePathFavorite(p),
+                                deleteIconColor: AppColors.gray9e,
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              );
+                            },
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

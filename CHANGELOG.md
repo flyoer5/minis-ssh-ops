@@ -1,3 +1,9 @@
+## 1.4.34
+
+- Files: path favorites (star + chips, long-press copy still)
+- Terminal: scrollback search with highlights; larger buffer (~400KB)
+- Continues 1.4.33 polish (CSI strip, path jump, records search)
+
 ## 1.4.33
 
 - Polish: stronger terminal CSI strip (private modes, alt screen, keypad)

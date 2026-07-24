@@ -28,6 +28,7 @@ class _TerminalPageState extends State<TerminalPage>
   final _scroll = ScrollController();
   final _focus = FocusNode();
   final _input = TextEditingController();
+  final _searchCtrl = TextEditingController();
   final _buf = StringBuffer();
   WebSocketChannel? _ch;
   StreamSubscription? _sub;
@@ -35,8 +36,11 @@ class _TerminalPageState extends State<TerminalPage>
   bool _connected = false;
   bool _connecting = false;
   bool _ctrl = false;
+  bool _showSearch = false;
   String _status = '';
   String _prev = '';
+  int _searchIdx = 0;
+  List<int> _searchHits = [];
 
   static const _bg = AppColors.terminalBlack;
   static const _fg = AppColors.text;
@@ -66,6 +70,7 @@ class _TerminalPageState extends State<TerminalPage>
     _ch?.sink.close();
     _scroll.dispose();
     _input.dispose();
+    _searchCtrl.dispose();
     _focus.dispose();
     super.dispose();
   }
@@ -86,11 +91,12 @@ class _TerminalPageState extends State<TerminalPage>
     // Keep SGR color sequences; drop only pure noise later in AnsiPainter.
     _buf.write(s);
     final t = _buf.toString();
-    if (t.length > 200000) {
+    // ~400KB raw scrollback (~keep last 200KB when overflow)
+    if (t.length > 400000) {
       // trim raw buffer (may cut mid-sequence occasionally; acceptable for scrollback)
       _buf
         ..clear()
-        ..write(t.substring(t.length - 100000));
+        ..write(t.substring(t.length - 200000));
     }
     if (!mounted) return;
     setState(() {});
@@ -251,6 +257,80 @@ class _TerminalPageState extends State<TerminalPage>
     } else {
       _openKb();
     }
+  }
+
+  String get _plainScrollback => stripAnsi(_buf.toString());
+
+  /// Prefer ANSI coloring; when searching, fall back to plain text with yellow hits.
+  TextSpan _buildScrollbackSpan(double fontSize) {
+    final raw = _buf.isEmpty ? '' : _buf.toString();
+    if (!_showSearch || _searchCtrl.text.trim().isEmpty || _searchHits.isEmpty) {
+      return AnsiPainter(fontSize: fontSize, defaultFg: _fg).build(raw);
+    }
+    final plain = _plainScrollback;
+    final q = _searchCtrl.text.trim();
+    final spans = <TextSpan>[];
+    var cursor = 0;
+    final base = TextStyle(fontFamily: 'monospace', fontSize: fontSize, height: 1.25, color: _fg);
+    final hit = base.copyWith(backgroundColor: const Color(0x66D29922), color: Colors.white);
+    final active = base.copyWith(backgroundColor: const Color(0xAAD29922), color: Colors.white, fontWeight: FontWeight.w700);
+    for (var i = 0; i < _searchHits.length; i++) {
+      final start = _searchHits[i];
+      if (start < cursor) continue;
+      if (start > cursor) {
+        spans.add(TextSpan(text: plain.substring(cursor, start), style: base));
+      }
+      final end = (start + q.length).clamp(0, plain.length);
+      spans.add(TextSpan(
+        text: plain.substring(start, end),
+        style: i == _searchIdx ? active : hit,
+      ));
+      cursor = end;
+    }
+    if (cursor < plain.length) {
+      spans.add(TextSpan(text: plain.substring(cursor), style: base));
+    }
+    return TextSpan(children: spans, style: base);
+  }
+
+  void _runSearch([String? q]) {
+    final query = (q ?? _searchCtrl.text).trim();
+    if (query.isEmpty) {
+      setState(() {
+        _searchHits = [];
+        _searchIdx = 0;
+      });
+      return;
+    }
+    final plain = _plainScrollback.toLowerCase();
+    final needle = query.toLowerCase();
+    final hits = <int>[];
+    var from = 0;
+    while (true) {
+      final i = plain.indexOf(needle, from);
+      if (i < 0) break;
+      hits.add(i);
+      from = i + needle.length;
+      if (hits.length > 500) break;
+    }
+    setState(() {
+      _searchHits = hits;
+      _searchIdx = hits.isEmpty ? 0 : 0;
+    });
+  }
+
+  void _searchNext({bool reverse = false}) {
+    if (_searchHits.isEmpty) {
+      _runSearch();
+      return;
+    }
+    setState(() {
+      if (reverse) {
+        _searchIdx = (_searchIdx - 1) < 0 ? _searchHits.length - 1 : _searchIdx - 1;
+      } else {
+        _searchIdx = (_searchIdx + 1) % _searchHits.length;
+      }
+    });
   }
 
   void _extra(String name) {
@@ -448,8 +528,21 @@ class _TerminalPageState extends State<TerminalPage>
                               );
                             }
                             break;
+                          case 'search':
+                            setState(() {
+                              _showSearch = !_showSearch;
+                              if (!_showSearch) {
+                                _searchHits = [];
+                                _searchIdx = 0;
+                              }
+                            });
+                            break;
                           case 'clear':
-                            setState(() => _buf.clear());
+                            setState(() {
+                              _buf.clear();
+                              _searchHits = [];
+                              _searchIdx = 0;
+                            });
                             break;
                           case 'reconnect':
                             _connect(state);
@@ -457,18 +550,70 @@ class _TerminalPageState extends State<TerminalPage>
                         }
                       },
 
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'paste', child: Text('粘贴')),
-                        PopupMenuItem(value: 'copy_plain', child: Text('复制纯文本')),
-                        PopupMenuItem(value: 'copy_raw', child: Text('复制原始(含ANSI)')),
-                        PopupMenuItem(value: 'clear', child: Text('清屏')),
-                        PopupMenuItem(value: 'reconnect', child: Text('重连')),
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: 'paste', child: Text('粘贴')),
+                        const PopupMenuItem(value: 'copy_plain', child: Text('复制纯文本')),
+                        const PopupMenuItem(value: 'copy_raw', child: Text('复制原始(含ANSI)')),
+                        PopupMenuItem(value: 'search', child: Text(_showSearch ? '关闭搜索' : '搜索回滚')),
+                        const PopupMenuItem(value: 'clear', child: Text('清屏')),
+                        const PopupMenuItem(value: 'reconnect', child: Text('重连')),
                       ],
                     ),
                   ],
                 ),
               ),
             ),
+            if (_showSearch)
+              Material(
+                color: AppColors.surface,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 4, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchCtrl,
+                          style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            hintText: '搜索终端输出…',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          ),
+                          onChanged: _runSearch,
+                          onSubmitted: (_) => _searchNext(),
+                        ),
+                      ),
+                      Text(
+                        _searchHits.isEmpty ? '0' : '${_searchIdx + 1}/${_searchHits.length}',
+                        style: const TextStyle(fontSize: 11, color: _muted, fontFamily: 'monospace'),
+                      ),
+                      IconButton(
+                        tooltip: '上一个',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _searchHits.isEmpty ? null : () => _searchNext(reverse: true),
+                        icon: const Icon(Icons.keyboard_arrow_up, size: 20),
+                      ),
+                      IconButton(
+                        tooltip: '下一个',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _searchHits.isEmpty ? null : () => _searchNext(),
+                        icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                      ),
+                      IconButton(
+                        tooltip: '关闭',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => setState(() {
+                          _showSearch = false;
+                          _searchHits = [];
+                          _searchIdx = 0;
+                        }),
+                        icon: const Icon(Icons.close, size: 18),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             Expanded(
               child: Stack(
                 children: [
@@ -483,10 +628,7 @@ class _TerminalPageState extends State<TerminalPage>
                         child: SingleChildScrollView(
                           controller: _scroll,
                           child: SelectableText.rich(
-                            AnsiPainter(
-                              fontSize: fontSize,
-                              defaultFg: _fg,
-                            ).build(_buf.isEmpty ? '' : _buf.toString()),
+                            _buildScrollbackSpan(fontSize),
                           ),
                         ),
                       ),
