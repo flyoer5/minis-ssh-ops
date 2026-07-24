@@ -492,7 +492,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.46',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.47',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
@@ -942,7 +942,10 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 contentPadding: EdgeInsets.zero,
                 dense: true,
                 title: const Text('写操作需确认', style: TextStyle(fontSize: 13.5)),
-                subtitle: const Text('开启后，写/破坏类命令需点运行', style: TextStyle(fontSize: 11.5)),
+                subtitle: const Text(
+                  '开启：写/破坏类命令弹出确认卡，点「运行并继续」后执行并让 Agent 接着干；关闭：自动执行（仍拦截策略黑名单）',
+                  style: TextStyle(fontSize: 11.5),
+                ),
                 value: state.confirmWrites,
                 onChanged: (v) => state.setConfirmWrites(v),
               ),

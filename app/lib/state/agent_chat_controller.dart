@@ -720,24 +720,68 @@ mixin AgentChatController on ChangeNotifier {
         final colon = rest.indexOf(':');
         final risk = colon > 0 ? rest.substring(0, colon) : 'write';
         final cmd = colon > 0 ? rest.substring(colon + 1) : rest;
-        final step = {
-          'id': (lastPlan == null ? 1 : (((lastPlan!['steps'] as List?)?.length ?? 0) + 1)),
-          'title': '需确认',
-          'command': cmd,
-          'risk': risk,
-        };
-        final steps = <Map<String, dynamic>>[step];
-        if (lastPlan != null && lastPlan!['steps'] is List) {
-          steps.insertAll(0, [for (final e in (lastPlan!['steps'] as List)) if (e is Map) Map<String, dynamic>.from(e)]);
+        final toolName = name.isEmpty ? (command.isEmpty ? 'run_command' : 'run_command') : name;
+        final open = _findOpenToolUse(name: toolName, command: command.isNotEmpty ? command : cmd);
+        if (open >= 0) {
+          final m = agentMessages[open];
+          agentMessages[open] = ChatMessage(
+            role: 'tool',
+            content: '等待确认',
+            kind: ChatKind.toolUse,
+            meta: {
+              ...?m.meta,
+              'part': 'toolUse',
+              'name': toolName,
+              'command': cmd.isNotEmpty ? cmd : (m.meta?['command'] ?? ''),
+              'description': '需要确认后执行',
+              'success': null,
+              'pendingConfirm': true,
+              'risk': risk,
+            },
+            at: m.at,
+          );
         }
-        lastPlan = {'summary': '待确认', 'steps': steps};
-        agentMessages.add(ChatMessage(
-          role: 'assistant',
-          content: '待确认',
-          kind: ChatKind.plan,
-          meta: {'plan': lastPlan, 'outputs': <String, String>{}},
-        ));
-        _lastPlanMsgIndex = agentMessages.length - 1;
+        // Dedup: if the same command is already pending in last plan, just refresh UI.
+        final existingSteps = (lastPlan?['steps'] as List?) ?? const [];
+        final already = existingSteps.any((e) {
+          if (e is! Map) return false;
+          return (e['command']?.toString() ?? '') == cmd;
+        });
+        if (!already) {
+          final step = {
+            'id': (lastPlan == null ? 1 : (((lastPlan!['steps'] as List?)?.length ?? 0) + 1)),
+            'title': '需确认',
+            'command': cmd,
+            'risk': risk,
+          };
+          final steps = <Map<String, dynamic>>[step];
+          if (lastPlan != null && lastPlan!['steps'] is List) {
+            steps.insertAll(0, [
+              for (final e in (lastPlan!['steps'] as List))
+                if (e is Map) Map<String, dynamic>.from(e),
+            ]);
+          }
+          lastPlan = {'summary': '待确认', 'steps': steps};
+          // Replace previous open plan card if still empty, else append.
+          final idx = _lastPlanMsgIndex;
+          final canReplace = idx != null &&
+              idx >= 0 &&
+              idx < agentMessages.length &&
+              agentMessages[idx].kind == ChatKind.plan &&
+              ((agentMessages[idx].meta?['outputs'] as Map?)?.isEmpty ?? true);
+          final planMsg = ChatMessage(
+            role: 'assistant',
+            content: '待确认',
+            kind: ChatKind.plan,
+            meta: {'plan': lastPlan, 'outputs': <String, String>{}},
+          );
+          if (canReplace) {
+            agentMessages[idx!] = planMsg;
+          } else {
+            agentMessages.add(planMsg);
+            _lastPlanMsgIndex = agentMessages.length - 1;
+          }
+        }
         return;
       }
       final toolName = name.isEmpty ? (command.isEmpty ? 'tool' : 'run_command') : name;

@@ -124,7 +124,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     _input.clear();
     setState(() {
       _busy = true;
-      _busyHint = '思考 / 调工具中…';
+      _busyHint = '思考 / 调用工具中…（可点停止）';
     });
     try {
       await state.agentChat(text);
@@ -528,9 +528,10 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                               alignment: WrapAlignment.center,
                               children: [
                                 for (final s in const [
-                                  '查看系统负载与磁盘',
-                                  '最近有哪些失败服务',
-                                  '总结 /var/log 关键错误',
+                                  '看一下负载、内存和磁盘',
+                                  '有哪些失败或重启过的服务？',
+                                  '检查最近系统日志里的错误',
+                                  '当前监听了哪些端口？',
                                 ])
                                   ActionChip(
                                     label: Text(s, style: TextStyle(fontSize: state.agentFontSize - 3)),
@@ -743,7 +744,12 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   String? _lastUserText(AppState state) {
     for (var i = state.agentMessages.length - 1; i >= 0; i--) {
       final m = state.agentMessages[i];
-      if (m.role == 'user' && m.content.trim().isNotEmpty) return m.content.trim();
+      if (m.role != 'user') continue;
+      final t = m.content.trim();
+      if (t.isEmpty) continue;
+      // Synthetic follow-up after user confirms a write command — not retriable intent.
+      if (t.startsWith('用户已确认并执行了以下命令：')) continue;
+      return t;
     }
     return null;
   }

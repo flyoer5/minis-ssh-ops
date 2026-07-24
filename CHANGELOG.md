@@ -1,3 +1,14 @@
+## 1.4.47
+
+### Agent
+- Confirm card: risk badge, copy, 运行并继续 (exec + resume agent with result)
+- 全部运行 for multi-step confirms; hide synthetic continue messages
+- Tool cards: 运行中 spinner, 中文 tool names, pending-confirm state
+- NEEDS_CONFIRM dedup + mark open toolUse; better confirmWrites setting copy
+- Error bubbles copyable; retry skips synthetic confirm follow-ups
+- System prompt: 机枢 identity, noninteractive flags, no re-run after confirm
+- Empty chips refreshed
+
 ## 1.4.46
 
 - Settings: Chinese thinking levels; about shows backend feature chips
