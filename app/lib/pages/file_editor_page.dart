@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 
 /// Full-screen remote text editor (MT Manager–inspired surface).
@@ -263,9 +264,9 @@ class _FileEditorPageState extends State<FileEditorPage> {
         if (await _confirmLeave() && mounted) Navigator.of(context).pop();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0D1117),
+        backgroundColor: AppColors.bg,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF161B22),
+          backgroundColor: AppColors.surface,
           toolbarHeight: 48,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, size: 20),
@@ -282,7 +283,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
                   if (_dirty)
                     const Padding(
                       padding: EdgeInsets.only(right: 6),
-                      child: Icon(Icons.circle, size: 8, color: Color(0xFFFBBF24)),
+                      child: Icon(Icons.circle, size: 8, color: AppColors.warnBright),
                     ),
                   Flexible(
                     child: Text(_name, maxLines: 1, overflow: TextOverflow.ellipsis,
@@ -291,13 +292,13 @@ class _FileEditorPageState extends State<FileEditorPage> {
                 ],
               ),
               Text(widget.path, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                  style: const TextStyle(fontSize: 10, color: AppColors.textMuted, fontFamily: 'monospace')),
             ],
           ),
           actions: [
             IconButton(
               tooltip: '查找/替换',
-              icon: Icon(Icons.search, size: 20, color: _showFind ? const Color(0xFF58A6FF) : null),
+              icon: Icon(Icons.search, size: 20, color: _showFind ? AppColors.accentSoft : null),
               onPressed: () => setState(() {
                 _showFind = !_showFind;
                 if (_showFind) _recomputeFinds();
@@ -318,7 +319,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
               icon: Icon(
                 _readOnly ? Icons.lock_outline : Icons.lock_open_outlined,
                 size: 18,
-                color: _readOnly ? const Color(0xFFD29922) : null,
+                color: _readOnly ? AppColors.warning : null,
               ),
               onPressed: () => setState(() => _readOnly = !_readOnly),
             ),
@@ -351,7 +352,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
                   : Text(
                       _readOnly ? '只读' : '保存',
                       style: TextStyle(
-                        color: (!_dirty || _readOnly) ? const Color(0xFF484F58) : const Color(0xFF3FB950),
+                        color: (!_dirty || _readOnly) ? AppColors.iconFaint : AppColors.success,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -362,7 +363,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
           children: [
             if (_showFind)
               Material(
-                color: const Color(0xFF161B22),
+                color: AppColors.surface,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
                   child: Column(
@@ -391,7 +392,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
                           IconButton(tooltip: '下一个', onPressed: _findHits.isEmpty ? null : () => _jumpFind(next: true), icon: const Icon(Icons.keyboard_arrow_down)),
                           Text(
                             _findHits.isEmpty ? '0/0' : '${_findIdx + 1}/${_findHits.length}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace'),
+                            style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace'),
                           ),
                         ],
                       ),
@@ -426,7 +427,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
                   // line numbers gutter (MT-like)
                   Container(
                     width: lineGutterWidth,
-                    color: const Color(0xFF0D1117),
+                    color: AppColors.bg,
                     padding: const EdgeInsets.only(top: 12, right: 6),
                     child: ListView.builder(
                       controller: _scroll,
@@ -441,13 +442,13 @@ class _FileEditorPageState extends State<FileEditorPage> {
                             fontFamily: 'monospace',
                             fontSize: _fontSize - 1,
                             height: 1.45,
-                            color: (i + 1) == _ln ? const Color(0xFFC9D1D9) : const Color(0xFF484F58),
+                            color: (i + 1) == _ln ? AppColors.textCode : AppColors.iconFaint,
                           ),
                         ),
                       ),
                     ),
                   ),
-                  Container(width: 1, color: const Color(0xFF21262D)),
+                  Container(width: 1, color: AppColors.surface2),
                   Expanded(
                     child: TextField(
                       controller: _ctrl,
@@ -461,9 +462,9 @@ class _FileEditorPageState extends State<FileEditorPage> {
                         fontFamily: 'monospace',
                         fontSize: _fontSize,
                         height: 1.45,
-                        color: _readOnly ? const Color(0xFF8B949E) : const Color(0xFFE6EDF3),
+                        color: _readOnly ? AppColors.textMuted : AppColors.text,
                       ),
-                      cursorColor: const Color(0xFF58A6FF),
+                      cursorColor: AppColors.accentSoft,
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.fromLTRB(10, 12, 10, 12),
@@ -478,7 +479,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
             // status bar (MT-like)
             Container(
               height: 28,
-              color: const Color(0xFF161B22),
+              color: AppColors.surface,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Row(
                 children: [
@@ -487,31 +488,31 @@ class _FileEditorPageState extends State<FileEditorPage> {
                     style: TextStyle(
                       fontSize: 11,
                       color: _readOnly
-                          ? const Color(0xFFD29922)
-                          : (_dirty ? const Color(0xFFFBBF24) : const Color(0xFF8B949E)),
+                          ? AppColors.warning
+                          : (_dirty ? AppColors.warnBright : AppColors.textMuted),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text('Ln $_ln, Col $_col', style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                  Text('Ln $_ln, Col $_col', style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
                   const SizedBox(width: 12),
-                  Text('$lines 行', style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                  Text('$lines 行', style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
                   const Spacer(),
-                  Text(_lang, style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                  Text(_lang, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
                   const SizedBox(width: 10),
                   Tooltip(
                     message: '按 UTF-8 解码/保存；其它编码请在服务端转换',
-                    child: Text(_encoding, style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                    child: Text(_encoding, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
                   ),
                   const SizedBox(width: 10),
                   if (widget.remoteMode != null && widget.remoteMode!.isNotEmpty) ...[
-                    Text(widget.remoteMode!, style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                    Text(widget.remoteMode!, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
                     const SizedBox(width: 8),
                   ],
                   if (widget.remoteSize != null) ...[
-                    Text(_fmtSize(widget.remoteSize!), style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                    Text(_fmtSize(widget.remoteSize!), style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
                     const SizedBox(width: 8),
                   ],
-                  Text('${_ctrl.text.length} 字符', style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+                  Text('${_ctrl.text.length} 字符', style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
                 ],
               ),
             ),

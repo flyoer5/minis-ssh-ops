@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
@@ -75,7 +76,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF161B22),
+      backgroundColor: AppColors.surface,
       builder: (c) {
         return StatefulBuilder(
           builder: (context, setModal) {
@@ -99,7 +100,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                               SizedBox(height: 4),
                               Text(
                                 '点「新会话」会归档当前对话；点条目恢复；可重命名或删除。',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF8B949E), height: 1.35),
+                                style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.35),
                               ),
                             ],
                           ),
@@ -123,11 +124,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                       alignment: Alignment.centerLeft,
                       child: Text(
                         list.isEmpty ? '暂无归档会话' : '共 ${list.length} 个',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E)),
+                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                       ),
                     ),
                   ),
-                  const Divider(height: 1, color: Color(0xFF30363D)),
+                  const Divider(height: 1, color: AppColors.border),
                   Expanded(
                     child: list.isEmpty
                         ? const Center(
@@ -136,113 +137,158 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                               child: Text(
                                 '还没有历史。发几条消息后点「新会话」即可归档。',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: Color(0xFF8B949E)),
+                                style: TextStyle(color: AppColors.textMuted),
                               ),
                             ),
                           )
-                        : ListView.separated(
-                            controller: sc,
-                            itemCount: list.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF21262D)),
-                            itemBuilder: (_, i) {
-                              final s = list[i];
-                              final hostHint = s.hostId == null ? '' : state.hostLabelFor(s.hostId);
-                              final open = state.agentSessionId == s.id;
-                              final when = s.updatedAt;
-                              final ts =
-                                  '${when.month.toString().padLeft(2, '0')}-${when.day.toString().padLeft(2, '0')} '
-                                  '${when.hour.toString().padLeft(2, '0')}:${when.minute.toString().padLeft(2, '0')}';
-                              return ListTile(
-                                dense: true,
-                                selected: open,
-                                selectedTileColor: const Color(0xFF1F6FEB).withAlpha(0x18),
-                                title: Text(
-                                  s.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: open ? FontWeight.w700 : FontWeight.w500,
-                                    color: open ? const Color(0xFF58A6FF) : null,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  [
-                                    '${s.messages.length} 条',
-                                    if (hostHint.isNotEmpty) hostHint,
-                                    ts,
-                                    if (open) '当前',
-                                  ].join(' · '),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF8B949E)),
-                                ),
-                                onTap: () {
-                                  state.openAgentSession(s);
-                                  Navigator.pop(c);
-                                },
-                                trailing: PopupMenuButton<String>(
-                                  tooltip: '更多',
-                                  icon: const Icon(Icons.more_vert, size: 20),
-                                  color: const Color(0xFF161B22),
-                                  onSelected: (v) async {
-                                    if (v == 'rename') {
-                                      final ctrl = TextEditingController(text: s.title);
-                                      final name = await showDialog<String>(
-                                        context: context,
-                                        builder: (d) => AlertDialog(
-                                          title: const Text('重命名会话'),
-                                          content: TextField(
-                                            controller: ctrl,
-                                            autofocus: true,
-                                            maxLength: 48,
-                                            decoration: const InputDecoration(labelText: '标题'),
-                                            onSubmitted: (x) => Navigator.pop(d, x),
+                        : Builder(
+                            builder: (_) {
+                              // Group by host: [(label, [sessions...]), ...]
+                              final groups = <String, List<AgentSession>>{};
+                              final order = <String>[];
+                              for (final s in list) {
+                                final key = s.hostId ?? '';
+                                final label = key.isEmpty
+                                    ? '未绑定主机'
+                                    : (state.hostLabelFor(key).isEmpty ? key : state.hostLabelFor(key));
+                                if (!groups.containsKey(label)) {
+                                  groups[label] = [];
+                                  order.add(label);
+                                }
+                                groups[label]!.add(s);
+                              }
+                              // flat rows: header | tiles
+                              final rows = <Object>[];
+                              for (final label in order) {
+                                rows.add(label);
+                                rows.addAll(groups[label]!);
+                              }
+                              return ListView.builder(
+                                controller: sc,
+                                itemCount: rows.length,
+                                itemBuilder: (_, i) {
+                                  final row = rows[i];
+                                  if (row is String) {
+                                    return Container(
+                                      width: double.infinity,
+                                      color: AppColors.bg,
+                                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                                      child: Text(
+                                        row,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.chipBlue,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  final s = row as AgentSession;
+                                  final hostHint = s.hostId == null ? '' : state.hostLabelFor(s.hostId);
+                                  final open = state.agentSessionId == s.id;
+                                  final when = s.updatedAt;
+                                  final ts =
+                                      '${when.month.toString().padLeft(2, '0')}-${when.day.toString().padLeft(2, '0')} '
+                                      '${when.hour.toString().padLeft(2, '0')}:${when.minute.toString().padLeft(2, '0')}';
+                                  return Column(
+                                    children: [
+                                      ListTile(
+                                        dense: true,
+                                        selected: open,
+                                        selectedTileColor: AppColors.accentDeep.withAlpha(0x18),
+                                        title: Text(
+                                          s.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: open ? FontWeight.w700 : FontWeight.w500,
+                                            color: open ? AppColors.accentSoft : null,
                                           ),
-                                          actions: [
-                                            TextButton(onPressed: () => Navigator.pop(d), child: const Text('取消')),
-                                            FilledButton(
-                                              onPressed: () => Navigator.pop(d, ctrl.text),
-                                              child: const Text('保存'),
+                                        ),
+                                        subtitle: Text(
+                                          [
+                                            '${s.messages.length} 条',
+                                            if (hostHint.isNotEmpty && _onlyCurrentHost) hostHint,
+                                            ts,
+                                            if (open) '当前',
+                                          ].join(' · '),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                                        ),
+                                        onTap: () {
+                                          state.openAgentSession(s);
+                                          Navigator.pop(c);
+                                        },
+                                        trailing: PopupMenuButton<String>(
+                                          tooltip: '更多',
+                                          icon: const Icon(Icons.more_vert, size: 20),
+                                          color: AppColors.surface,
+                                          onSelected: (v) async {
+                                            if (v == 'rename') {
+                                              final ctrl = TextEditingController(text: s.title);
+                                              final name = await showDialog<String>(
+                                                context: context,
+                                                builder: (d) => AlertDialog(
+                                                  title: const Text('重命名会话'),
+                                                  content: TextField(
+                                                    controller: ctrl,
+                                                    autofocus: true,
+                                                    maxLength: 48,
+                                                    decoration: const InputDecoration(labelText: '标题'),
+                                                    onSubmitted: (x) => Navigator.pop(d, x),
+                                                  ),
+                                                  actions: [
+                                                    TextButton(onPressed: () => Navigator.pop(d), child: const Text('取消')),
+                                                    FilledButton(
+                                                      onPressed: () => Navigator.pop(d, ctrl.text),
+                                                      child: const Text('保存'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              if (name != null && name.trim().isNotEmpty) {
+                                                state.renameAgentSession(s.id, name);
+                                                setModal(() {});
+                                              }
+                                            } else if (v == 'delete') {
+                                              final ok = await showDialog<bool>(
+                                                context: context,
+                                                builder: (d) => AlertDialog(
+                                                  title: const Text('删除会话？'),
+                                                  content: Text(s.title, maxLines: 3),
+                                                  actions: [
+                                                    TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('取消')),
+                                                    FilledButton(
+                                                      onPressed: () => Navigator.pop(d, true),
+                                                      child: const Text('删除'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              if (ok == true) {
+                                                state.deleteAgentSession(s.id);
+                                                setModal(() {});
+                                              }
+                                            }
+                                          },
+                                          itemBuilder: (_) => const [
+                                            PopupMenuItem(value: 'rename', child: Text('重命名')),
+                                            PopupMenuItem(
+                                              value: 'delete',
+                                              child: Text('删除', style: TextStyle(color: AppColors.danger)),
                                             ),
                                           ],
                                         ),
-                                      );
-                                      if (name != null && name.trim().isNotEmpty) {
-                                        state.renameAgentSession(s.id, name);
-                                        setModal(() {});
-                                      }
-                                    } else if (v == 'delete') {
-                                      final ok = await showDialog<bool>(
-                                        context: context,
-                                        builder: (d) => AlertDialog(
-                                          title: const Text('删除会话？'),
-                                          content: Text(s.title, maxLines: 3),
-                                          actions: [
-                                            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('取消')),
-                                            FilledButton(
-                                              onPressed: () => Navigator.pop(d, true),
-                                              child: const Text('删除'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      if (ok == true) {
-                                        state.deleteAgentSession(s.id);
-                                        setModal(() {});
-                                      }
-                                    }
-                                  },
-                                  itemBuilder: (_) => const [
-                                    PopupMenuItem(value: 'rename', child: Text('重命名')),
-                                    PopupMenuItem(
-                                      value: 'delete',
-                                      child: Text('删除', style: TextStyle(color: Color(0xFFF85149))),
-                                    ),
-                                  ],
-                                ),
+                                      ),
+                                      const Divider(height: 1, color: AppColors.surface2),
+                                    ],
+                                  );
+                                },
                               );
                             },
                           ),
+                  ),
                   ),
                 ],
               ),
@@ -258,7 +304,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     super.build(context);
     final state = context.watch<AppState>();
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         toolbarHeight: 44,
         titleSpacing: 12,
@@ -341,8 +387,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
             top: false,
             child: Container(
               decoration: const BoxDecoration(
-                color: Color(0xFF0D1117),
-                border: Border(top: BorderSide(color: Color(0xFF21262D))),
+                color: AppColors.bg,
+                border: Border(top: BorderSide(color: AppColors.surface2)),
               ),
               padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
               child: Row(
@@ -354,21 +400,21 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                       focusNode: _focus,
                       minLines: 1,
                       maxLines: 6,
-                      style: TextStyle(fontSize: state.agentFontSize, color: const Color(0xFFE6EDF3)),
+                      style: TextStyle(fontSize: state.agentFontSize, color: AppColors.text),
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(state),
                       decoration: InputDecoration(
                         hintText: state.selectedHostId == null ? '先选主机' : '消息',
-                        hintStyle: const TextStyle(color: Color(0xFF6E7681)),
+                        hintStyle: const TextStyle(color: AppColors.textFaint),
                         filled: true,
-                        fillColor: const Color(0xFF161B22),
+                        fillColor: AppColors.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(color: Color(0xFF30363D)),
+                          borderSide: const BorderSide(color: AppColors.border),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(color: Color(0xFF30363D)),
+                          borderSide: const BorderSide(color: AppColors.border),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(22),
@@ -381,7 +427,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                   const SizedBox(width: 8),
                   Material(
                     color: (_busy || !state.backendOk || state.selectedHostId == null)
-                        ? const Color(0xFF21262D)
+                        ? AppColors.surface2
                         : const Color(0xFF238636),
                     shape: const CircleBorder(),
                     child: IconButton(
@@ -445,14 +491,14 @@ class _ConfirmPlanCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFD29922)),
+        border: Border.all(color: AppColors.warning),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('需要确认的命令', style: TextStyle(fontWeight: FontWeight.w700, fontSize: fs - 2, color: const Color(0xFFD29922))),
+          Text('需要确认的命令', style: TextStyle(fontWeight: FontWeight.w700, fontSize: fs - 2, color: AppColors.warning)),
           const SizedBox(height: 6),
           for (final raw in steps)
             if (raw is Map)
@@ -468,10 +514,10 @@ class _ConfirmPlanCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('[$risk] $cmd', style: TextStyle(fontFamily: 'monospace', fontSize: fs - 3, color: const Color(0xFFC9D1D9))),
+                        Text('[$risk] $cmd', style: TextStyle(fontFamily: 'monospace', fontSize: fs - 3, color: AppColors.textCode)),
                         if (out != null) ...[
                           const SizedBox(height: 3),
-                          Text(out, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 4, color: const Color(0xFF8B949E))),
+                          Text(out, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 4, color: AppColors.textMuted)),
                         ] else
                           Align(
                             alignment: Alignment.centerRight,
@@ -567,7 +613,7 @@ class _Bubble extends StatelessWidget {
     if (msg.kind == ChatKind.status && part != 'toolUse') {
       return Padding(
         padding: const EdgeInsets.only(bottom: 6, left: 2),
-        child: Text(msg.content, style: TextStyle(fontSize: fs - 2.5, color: const Color(0xFF8B949E))),
+        child: Text(msg.content, style: TextStyle(fontSize: fs - 2.5, color: AppColors.textMuted)),
       );
     }
 
@@ -601,14 +647,14 @@ class _Bubble extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: const Color(0xFF6E2A2E)),
         ),
-        child: _MdBody(data: msg.content, baseColor: const Color(0xFFFFB4A9), fontSize: fs - 1),
+        child: _MdBody(data: msg.content, baseColor: AppColors.dangerSoft, fontSize: fs - 1),
       );
     }
 
     // —— text (assistant): Markdown ——
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, right: 4),
-      child: _MdBody(data: msg.content, baseColor: const Color(0xFFE6EDF3), fontSize: fs),
+      child: _MdBody(data: msg.content, baseColor: AppColors.text, fontSize: fs),
     );
   }
 
@@ -700,13 +746,13 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
     final success = _success;
     final Color accent;
     if (running && widget.part == 'toolUse') {
-      accent = const Color(0xFFD29922);
+      accent = AppColors.warning;
     } else if (success == false) {
-      accent = const Color(0xFFF85149);
+      accent = AppColors.danger;
     } else if (success == true) {
-      accent = const Color(0xFF3FB950);
+      accent = AppColors.success;
     } else {
-      accent = const Color(0xFF79C0FF);
+      accent = AppColors.chipBlue;
     }
 
     final body = _body.trim();
@@ -716,9 +762,9 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF30363D)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -770,7 +816,7 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
                             _desc,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: widget.fontSize - 2.5, color: const Color(0xFFC9D1D9), height: 1.3),
+                            style: TextStyle(fontSize: widget.fontSize - 2.5, color: AppColors.textCode, height: 1.3),
                           ),
                         ],
                       ],
@@ -780,14 +826,14 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
                     onTap: widget.onCopy,
                     child: const Padding(
                       padding: EdgeInsets.all(4),
-                      child: Icon(Icons.copy_all, size: 14, color: Color(0xFF8B949E)),
+                      child: Icon(Icons.copy_all, size: 14, color: AppColors.textMuted),
                     ),
                   ),
                   if (hasBody)
                     Icon(
                       _open ? Icons.expand_less : Icons.expand_more,
                       size: 18,
-                      color: const Color(0xFF8B949E),
+                      color: AppColors.textMuted,
                     ),
                 ],
               ),
@@ -797,8 +843,8 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
             Container(
               width: double.infinity,
               decoration: const BoxDecoration(
-                color: Color(0xFF0D1117),
-                border: Border(top: BorderSide(color: Color(0xFF21262D))),
+                color: AppColors.bg,
+                border: Border(top: BorderSide(color: AppColors.surface2)),
               ),
               padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
               child: SelectableText(
@@ -807,7 +853,7 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
                   fontFamily: 'monospace',
                   fontSize: widget.fontSize - 3,
                   height: 1.35,
-                  color: const Color(0xFFC9D1D9),
+                  color: AppColors.textCode,
                 ),
               ),
             ),
@@ -853,16 +899,16 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
               padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
               child: Row(
                 children: [
-                  const Icon(Icons.psychology_outlined, size: 16, color: Color(0xFFA78BFA)),
+                  const Icon(Icons.psychology_outlined, size: 16, color: AppColors.purple),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('思考', style: TextStyle(fontSize: widget.fontSize - 3, fontWeight: FontWeight.w700, color: const Color(0xFFA78BFA))),
+                        Text('思考', style: TextStyle(fontSize: widget.fontSize - 3, fontWeight: FontWeight.w700, color: AppColors.purple)),
                         if (!_open && short.isNotEmpty)
                           Text(short, maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: widget.fontSize - 3.5, color: const Color(0xFF8B949E))),
+                              style: TextStyle(fontSize: widget.fontSize - 3.5, color: AppColors.textMuted)),
                       ],
                     ),
                   ),
@@ -870,10 +916,10 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
                     onTap: widget.onCopy,
                     child: const Padding(
                       padding: EdgeInsets.all(4),
-                      child: Icon(Icons.copy_all, size: 14, color: Color(0xFF8B949E)),
+                      child: Icon(Icons.copy_all, size: 14, color: AppColors.textMuted),
                     ),
                   ),
-                  Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18, color: const Color(0xFF8B949E)),
+                  Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18, color: AppColors.textMuted),
                 ],
               ),
             ),
@@ -882,8 +928,8 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
             Container(
               width: double.infinity,
               decoration: const BoxDecoration(
-                color: Color(0xFF0D1117),
-                border: Border(top: BorderSide(color: Color(0xFF21262D))),
+                color: AppColors.bg,
+                border: Border(top: BorderSide(color: AppColors.surface2)),
               ),
               padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
               child: SelectableText(
@@ -914,29 +960,29 @@ class _MdBody extends StatelessWidget {
       h3: base.copyWith(fontSize: fontSize + 2, fontWeight: FontWeight.w700),
       strong: base.copyWith(fontWeight: FontWeight.w800),
       em: base.copyWith(fontStyle: FontStyle.italic),
-      listBullet: base.copyWith(color: const Color(0xFF8B949E)),
+      listBullet: base.copyWith(color: AppColors.textMuted),
       listIndent: 20,
-      blockquote: base.copyWith(color: const Color(0xFF8B949E)),
+      blockquote: base.copyWith(color: AppColors.textMuted),
       blockquoteDecoration: const BoxDecoration(
-        border: Border(left: BorderSide(color: Color(0xFF30363D), width: 3)),
+        border: Border(left: BorderSide(color: AppColors.border, width: 3)),
       ),
       blockquotePadding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
       code: TextStyle(
         fontFamily: 'monospace',
         fontSize: fontSize - 1.5,
         color: const Color(0xFFFF7B72),
-        backgroundColor: const Color(0xFF21262D),
+        backgroundColor: AppColors.surface2,
       ),
       codeblockDecoration: BoxDecoration(
-        color: const Color(0xFF0D1117),
+        color: AppColors.bg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF30363D)),
+        border: Border.all(color: AppColors.border),
       ),
       codeblockPadding: const EdgeInsets.all(10),
-      a: base.copyWith(color: const Color(0xFF58A6FF), decoration: TextDecoration.underline),
+      a: base.copyWith(color: AppColors.accentSoft, decoration: TextDecoration.underline),
       tableHead: base.copyWith(fontWeight: FontWeight.w700),
       tableBody: base.copyWith(fontSize: fontSize - 1),
-      tableBorder: TableBorder.all(color: const Color(0xFF30363D), width: 0.5),
+      tableBorder: TableBorder.all(color: AppColors.border, width: 0.5),
       tableCellsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       blockSpacing: 8,
     );

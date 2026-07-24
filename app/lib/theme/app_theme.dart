@@ -16,6 +16,18 @@ abstract final class AppColors {
   static const warning = Color(0xFFD29922);
   static const danger = Color(0xFFF85149);
   static const purple = Color(0xFFA78BFA);
+  static const textCode = Color(0xFFC9D1D9);
+  static const chipBlue = Color(0xFF79C0FF);
+  static const slate = Color(0xFF64748B);
+  static const darkBar = Color(0xFF1E1E1E);
+  static const slateDeep = Color(0xFF1E293B);
+  static const iconFaint = Color(0xFF484F58);
+  static const dangerSoft = Color(0xFFFFB4A9);
+  static const warnBright = Color(0xFFFBBF24);
+  static const accentDeep = Color(0xFF1F6FEB);
+  static const cyan = Color(0xFF4FC3F7);
+  static const dangerAlt = Color(0xFFEF4444);
+  static const warnAlt = Color(0xFFF59E0B);
 }
 
 ThemeData buildAppTheme() {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
@@ -89,7 +90,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
-        backgroundColor: const Color(0xFF161B22),
+        backgroundColor: AppColors.surface,
         builder: (c) {
           return StatefulBuilder(
             builder: (c, setLocal) {
@@ -112,7 +113,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                                 SizedBox(height: 4),
                                 Text(
                                   '首次连接自动信任并记住指纹；重装系统后若指纹变化需删除旧记录再连。',
-                                  style: TextStyle(fontSize: 12, color: Color(0xFF8B949E), height: 1.35),
+                                  style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.35),
                                 ),
                               ],
                             ),
@@ -125,7 +126,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                       child: Row(
                         children: [
-                          Text('${entries.length} 条信任记录', style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
+                          Text('${entries.length} 条信任记录', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
                           const Spacer(),
                           if (entries.isNotEmpty)
                             TextButton(
@@ -147,7 +148,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                                 setLocal(() => entries = []);
                                 if (mounted) _toast('已清空 $n 条');
                               },
-                              child: const Text('全部清空', style: TextStyle(color: Color(0xFFF85149))),
+                              child: const Text('全部清空', style: TextStyle(color: AppColors.danger)),
                             ),
                           IconButton(
                             tooltip: '刷新',
@@ -162,14 +163,14 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                         ],
                       ),
                     ),
-                    const Divider(height: 1, color: Color(0xFF30363D)),
+                    const Divider(height: 1, color: AppColors.border),
                     Expanded(
                       child: entries.isEmpty
-                          ? const Center(child: Text('暂无信任记录', style: TextStyle(color: Color(0xFF8B949E))))
+                          ? const Center(child: Text('暂无信任记录', style: TextStyle(color: AppColors.textMuted)))
                           : ListView.separated(
                               controller: sc,
                               itemCount: entries.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF21262D)),
+                              separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.surface2),
                               itemBuilder: (_, i) {
                                 final e = entries[i];
                                 final host = e['host']?.toString() ?? '';
@@ -185,11 +186,11 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                                       if (fp.isNotEmpty) 'SHA256:$fp',
                                     ].join(' · '),
                                     maxLines: 3,
-                                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF8B949E)),
+                                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textMuted),
                                   ),
                                   trailing: IconButton(
                                     tooltip: '删除并重新信任',
-                                    icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFF85149)),
+                                    icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.danger),
                                     onPressed: () async {
                                       final ok = await showDialog<bool>(
                                         context: c,
@@ -238,7 +239,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
-        backgroundColor: const Color(0xFF161B22),
+        backgroundColor: AppColors.surface,
         builder: (c) {
           return StatefulBuilder(
             builder: (c, setLocal) {
@@ -261,7 +262,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                                 SizedBox(height: 4),
                                 Text(
                                   '会话变长后会把旧轮次折叠成 summary/facts，供后续对话引用。可按会话查看或清空。',
-                                  style: TextStyle(fontSize: 12, color: Color(0xFF8B949E), height: 1.35),
+                                  style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.35),
                                 ),
                               ],
                             ),
@@ -274,7 +275,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                       child: Row(
                         children: [
-                          Text('${entries.length} 条', style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
+                          Text('${entries.length} 条', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
                           const Spacer(),
                           if (entries.isNotEmpty)
                             TextButton(
@@ -295,7 +296,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                                 setLocal(() => entries = []);
                                 if (mounted) _toast('已清空 ${res['deleted'] ?? ''} 条记忆');
                               },
-                              child: const Text('全部清空', style: TextStyle(color: Color(0xFFF85149))),
+                              child: const Text('全部清空', style: TextStyle(color: AppColors.danger)),
                             ),
                           IconButton(
                             tooltip: '刷新',
@@ -310,15 +311,15 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                         ],
                       ),
                     ),
-                    const Divider(height: 1, color: Color(0xFF30363D)),
+                    const Divider(height: 1, color: AppColors.border),
                     Expanded(
                       child: entries.isEmpty
-                          ? const Center(child: Text('暂无长期记忆', style: TextStyle(color: Color(0xFF8B949E))))
+                          ? const Center(child: Text('暂无长期记忆', style: TextStyle(color: AppColors.textMuted)))
                           : ListView.separated(
                               controller: sc,
                               padding: const EdgeInsets.only(bottom: 16),
                               itemCount: entries.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF21262D)),
+                              separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.surface2),
                               itemBuilder: (_, i) {
                                 final e = entries[i];
                                 final sid = e['sessionId']?.toString() ?? '';
@@ -337,11 +338,11 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                                     ].where((s) => s.trim().isNotEmpty).join('\n'),
                                     maxLines: 5,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E), height: 1.3),
+                                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.3),
                                   ),
                                   trailing: IconButton(
                                     tooltip: '删除',
-                                    icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFF85149)),
+                                    icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.danger),
                                     onPressed: () async {
                                       final ok = await showDialog<bool>(
                                         context: c,
@@ -420,9 +421,9 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF30363D)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -448,14 +449,14 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                     children: [
                       Text(title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
                       if (subtitle != null)
-                        Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E), height: 1.25)),
+                        Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, height: 1.25)),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFF21262D)),
+          const Divider(height: 1, color: AppColors.surface2),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
             child: Column(
@@ -486,13 +487,13 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFF0D1117),
+                color: AppColors.bg,
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFF30363D)),
+                border: Border.all(color: AppColors.border),
               ),
               child: Text(
                 value.toStringAsFixed(0),
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF79C0FF)),
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppColors.chipBlue),
               ),
             ),
           ],
@@ -513,7 +514,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           ),
         ),
         if (hint != null)
-          Text(hint, style: const TextStyle(fontSize: 11, color: Color(0xFF6E7681))),
+          Text(hint, style: const TextStyle(fontSize: 11, color: AppColors.textFaint)),
       ],
     );
   }
@@ -531,16 +532,16 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F6FEB).withAlpha(0x22),
+        color: AppColors.accentDeep.withAlpha(0x22),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFF1F6FEB).withAlpha(0x55)),
+        border: Border.all(color: AppColors.accentDeep.withAlpha(0x55)),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF79C0FF))),
+      child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.chipBlue)),
     );
   }
 
   Widget _statusChip(bool ok, String text) {
-    final c = ok ? const Color(0xFF3FB950) : const Color(0xFFF85149);
+    final c = ok ? AppColors.success : AppColors.danger;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -564,10 +565,10 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     super.build(context);
     final state = context.watch<AppState>();
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         toolbarHeight: 44,
-        backgroundColor: const Color(0xFF0D1117),
+        backgroundColor: AppColors.bg,
         titleSpacing: 12,
         title: const Text('设置', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       ),
@@ -577,7 +578,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           // —— 关于 ——
           _section(
             icon: Icons.info_outline,
-            accent: const Color(0xFF58A6FF),
+            accent: AppColors.accentSoft,
             title: '关于',
             subtitle: '个人向 · arm64 · 固定签名可覆盖升级',
             children: [
@@ -589,17 +590,17 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1F6FEB).withAlpha(0x33),
+                      color: AppColors.accentDeep.withAlpha(0x33),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text('1.4.9', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF79C0FF))),
+                    child: const Text('1.4.9', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue)),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
               const Text(
                 '主机探针 · Agent · 终端 · SFTP · 审计',
-                style: TextStyle(fontSize: 12, color: Color(0xFF8B949E)),
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
             ],
           ),
@@ -607,7 +608,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           // —— 后端 ——
           _section(
             icon: Icons.dns_outlined,
-            accent: const Color(0xFF3FB950),
+            accent: AppColors.success,
             title: '后端连接',
             subtitle: '本机 Go 服务地址与 Local Token',
             children: [
@@ -620,18 +621,18 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                   _portChip(state.api.baseUrl),
                   Text(
                     state.api.baseUrl,
-                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF8B949E)),
+                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textMuted),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
               const Text(
                 '本地后端端口按 applicationId 派生（17890+hash%1024），避免与其它安装包抢同一端口。',
-                style: TextStyle(fontSize: 11, color: Color(0xFF6E7681), height: 1.35),
+                style: TextStyle(fontSize: 11, color: AppColors.textFaint, height: 1.35),
               ),
               if (state.backendNote != null) ...[
                 const SizedBox(height: 6),
-                Text(state.backendNote!, style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E))),
+                Text(state.backendNote!, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
               ],
               const SizedBox(height: 8),
               TextField(
@@ -672,7 +673,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           // —— 大模型 ——
           _section(
             icon: Icons.smart_toy_outlined,
-            accent: const Color(0xFFA78BFA),
+            accent: AppColors.purple,
             title: '大模型',
             subtitle: 'OpenAI 兼容网关 · 思考级别',
             children: [
@@ -745,7 +746,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               if (_modelIds.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 2, bottom: 6),
-                  child: Text('共 ${_modelIds.length} 个模型', style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E))),
+                  child: Text('共 ${_modelIds.length} 个模型', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
                 ),
               DropdownButtonFormField<String>(
                 value: const ['none', 'auto', 'low', 'medium', 'high', 'xhigh'].contains(thinkingLevel)
@@ -795,7 +796,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           // —— 显示 / 字体 ——
           _section(
             icon: Icons.text_fields,
-            accent: const Color(0xFF79C0FF),
+            accent: AppColors.chipBlue,
             title: '显示与字体',
             subtitle: '分别调整终端 / Agent / 记录',
             children: [
@@ -831,21 +832,21 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D1117),
+                  color: AppColors.bg,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF30363D)),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('预览 · Agent', style: TextStyle(fontSize: state.agentFontSize, color: const Color(0xFFE6EDF3))),
+                    Text('预览 · Agent', style: TextStyle(fontSize: state.agentFontSize, color: AppColors.text)),
                     const SizedBox(height: 4),
                     Text(
                       '预览 · 记录  exit 0 · 命令示例',
                       style: TextStyle(
                         fontSize: state.recordsFontSize,
                         fontFamily: 'monospace',
-                        color: const Color(0xFF8B949E),
+                        color: AppColors.textMuted,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -854,7 +855,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       style: TextStyle(
                         fontSize: state.termFontSize,
                         fontFamily: 'monospace',
-                        color: const Color(0xFF3FB950),
+                        color: AppColors.success,
                       ),
                     ),
                   ],
@@ -866,7 +867,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           // —— Agent 行为 ——
           _section(
             icon: Icons.rule_folder_outlined,
-            accent: const Color(0xFFD29922),
+            accent: AppColors.warning,
             title: 'Agent 行为',
             subtitle: '确认策略与安全',
             children: [
@@ -942,7 +943,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               if (state.selectedHostId == null)
                 const Padding(
                   padding: EdgeInsets.only(top: 6),
-                  child: Text('请先在「主机」页选中一台主机', style: TextStyle(fontSize: 11, color: Color(0xFFD29922))),
+                  child: Text('请先在「主机」页选中一台主机', style: TextStyle(fontSize: 11, color: AppColors.warning)),
                 ),
               if (pingMsg != null) ...[
                 const SizedBox(height: 8),
@@ -950,13 +951,13 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                   width: double.infinity,
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0D1117),
+                    color: AppColors.bg,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF30363D)),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: SelectableText(
                     pingMsg!,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11.5, color: Color(0xFFC9D1D9)),
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11.5, color: AppColors.textCode),
                   ),
                 ),
               ],
@@ -966,7 +967,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           // —— 保活 ——
           _section(
             icon: Icons.battery_charging_full,
-            accent: const Color(0xFF3FB950),
+            accent: AppColors.success,
             title: '后台保活',
             subtitle: '忽略电池优化，降低被系统杀掉概率',
             children: [
@@ -978,7 +979,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                   state.batteryIgnored ? '已忽略（有利于后台）' : '未忽略，后台易被杀',
                   style: TextStyle(
                     fontSize: 11.5,
-                    color: state.batteryIgnored ? const Color(0xFF3FB950) : const Color(0xFFD29922),
+                    color: state.batteryIgnored ? AppColors.success : AppColors.warning,
                   ),
                 ),
                 trailing: FilledButton.tonal(

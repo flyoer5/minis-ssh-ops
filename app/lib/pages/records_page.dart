@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:ssh_ai_agent/backend/native_backend.dart';
+import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
@@ -31,15 +35,15 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
   Color _riskColor(String risk) {
     switch (risk) {
       case 'destructive':
-        return const Color(0xFFF85149);
+        return AppColors.danger;
       case 'write':
-        return const Color(0xFFD29922);
+        return AppColors.warning;
       case 'blocked':
         return const Color(0xFFA371F7);
       case 'read':
-        return const Color(0xFF3FB950);
+        return AppColors.success;
       default:
-        return const Color(0xFF8B949E);
+        return AppColors.textMuted;
     }
   }
 
@@ -85,11 +89,11 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         toolbarHeight: 44,
         titleSpacing: 12,
-        backgroundColor: const Color(0xFF0D1117),
+        backgroundColor: AppColors.bg,
         title: Text('记录', style: TextStyle(fontSize: fs + 1, fontWeight: FontWeight.w700)),
         actions: [
           IconButton(
@@ -169,17 +173,17 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
               alignment: Alignment.centerLeft,
               child: Text(
                 list.isEmpty ? '暂无记录' : '共 ${list.length} 条',
-                style: TextStyle(fontSize: fs - 2, color: const Color(0xFF8B949E)),
+                style: TextStyle(fontSize: fs - 2, color: AppColors.textMuted),
               ),
             ),
           ),
           Expanded(
             child: list.isEmpty
-                ? Center(child: Text('暂无审计记录', style: TextStyle(fontSize: fs, color: const Color(0xFF8B949E))))
+                ? Center(child: Text('暂无审计记录', style: TextStyle(fontSize: fs, color: AppColors.textMuted)))
                 : ListView.separated(
                     padding: const EdgeInsets.only(bottom: 16),
                     itemCount: list.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF21262D)),
+                    separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.surface2),
                     itemBuilder: (ctx, i) {
                       final e = list[i];
                       final risk = e['risk']?.toString() ?? '';
@@ -215,7 +219,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                                         fontSize: fs,
                                         fontFamily: 'monospace',
                                         height: 1.3,
-                                        color: const Color(0xFFE6EDF3),
+                                        color: AppColors.text,
                                       ),
                                     ),
                                     const SizedBox(height: 4),
@@ -224,16 +228,16 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                                       runSpacing: 2,
                                       children: [
                                         Text(risk.isEmpty ? '—' : risk, style: TextStyle(fontSize: fs - 2, color: rc, fontWeight: FontWeight.w600)),
-                                        Text('exit $exit', style: TextStyle(fontSize: fs - 2, color: const Color(0xFF8B949E), fontFamily: 'monospace')),
-                                        Text(hostName, style: TextStyle(fontSize: fs - 2, color: const Color(0xFF79C0FF))),
+                                        Text('exit $exit', style: TextStyle(fontSize: fs - 2, color: AppColors.textMuted, fontFamily: 'monospace')),
+                                        Text(hostName, style: TextStyle(fontSize: fs - 2, color: AppColors.chipBlue)),
                                         if (at.isNotEmpty)
-                                          Text(at, style: TextStyle(fontSize: fs - 2, color: const Color(0xFF8B949E), fontFamily: 'monospace')),
+                                          Text(at, style: TextStyle(fontSize: fs - 2, color: AppColors.textMuted, fontFamily: 'monospace')),
                                       ],
                                     ),
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.chevron_right, size: 16, color: Color(0xFF484F58)),
+                              const Icon(Icons.chevron_right, size: 16, color: AppColors.iconFaint),
                             ],
                           ),
                         ),
@@ -273,11 +277,25 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
       buf.writeln(row);
     }
     final csv = buf.toString();
+    String? savedPath;
+    if (NativeBackend.isAndroidNative) {
+      try {
+        final name =
+            'ssh-audit-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('.', '').substring(0, 15)}.csv';
+        final b64 = base64Encode(utf8.encode(csv));
+        savedPath = await NativeBackend.saveBytesToDownloads(name: name, b64: b64);
+      } catch (_) {
+        savedPath = null;
+      }
+    }
     await Clipboard.setData(ClipboardData(text: csv));
     if (!context.mounted) return;
+    final msg = savedPath != null && savedPath.isNotEmpty
+        ? '已导出 ${list.length} 条到下载目录，并复制到剪贴板'
+        : '已复制 ${list.length} 条 CSV 到剪贴板';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('已复制 ${list.length} 条 CSV 到剪贴板'),
+        content: Text(msg),
         action: SnackBarAction(
           label: '预览',
           onPressed: () {
@@ -289,7 +307,12 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                   width: double.maxFinite,
                   height: 320,
                   child: SingleChildScrollView(
-                    child: SelectableText(csv, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                    child: SelectableText(
+                      savedPath != null && savedPath!.isNotEmpty
+                          ? '文件: $savedPath\n\n$csv'
+                          : csv,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                    ),
                   ),
                 ),
                 actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭'))],
@@ -310,7 +333,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF161B22),
+      backgroundColor: AppColors.surface,
       builder: (c) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.55,
@@ -320,25 +343,25 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
           controller: sc,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: const Color(0xFF30363D), borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 12),
-            Text('命令详情', style: TextStyle(fontSize: fs + 1, fontWeight: FontWeight.w700, color: const Color(0xFFE6EDF3))),
+            Text('命令详情', style: TextStyle(fontSize: fs + 1, fontWeight: FontWeight.w700, color: AppColors.text)),
             const SizedBox(height: 8),
-            SelectableText(cmd, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 1, color: const Color(0xFFC9D1D9))),
+            SelectableText(cmd, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 1, color: AppColors.textCode)),
             const SizedBox(height: 10),
-            Text('风险 $risk · exit ${e['exitCode']} · $hostName', style: TextStyle(fontSize: fs - 2, color: const Color(0xFF8B949E))),
-            if (at.isNotEmpty) Text(at, style: TextStyle(fontSize: fs - 2, color: const Color(0xFF8B949E), fontFamily: 'monospace')),
+            Text('风险 $risk · exit ${e['exitCode']} · $hostName', style: TextStyle(fontSize: fs - 2, color: AppColors.textMuted)),
+            if (at.isNotEmpty) Text(at, style: TextStyle(fontSize: fs - 2, color: AppColors.textMuted, fontFamily: 'monospace')),
             if (stdout.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text('stdout', style: TextStyle(fontSize: fs - 2, fontWeight: FontWeight.w700, color: const Color(0xFF3FB950))),
+              Text('stdout', style: TextStyle(fontSize: fs - 2, fontWeight: FontWeight.w700, color: AppColors.success)),
               const SizedBox(height: 4),
-              SelectableText(stdout, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 2, color: const Color(0xFFC9D1D9))),
+              SelectableText(stdout, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 2, color: AppColors.textCode)),
             ],
             if (stderr.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text('stderr', style: TextStyle(fontSize: fs - 2, fontWeight: FontWeight.w700, color: const Color(0xFFF85149))),
+              Text('stderr', style: TextStyle(fontSize: fs - 2, fontWeight: FontWeight.w700, color: AppColors.danger)),
               const SizedBox(height: 4),
-              SelectableText(stderr, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 2, color: const Color(0xFFFFB4A9))),
+              SelectableText(stderr, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 2, color: AppColors.dangerSoft)),
             ],
           ],
         ),

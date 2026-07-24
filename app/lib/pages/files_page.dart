@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
@@ -130,7 +131,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
   Future<void> _pickSort() async {
     final a = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: AppColors.darkBar,
       builder: (c) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -520,8 +521,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                 },
               ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Color(0xFFF85149)),
-              title: const Text('删除', style: TextStyle(color: Color(0xFFF85149))),
+              leading: const Icon(Icons.delete_outline, color: AppColors.danger),
+              title: const Text('删除', style: TextStyle(color: AppColors.danger)),
               onTap: () {
                 Navigator.pop(c);
                 active.selected
@@ -546,7 +547,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
 
   Widget _pane(BuildContext context, _Pane pane, int idx) {
     final focused = focus == idx;
-    final border = focused ? const Color(0xFF4FC3F7) : const Color(0xFF333333);
+    final border = focused ? AppColors.cyan : const Color(0xFF333333);
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => focus = idx),
@@ -558,7 +559,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
           child: Column(
             children: [
               Material(
-                color: focused ? const Color(0xFF1A2A33) : const Color(0xFF1E1E1E),
+                color: focused ? const Color(0xFF1A2A33) : AppColors.darkBar,
                 child: Column(
                   children: [
                     // MT-style path strip: ~ / full/path   [↑] [↻]
@@ -571,7 +572,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
-                              color: focused ? const Color(0xFF4FC3F7) : const Color(0xFF666666),
+                              color: focused ? AppColors.cyan : const Color(0xFF666666),
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -690,7 +691,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                           child: Icon(
                                             sel ? Icons.check_circle : Icons.radio_button_unchecked,
                                             size: 18,
-                                            color: sel ? const Color(0xFF4FC3F7) : Colors.white38,
+                                            color: sel ? AppColors.cyan : Colors.white38,
                                           ),
                                         )
                                       else
@@ -796,7 +797,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
               tooltip: '更多',
               padding: EdgeInsets.zero,
               icon: const Icon(Icons.more_vert, size: 20),
-              color: const Color(0xFF1E1E1E),
+              color: AppColors.darkBar,
               onSelected: (v) {
                 switch (v) {
                   case 'delete':
@@ -816,7 +817,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                 PopupMenuItem(
                   value: 'delete',
                   enabled: active.selected.isNotEmpty,
-                  child: const Text('删除选中', style: TextStyle(color: Color(0xFFF85149))),
+                  child: const Text('删除选中', style: TextStyle(color: AppColors.danger)),
                 ),
                 const PopupMenuItem(value: 'cancel', child: Text('取消多选')),
               ],
@@ -829,7 +830,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
               onPressed: () async {
                 final a = await showModalBottomSheet<String>(
                   context: context,
-                  backgroundColor: const Color(0xFF1E1E1E),
+                  backgroundColor: AppColors.darkBar,
                   builder: (c) => SafeArea(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -871,7 +872,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
             PopupMenuButton<String>(
               tooltip: '更多',
               icon: const Icon(Icons.more_vert, size: 20),
-              color: const Color(0xFF1E1E1E),
+              color: AppColors.darkBar,
               onSelected: (v) {
                 switch (v) {
                   case 'focus':
@@ -903,7 +904,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: AppColors.darkBar,
         toolbarHeight: 44,
         titleSpacing: 8,
         title: Text(

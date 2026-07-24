@@ -133,7 +133,15 @@ class MainActivity : FlutterActivity() {
             val resolver = applicationContext.contentResolver
             val values = android.content.ContentValues().apply {
                 put(android.provider.MediaStore.Downloads.DISPLAY_NAME, safe)
-                put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/octet-stream")
+                put(
+                    android.provider.MediaStore.Downloads.MIME_TYPE,
+                    when {
+                        safe.endsWith(".csv", true) -> "text/csv"
+                        safe.endsWith(".txt", true) || safe.endsWith(".log", true) -> "text/plain"
+                        safe.endsWith(".json", true) -> "application/json"
+                        else -> "application/octet-stream"
+                    },
+                )
                 put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
             }
             val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)

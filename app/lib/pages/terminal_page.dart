@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
@@ -36,11 +37,11 @@ class _TerminalPageState extends State<TerminalPage>
   String _prev = '';
 
   static const _bg = Color(0xFF000000);
-  static const _fg = Color(0xFFE6EDF3);
-  static const _green = Color(0xFF3FB950);
-  static const _muted = Color(0xFF8B949E);
-  static const _keyBg = Color(0xFF21262D);
-  static const _bar = Color(0xFF0D1117);
+  static const _fg = AppColors.text;
+  static const _green = AppColors.success;
+  static const _muted = AppColors.textMuted;
+  static const _keyBg = AppColors.surface2;
+  static const _bar = AppColors.bg;
 
   @override
   bool get wantKeepAlive => true;
@@ -342,7 +343,7 @@ class _TerminalPageState extends State<TerminalPage>
         child: SizedBox(
           height: 36,
           child: Material(
-            color: on ? const Color(0xFF30363D) : _keyBg,
+            color: on ? AppColors.border : _keyBg,
             borderRadius: BorderRadius.circular(6),
             child: InkWell(
               borderRadius: BorderRadius.circular(6),
@@ -381,7 +382,7 @@ class _TerminalPageState extends State<TerminalPage>
                 height: 36,
                 padding: const EdgeInsets.only(left: 10, right: 2),
                 decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Color(0xFF21262D))),
+                  border: Border(bottom: BorderSide(color: AppColors.surface2)),
                 ),
                 child: Row(
                   children: [
@@ -438,7 +439,7 @@ class _TerminalPageState extends State<TerminalPage>
                       tooltip: '更多',
                       padding: EdgeInsets.zero,
                       icon: const Icon(Icons.more_vert, size: 18, color: _muted),
-                      color: const Color(0xFF161B22),
+                      color: AppColors.surface,
                       onSelected: (v) async {
                         switch (v) {
                           case 'paste':

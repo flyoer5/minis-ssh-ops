@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
@@ -136,11 +137,11 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                           contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFF1E293B)),
+                            borderSide: const BorderSide(color: AppColors.slateDeep),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFF1E293B)),
+                            borderSide: const BorderSide(color: AppColors.slateDeep),
                           ),
                         ),
                       ),
@@ -164,7 +165,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                 addr.contains(q);
                           }).toList();
                           if (list.isEmpty) {
-                            return const Center(child: Text('无匹配主机', style: TextStyle(color: Color(0xFF64748B))));
+                            return const Center(child: Text('无匹配主机', style: TextStyle(color: AppColors.slate)));
                           }
                           return RefreshIndicator(
                             onRefresh: () => _refreshAll(state),
@@ -210,7 +211,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     }
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF161B22),
+      backgroundColor: AppColors.surface,
       isScrollControlled: true,
       builder: (c) => Padding(
         padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(c).bottom),
@@ -219,14 +220,14 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: const Color(0xFF30363D), borderRadius: BorderRadius.circular(2)))),
+              Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 12),
               Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              Text(addr, style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E), fontFamily: 'monospace')),
+              Text(addr, style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontFamily: 'monospace')),
               const SizedBox(height: 8),
               Text(
                 s.ok ? 'Online · ${s.oneLine}' : s.oneLine,
-                style: TextStyle(color: s.ok ? const Color(0xFF3FB950) : const Color(0xFFF85149), fontWeight: FontWeight.w700),
+                style: TextStyle(color: s.ok ? AppColors.success : AppColors.danger, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
               for (final l in s.lines)
@@ -235,16 +236,16 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(width: 48, child: Text(l.label, style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E)))),
-                      Expanded(child: SelectableText(l.value, style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Color(0xFFC9D1D9)))),
+                      SizedBox(width: 48, child: Text(l.label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted))),
+                      Expanded(child: SelectableText(l.value, style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: AppColors.textCode))),
                     ],
                   ),
                 ),
               if (s.detail.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                const Text('原始详情', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF8B949E))),
+                const Text('原始详情', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
                 const SizedBox(height: 4),
-                SelectableText(s.detail, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF8B949E))),
+                SelectableText(s.detail, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textMuted)),
               ],
             ],
           ),
@@ -269,8 +270,8 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
               onTap: () => Navigator.pop(c, 'edit'),
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Color(0xFFF85149)),
-              title: const Text('删除', style: TextStyle(color: Color(0xFFF85149))),
+              leading: const Icon(Icons.delete_outline, color: AppColors.danger),
+              title: const Text('删除', style: TextStyle(color: AppColors.danger)),
               onTap: () => Navigator.pop(c, 'delete'),
             ),
           ],
@@ -510,16 +511,16 @@ class _StatusCard extends StatelessWidget {
   }
 
   Color _barColor(double? p) {
-    if (p == null) return const Color(0xFF64748B);
-    if (p >= 0.9) return const Color(0xFFEF4444);
-    if (p >= 0.75) return const Color(0xFFF59E0B);
+    if (p == null) return AppColors.slate;
+    if (p >= 0.9) return AppColors.dangerAlt;
+    if (p >= 0.75) return AppColors.warnAlt;
     return const Color(0xFF22C55E);
   }
 
   Color get _status {
-    if (loading) return const Color(0xFFFBBF24);
-    if (summary == null) return const Color(0xFF64748B);
-    if (!summary!.ok) return const Color(0xFFEF4444);
+    if (loading) return AppColors.warnBright;
+    if (summary == null) return AppColors.slate;
+    if (!summary!.ok) return AppColors.dangerAlt;
     return const Color(0xFF22C55E);
   }
 
@@ -554,7 +555,7 @@ class _StatusCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: selected ? const Color(0xFF3B82F6) : const Color(0xFF1E293B),
+          color: selected ? const Color(0xFF3B82F6) : AppColors.slateDeep,
           width: selected ? 1.5 : 1,
         ),
       ),
@@ -597,7 +598,7 @@ class _StatusCard extends StatelessWidget {
                       constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                       tooltip: '探针详情',
                       onPressed: onShowDetail,
-                      icon: const Icon(Icons.info_outline, size: 16, color: Color(0xFF8B949E)),
+                      icon: const Icon(Icons.info_outline, size: 16, color: AppColors.textMuted),
                     ),
                   if (loading)
                     const Padding(
@@ -610,21 +611,21 @@ class _StatusCard extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       onPressed: onRefresh,
-                      icon: const Icon(Icons.sync, size: 16, color: Color(0xFF64748B)),
+                      icon: const Icon(Icons.sync, size: 16, color: AppColors.slate),
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       onPressed: onMenu,
-                      icon: const Icon(Icons.more_vert, size: 16, color: Color(0xFF64748B)),
+                      icon: const Icon(Icons.more_vert, size: 16, color: AppColors.slate),
                     ),
                   ],
                 ],
               ),
               Padding(
                 padding: const EdgeInsets.only(left: 16, top: 1),
-                child: Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontFamily: 'monospace')),
+                child: Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: AppColors.slate, fontFamily: 'monospace')),
               ),
               const SizedBox(height: 6),
               if (summary == null && !loading)
@@ -660,7 +661,7 @@ class _StatusCard extends StatelessWidget {
                     return memMain == '—' ? full : memMain;
                   }(),
                   memP,
-                  const Color(0xFFA78BFA),
+                  AppColors.purple,
                 ),
                 const SizedBox(height: 5),
                 _metricRow(
@@ -695,7 +696,7 @@ class _StatusCard extends StatelessWidget {
                       final at = probedAt;
                       if (at == null) return const Color(0xFF94A3B8);
                       final sec = DateTime.now().difference(at).inSeconds;
-                      if (sec > 120) return const Color(0xFFF59E0B); // stale
+                      if (sec > 120) return AppColors.warnAlt; // stale
                       return const Color(0xFF94A3B8);
                     }(),
                     fontFamily: 'monospace',
@@ -743,7 +744,7 @@ class _StatusCard extends StatelessWidget {
           child: LinearProgressIndicator(
             value: progress?.clamp(0.0, 1.0) ?? 0,
             minHeight: 4,
-            backgroundColor: const Color(0xFF1E293B),
+            backgroundColor: AppColors.slateDeep,
             color: progress == null ? const Color(0xFF334155) : c,
           ),
         ),

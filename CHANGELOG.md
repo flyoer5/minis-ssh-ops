@@ -1,3 +1,9 @@
+## 1.4.17
+
+- I: AppColors rollout across pages
+- I: audit CSV to Downloads + clipboard
+- I: agent sessions grouped by host
+
 ## 1.4.16
 
 - H: agent session rename/delete sheet polish
