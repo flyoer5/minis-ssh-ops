@@ -1,3 +1,8 @@
+## 1.4.24
+
+- Fix: final reasoning no longer creates a second thinking card under the answer
+- Reasoning coalesced per turn (above reply)
+
 ## 1.4.23
 
 - Fix: do not TrimSpace reasoning stream tokens (spaces between words)

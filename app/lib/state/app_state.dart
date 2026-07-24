@@ -672,33 +672,83 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Minis-like: reasoning is a separate foldable block (not mixed into answer text).
+  /// Index of the latest reasoning bubble in the *current turn* (after last user msg).
+  /// Returns -1 if none. Used so final/reasoning never spawns a second block under the answer.
+  int _lastReasoningIndexInTurn() {
+    for (var i = agentMessages.length - 1; i >= 0; i--) {
+      final m = agentMessages[i];
+      if (m.role == 'user') break;
+      if (m.kind == ChatKind.reasoning) return i;
+    }
+    return -1;
+  }
+
+  /// Whether this turn already has assistant answer text (after last user).
+  bool _turnHasAssistantText() {
+    for (var i = agentMessages.length - 1; i >= 0; i--) {
+      final m = agentMessages[i];
+      if (m.role == 'user') break;
+      if (m.role == 'assistant' && m.kind == ChatKind.text) return true;
+    }
+    return false;
+  }
+
+  String _normReason(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  /// Minis-like: reasoning is a foldable block *above* the answer for this turn.
+  /// Never append a new thinking card after assistant text (final often re-sends full reasoning).
   void _pushReasoning(String reasoning) {
     final r = reasoning.trim();
     if (r.isEmpty) return;
-    if (agentMessages.isNotEmpty) {
-      final last = agentMessages.last;
-      if (last.kind == ChatKind.reasoning) {
-        if (r == last.content || last.content.contains(r)) return;
-        if (r.startsWith(last.content)) {
-          agentMessages[agentMessages.length - 1] = ChatMessage(
+    final idx = _lastReasoningIndexInTurn();
+    if (idx >= 0) {
+      final last = agentMessages[idx];
+      final a = _normReason(last.content);
+      final b = _normReason(r);
+      // Same / prefix / overlap → keep one block (prefer longer full text)
+      if (a == b || b.startsWith(a) || a.startsWith(b) || a.contains(b) || b.contains(a)) {
+        if (r.length >= last.content.length) {
+          agentMessages[idx] = ChatMessage(
             role: 'assistant',
             content: r,
             kind: ChatKind.reasoning,
             meta: {'part': 'reasoning'},
             at: last.at,
           );
-          return;
         }
-        agentMessages[agentMessages.length - 1] = ChatMessage(
-          role: 'assistant',
-          content: '${last.content}\n\n$r',
-          kind: ChatKind.reasoning,
-          meta: {'part': 'reasoning'},
-          at: last.at,
-        );
         return;
       }
+      // Different segment in same turn (e.g. pre-tool vs post-tool): merge into one card
+      agentMessages[idx] = ChatMessage(
+        role: 'assistant',
+        content: '${last.content}\n\n$r',
+        kind: ChatKind.reasoning,
+        meta: {'part': 'reasoning'},
+        at: last.at,
+      );
+      return;
+    }
+    // No reasoning yet this turn.
+    // If answer text already exists, do NOT put thinking under the reply —
+    // insert just before the first assistant text of this turn, or skip if empty utility.
+    if (_turnHasAssistantText()) {
+      // Find first assistant text after last user; insert reasoning before it
+      var insertAt = agentMessages.length;
+      for (var i = agentMessages.length - 1; i >= 0; i--) {
+        final m = agentMessages[i];
+        if (m.role == 'user') break;
+        if (m.role == 'assistant' && m.kind == ChatKind.text) insertAt = i;
+      }
+      agentMessages.insert(
+        insertAt,
+        ChatMessage(
+          role: 'assistant',
+          content: r,
+          kind: ChatKind.reasoning,
+          meta: {'part': 'reasoning'},
+        ),
+      );
+      return;
     }
     agentMessages.add(ChatMessage(
       role: 'assistant',
@@ -739,21 +789,39 @@ class AppState extends ChangeNotifier {
     ));
   }
 
-  /// Stream token: append to last reasoning bubble (or create one).
+  /// Stream token: append into current-turn reasoning bubble (never after answer text).
   void _appendReasoningDelta(String piece) {
     if (piece.isEmpty) return;
-    if (agentMessages.isNotEmpty) {
-      final last = agentMessages.last;
-      if (last.kind == ChatKind.reasoning) {
-        agentMessages[agentMessages.length - 1] = ChatMessage(
+    final idx = _lastReasoningIndexInTurn();
+    if (idx >= 0) {
+      final last = agentMessages[idx];
+      agentMessages[idx] = ChatMessage(
+        role: 'assistant',
+        content: last.content + piece,
+        kind: ChatKind.reasoning,
+        meta: {'part': 'reasoning'},
+        at: last.at,
+      );
+      return;
+    }
+    // If answer already started, open/update a reasoning card *above* it
+    if (_turnHasAssistantText()) {
+      var insertAt = agentMessages.length;
+      for (var i = agentMessages.length - 1; i >= 0; i--) {
+        final m = agentMessages[i];
+        if (m.role == 'user') break;
+        if (m.role == 'assistant' && m.kind == ChatKind.text) insertAt = i;
+      }
+      agentMessages.insert(
+        insertAt,
+        ChatMessage(
           role: 'assistant',
-          content: last.content + piece,
+          content: piece,
           kind: ChatKind.reasoning,
           meta: {'part': 'reasoning'},
-          at: last.at,
-        );
-        return;
-      }
+        ),
+      );
+      return;
     }
     agentMessages.add(ChatMessage(
       role: 'assistant',
@@ -1071,6 +1139,8 @@ class AppState extends ChangeNotifier {
         description: desc,
       );
     } else if (type == 'final' && (content.isNotEmpty || reasoning.isNotEmpty)) {
+      // final often re-sends full reasoning after deltas + answer already rendered.
+      // Only coalesce into existing turn reasoning — never stack under the reply.
       if (reasoning.isNotEmpty) _pushReasoning(reasoning);
       if (content.isNotEmpty) {
         // Stream already drew the bubble via assistant_delta; final must not spawn a second one.
