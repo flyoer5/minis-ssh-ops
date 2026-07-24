@@ -222,14 +222,14 @@ class _FileEditorPageState extends State<FileEditorPage> {
 
   void _jumpFind({required bool next}) {
     if (_findHits.isEmpty) return;
+    if (next) {
+      _findIdx = (_findIdx + 1) % _findHits.length;
+    } else {
+      _findIdx = (_findIdx - 1 + _findHits.length) % _findHits.length;
+    }
+    final start = _findHits[_findIdx];
+    final end = start + _findCtrl.text.length;
     setState(() {
-      if (next) {
-        _findIdx = (_findIdx + 1) % _findHits.length;
-      } else {
-        _findIdx = (_findIdx - 1 + _findHits.length) % _findHits.length;
-      }
-      final start = _findHits[_findIdx];
-      final end = start + _findCtrl.text.length;
       _ctrl.selection = TextSelection(baseOffset: start, extentOffset: end);
       _focus.requestFocus();
     });

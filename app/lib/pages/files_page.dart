@@ -605,7 +605,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     return '${(n / (1024 * 1024 * 1024)).toStringAsFixed(1)} G';
   }
 
-  Widget _pane(BuildContext context, _Pane pane, int idx) {
+  Widget _pane(BuildContext context, _Pane pane, int idx, {double fontSize = 14}) {
+    final fs = fontSize;
     final focused = focus == idx;
     final border = focused ? AppColors.cyan : AppColors.gray33;
     return Expanded(
@@ -1007,12 +1008,12 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       body: dualPane
           ? Row(
               children: [
-                _pane(context, _left, 0),
+                _pane(context, _left, 0, fontSize: fs),
                 Container(width: 1, color: AppColors.dividerSoft),
-                _pane(context, _right, 1),
+                _pane(context, _right, 1, fontSize: fs),
               ],
             )
-          : Row(children: [_pane(context, active, focus)]),
+          : Row(children: [_pane(context, active, focus, fontSize: fs)]),
     );
   }
 }
