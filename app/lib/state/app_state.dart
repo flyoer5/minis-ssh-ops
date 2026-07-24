@@ -22,6 +22,8 @@ class AppState extends ChangeNotifier {
 
   final ApiClient api;
   bool backendOk = false;
+  List<String> backendFeatures = [];
+  String? backendVersion;
   bool startingBackend = false;
   String? backendError;
   String? backendNote;
@@ -214,6 +216,12 @@ class AppState extends ChangeNotifier {
       final h = await api.health();
       backendOk = h['ok'] == true;
       if (backendOk) backendError = null;
+      final feats = h['features'];
+      if (feats is List) {
+        backendFeatures = [for (final e in feats) e.toString()];
+      }
+      final ver = h['version']?.toString();
+      if (ver != null && ver.isNotEmpty) backendVersion = ver;
     } catch (e) {
       backendOk = false;
       backendError = e.toString();

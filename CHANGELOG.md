@@ -1,3 +1,8 @@
+## 1.4.22
+
+- Blink streaming cursor; terminal copy plain/raw; probe retry+copy; settings feature chips
+- includes 1.4.21 stream coalesce fix
+
 ## 1.4.21
 
 - Fix: streaming assistant_delta + final no longer creates duplicate bubbles

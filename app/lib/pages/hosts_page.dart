@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
@@ -190,7 +191,14 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                   onSelect: () => state.selectHost(id),
                                   onRefresh: () => _refreshProbe(state, id, force: true),
                                   onMenu: () => _hostMenu(context, state, h),
-                                  onShowDetail: () => _showProbeDetail(context, name, addr, _summary[id]),
+                                  onShowDetail: () => _showProbeDetail(
+                                    context,
+                                    name,
+                                    addr,
+                                    _summary[id],
+                                    hostId: id,
+                                    onRetry: () => _refreshProbe(state, id, force: true),
+                                  ),
                                 );
                               },
                             ),
@@ -204,7 +212,14 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   }
 
 
-  void _showProbeDetail(BuildContext context, String name, String addr, ProbeSummary? s) {
+  void _showProbeDetail(
+    BuildContext context,
+    String name,
+    String addr,
+    ProbeSummary? s, {
+    String? hostId,
+    VoidCallback? onRetry,
+  }) {
     if (s == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('尚无探针数据')));
       return;
@@ -247,6 +262,38 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                 const SizedBox(height: 4),
                 SelectableText(s.detail, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textMuted)),
               ],
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  if (!s.ok && onRetry != null)
+                    FilledButton.icon(
+                      onPressed: () {
+                        Navigator.pop(c);
+                        onRetry();
+                      },
+                      icon: const Icon(Icons.sync, size: 16),
+                      label: const Text('重试探针'),
+                    ),
+                  if (!s.ok && onRetry != null) const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final buf = StringBuffer()
+                        ..writeln(name)
+                        ..writeln(addr)
+                        ..writeln(s.ok ? 'Online' : s.oneLine)
+                        ..writeln(s.detail.isNotEmpty ? s.detail : s.oneLine);
+                      await Clipboard.setData(ClipboardData(text: buf.toString()));
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已复制错误/详情'), duration: Duration(seconds: 1)),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.copy_all, size: 16),
+                    label: const Text('复制'),
+                  ),
+                ],
+              ),
             ],
           ),
         ),

@@ -712,11 +712,12 @@ class _Bubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _MdBody(data: msg.content, baseColor: AppColors.text, fontSize: fs),
-          if (streaming)
+                    if (streaming)
             Padding(
               padding: const EdgeInsets.only(top: 2),
-              child: Text('▍', style: TextStyle(fontSize: fs, color: AppColors.accentSoft, height: 1)),
+              child: _BlinkCursor(fontSize: fs),
             ),
+
         ],
       ),
     );
@@ -1058,6 +1059,42 @@ class _MdBody extends StatelessWidget {
       shrinkWrap: true,
       fitContent: true,
       onTapLink: (text, href, title) {},
+    );
+  }
+}
+
+/// Blinking block cursor for streaming assistant text.
+class _BlinkCursor extends StatefulWidget {
+  final double fontSize;
+  const _BlinkCursor({this.fontSize = 15});
+
+  @override
+  State<_BlinkCursor> createState() => _BlinkCursorState();
+}
+
+class _BlinkCursorState extends State<_BlinkCursor> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 530))..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.15, end: 1.0).animate(_c),
+      child: Text(
+        '█',
+        style: TextStyle(fontSize: widget.fontSize, color: AppColors.accentSoft, height: 1),
+      ),
     );
   }
 }

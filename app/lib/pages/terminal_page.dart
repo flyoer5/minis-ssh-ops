@@ -421,6 +421,23 @@ class _TerminalPageState extends State<TerminalPage>
                             _send(text.replaceAll('\n', '\r'));
                             _openKb();
                             break;
+                          case 'copy_plain':
+                            final plain = stripAnsi(_buf.toString());
+                            await Clipboard.setData(ClipboardData(text: plain));
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('已复制纯文本'), duration: Duration(seconds: 1)),
+                              );
+                            }
+                            break;
+                          case 'copy_raw':
+                            await Clipboard.setData(ClipboardData(text: _buf.toString()));
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('已复制原始输出'), duration: Duration(seconds: 1)),
+                              );
+                            }
+                            break;
                           case 'clear':
                             setState(() => _buf.clear());
                             break;
@@ -429,8 +446,11 @@ class _TerminalPageState extends State<TerminalPage>
                             break;
                         }
                       },
+
                       itemBuilder: (_) => const [
                         PopupMenuItem(value: 'paste', child: Text('粘贴')),
+                        PopupMenuItem(value: 'copy_plain', child: Text('复制纯文本')),
+                        PopupMenuItem(value: 'copy_raw', child: Text('复制原始(含ANSI)')),
                         PopupMenuItem(value: 'clear', child: Text('清屏')),
                         PopupMenuItem(value: 'reconnect', child: Text('重连')),
                       ],

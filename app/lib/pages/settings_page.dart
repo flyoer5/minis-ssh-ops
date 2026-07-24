@@ -630,6 +630,43 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 '本地后端端口按 applicationId 派生（17890+hash%1024），避免与其它安装包抢同一端口。',
                 style: TextStyle(fontSize: 11, color: AppColors.textFaint, height: 1.35),
               ),
+              if (state.backendVersion != null) ...[
+                const SizedBox(height: 6),
+                Text('后端版本 ${state.backendVersion}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
+              ],
+              if (state.backendFeatures.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Text('能力', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final f in state.backendFeatures)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface2,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: f == 'tokstream' || f == 'stream' || f == 'fscopy' || f == 'fsmove'
+                                ? AppColors.accentSoft.withAlpha(0x66)
+                                : AppColors.border,
+                          ),
+                        ),
+                        child: Text(
+                          f,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600,
+                            color: f == 'tokstream' || f == 'stream' ? AppColors.accentSoft : AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
               if (state.backendNote != null) ...[
                 const SizedBox(height: 6),
                 Text(state.backendNote!, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
