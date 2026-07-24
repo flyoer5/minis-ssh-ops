@@ -5,6 +5,8 @@
 - Settings & Records: `wantKeepAlive: false` to free memory off-tab
 - Slim backend status strip (replace tall MaterialBanner)
 - Test: host auth body assembly unit test
+- Structure: extract `AgentChatController` mixin (~850 lines streaming/session/tool pairing)
+- AppState slimmed to bootstrap/hosts/probe/LLM/config (~500 lines)
 
 ## 1.4.30
 
