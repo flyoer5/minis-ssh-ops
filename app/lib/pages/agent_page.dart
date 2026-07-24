@@ -398,6 +398,14 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                               height: 1.45,
                             ),
                           ),
+                          if (state.selectedHostId == null) ...[
+                            const SizedBox(height: 14),
+                            FilledButton.tonalIcon(
+                              onPressed: () => NavScope.maybeOf(context)?.go(0),
+                              icon: const Icon(Icons.dns_outlined, size: 18),
+                              label: const Text('去选主机'),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -453,6 +461,35 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                     },
                   ),
           ),
+          if (_canRetryLast(state))
+            Material(
+              color: AppColors.surface,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.replay, size: 16, color: AppColors.accentSoft),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '可重试：${_lastUserText(state) ?? ""}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      ),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: AppColors.accentSoft,
+                      ),
+                      onPressed: () => _retryLast(state),
+                      child: const Text('重试', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           // Minis-like composer
           SafeArea(
             top: false,
@@ -543,6 +580,57 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       _busyHint = '已停止';
     });
   }
+
+
+  String? _lastUserText(AppState state) {
+    for (var i = state.agentMessages.length - 1; i >= 0; i--) {
+      final m = state.agentMessages[i];
+      if (m.role == 'user' && m.content.trim().isNotEmpty) return m.content.trim();
+    }
+    return null;
+  }
+
+  bool _canRetryLast(AppState state) {
+    if (_busy || state.agentBusy || state.selectedHostId == null) return false;
+    if (_lastUserText(state) == null) return false;
+    for (var i = state.agentMessages.length - 1; i >= 0; i--) {
+      final m = state.agentMessages[i];
+      if (m.role == 'user') return false;
+      if (m.kind == ChatKind.error) return true;
+      if (m.kind == ChatKind.status &&
+          (m.content.contains('停止') || m.content.contains('取消') || m.meta?['interrupted'] == true)) {
+        return true;
+      }
+      if (m.meta?['interrupted'] == true) return true;
+      if (m.kind == ChatKind.text || m.kind == ChatKind.reasoning) continue;
+    }
+    return false;
+  }
+
+  Future<void> _retryLast(AppState state) async {
+    final text = _lastUserText(state);
+    if (text == null || _busy) return;
+    setState(() {
+      _busy = true;
+      _busyHint = '重试中…';
+    });
+    try {
+      await state.agentChat(text);
+    } catch (e) {
+      if (mounted) {
+        final short = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(short.length > 160 ? '${short.substring(0, 160)}…' : short)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+        _bottom();
+      }
+    }
+  }
+
 
   Future<void> _handleHostKeyMismatch(AppState state) async {
     final go = await showDialog<bool>(

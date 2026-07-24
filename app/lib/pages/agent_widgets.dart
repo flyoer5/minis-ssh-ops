@@ -163,9 +163,27 @@ class _Bubble extends StatelessWidget {
 
     // —— memory / generic status line ——
     if (part == 'status' || msg.kind == ChatKind.status) {
+      final stop = msg.meta?['interrupted'] == true || msg.content.contains('停止') || msg.content.contains('取消');
       return Padding(
         padding: const EdgeInsets.only(bottom: 6, left: 2),
-        child: Text(msg.content, style: TextStyle(fontSize: fs - 2.5, color: AppColors.textMuted)),
+        child: Row(
+          children: [
+            if (stop) ...[
+              const Icon(Icons.stop_circle_outlined, size: 14, color: AppColors.warning),
+              const SizedBox(width: 6),
+            ],
+            Expanded(
+              child: Text(
+                msg.content,
+                style: TextStyle(
+                  fontSize: fs - 2.5,
+                  color: stop ? AppColors.warning : AppColors.textMuted,
+                  fontWeight: stop ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -174,6 +192,7 @@ class _Bubble extends StatelessWidget {
       return _ReasoningBlock(
         content: msg.content,
         fontSize: fs,
+        interrupted: msg.meta?['interrupted'] == true,
         onCopy: () => _copy(context, msg.content),
       );
     }
@@ -199,6 +218,11 @@ class _Bubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (msg.meta?['interrupted'] == true)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text('已中断', style: TextStyle(fontSize: fs - 4, color: AppColors.warning, fontWeight: FontWeight.w700)),
+            ),
           if (streaming)
             SelectableText(
               msg.content,
@@ -425,8 +449,9 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
 class _ReasoningBlock extends StatefulWidget {
   final String content;
   final double fontSize;
+  final bool interrupted;
   final VoidCallback onCopy;
-  const _ReasoningBlock({required this.content, required this.onCopy, this.fontSize = 15});
+  const _ReasoningBlock({required this.content, required this.onCopy, this.fontSize = 15, this.interrupted = false});
 
   @override
   State<_ReasoningBlock> createState() => _ReasoningBlockState();
@@ -463,7 +488,16 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('思考', style: TextStyle(fontSize: widget.fontSize - 3, fontWeight: FontWeight.w700, color: AppColors.purple)),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('思考', style: TextStyle(fontSize: widget.fontSize - 3, fontWeight: FontWeight.w700, color: AppColors.purple)),
+                            if (widget.interrupted) ...[
+                              const SizedBox(width: 8),
+                              Text('已中断', style: TextStyle(fontSize: widget.fontSize - 4, color: AppColors.warning, fontWeight: FontWeight.w700)),
+                            ],
+                          ],
+                        ),
                         if (!_open && short.isNotEmpty)
                           Text(short, maxLines: 1, overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontSize: widget.fontSize - 3.5, color: AppColors.textMuted)),

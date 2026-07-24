@@ -136,7 +136,37 @@ mixin AgentChatController on ChangeNotifier {
     api.cancelAgentStream();
     agentBusy = false;
     _flushStreamNotify();
-    _pushMsg(ChatMessage(role: 'assistant', content: '已取消', kind: ChatKind.status));
+    // Tag open turn bubbles so UI can show「已中断」on half-finished text/thinking.
+    for (var i = agentMessages.length - 1; i >= 0; i--) {
+      final m = agentMessages[i];
+      if (m.role == 'user') break;
+      if (m.kind == ChatKind.text || m.kind == ChatKind.reasoning) {
+        final meta = <String, dynamic>{
+          if (m.meta != null) ...m.meta!,
+          'interrupted': true,
+        };
+        // Seal stream draft so it won't keep looking "live"
+        if (meta['part']?.toString() == 'text_delta') meta['part'] = 'text';
+        agentMessages[i] = ChatMessage(
+          role: m.role,
+          content: m.content,
+          kind: m.kind,
+          meta: meta,
+          at: m.at,
+        );
+      }
+    }
+    final already = agentMessages.isNotEmpty &&
+        agentMessages.last.kind == ChatKind.status &&
+        (agentMessages.last.content == '已停止生成' || agentMessages.last.content == '已取消');
+    if (!already) {
+      _pushMsg(ChatMessage(
+        role: 'assistant',
+        content: '已停止生成',
+        kind: ChatKind.status,
+        meta: {'interrupted': true},
+      ));
+    }
     notifyListeners();
   }
 

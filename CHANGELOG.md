@@ -1,3 +1,9 @@
+## 1.4.36
+
+- Agent polish: empty-state jump to hosts; retry last after stop/error
+- Interrupted bubbles tagged「已中断」; stop status clearer
+- Continues 1.4.35: ErrorWidget recovery, safer add-host (not installed by default)
+
 ## 1.4.35
 
 - Fix: friendly ErrorWidget instead of stuck red crash screen
