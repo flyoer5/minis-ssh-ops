@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bufio"
+	"context"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -90,7 +91,11 @@ func mustJSONWithoutStream(body []byte) []byte {
 }
 
 func (c *Client) postChatStream(body []byte, onDelta func(kind, text string)) (LoopMsg, error) {
-	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/chat/completions", bytes.NewReader(body))
+	ctx := c.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return LoopMsg{}, err
 	}
@@ -144,6 +149,10 @@ func (c *Client) postChatStream(body []byte, onDelta func(kind, text string)) (L
 	buf := make([]byte, 0, 64*1024)
 	sc.Buffer(buf, 2<<20)
 	for sc.Scan() {
+		if err := ctx.Err(); err != nil {
+			_ = resp.Body.Close()
+			return LoopMsg{}, err
+		}
 		line := sc.Text()
 		if line == "" {
 			continue

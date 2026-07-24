@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -112,6 +113,12 @@ func (c *Client) RunLoopStream(userText string, history []LoopMsg, run ToolRunne
 	}
 
 	for round := 0; round < maxRounds; round++ {
+		if c.Ctx != nil {
+			if err := c.Ctx.Err(); err != nil {
+				push(LoopEvent{Type: "error", Content: "cancelled"})
+				return events, msgs, err
+			}
+		}
 		// Prefer OpenAI-style token stream when a sink is present (SSE UI);
 		// otherwise keep non-stream batch chat for simple callers.
 		var asst LoopMsg
@@ -158,6 +165,12 @@ func (c *Client) RunLoopStream(userText string, history []LoopMsg, run ToolRunne
 			push(LoopEvent{Type: "assistant", Content: strings.TrimSpace(asst.Content), Reasoning: strings.TrimSpace(asst.Reasoning)})
 		}
 		for _, tc := range asst.ToolCalls {
+			if c.Ctx != nil {
+				if err := c.Ctx.Err(); err != nil {
+					push(LoopEvent{Type: "error", Content: "cancelled"})
+					return events, msgs, err
+				}
+			}
 			args := map[string]any{}
 			_ = json.Unmarshal([]byte(tc.Function.Arguments), &args)
 			cmd, _ := args["command"].(string)
@@ -233,7 +246,11 @@ func (c *Client) chatTools(messages []LoopMsg) (LoopMsg, error) {
 }
 
 func (c *Client) postChat(body []byte) (LoopMsg, error) {
-	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/chat/completions", bytes.NewReader(body))
+	ctx := c.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return LoopMsg{}, err
 	}

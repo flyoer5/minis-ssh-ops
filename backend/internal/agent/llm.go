@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +18,9 @@ type Client struct {
 	Model         string
 	ThinkingLevel string // none|low|medium|high|xhigh|auto
 	HTTP          *http.Client
+	// Req is cancelled when the SSE client disconnects (user stop).
+	// LLM HTTP requests and tool rounds should respect it.
+	Ctx context.Context
 }
 
 type Msg struct {
@@ -42,6 +46,7 @@ func NewClient(baseURL, apiKey, model string) *Client {
 		BaseURL: strings.TrimRight(baseURL, "/"),
 		APIKey:  apiKey,
 		Model:   model,
+		Ctx:     context.Background(),
 		HTTP: &http.Client{
 			Timeout:   120 * time.Second,
 			Transport: tr,

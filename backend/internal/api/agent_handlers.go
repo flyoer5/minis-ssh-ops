@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"encoding/json"
@@ -75,6 +76,10 @@ func (s *Server) handleExecV2(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) runSSH(hostID, command string) (sshx.ExecResult, error) {
+	return s.runSSHContext(context.Background(), hostID, command)
+}
+
+func (s *Server) runSSHContext(ctx context.Context, hostID, command string) (sshx.ExecResult, error) {
 	h, err := s.Store.GetHost(hostID)
 	if err != nil {
 		return sshx.ExecResult{}, err
@@ -83,7 +88,7 @@ func (s *Server) runSSH(hostID, command string) (sshx.ExecResult, error) {
 	if err != nil {
 		return sshx.ExecResult{}, err
 	}
-	return sshx.Exec(sshx.ConnectParams{
+	return sshx.ExecContext(ctx, sshx.ConnectParams{
 		Host:          h.Host,
 		Port:          h.Port,
 		Username:      h.Username,
@@ -150,7 +155,7 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	run := func(name string, args map[string]any) (string, error) {
 		switch name {
 		case "probe_host":
-			res, err := s.runSSH(body.HostID, probeScript)
+			res, err := s.runSSHContext(r.Context(), body.HostID, probeScript)
 			if err != nil {
 				return "", err
 			}
@@ -181,7 +186,7 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 				})
 				return "", fmt.Errorf("NEEDS_CONFIRM:%s:%s", lvl, cmd)
 			}
-			res, err := s.runSSH(body.HostID, cmd)
+			res, err := s.runSSHContext(r.Context(), body.HostID, cmd)
 			if err != nil {
 				return "", err
 			}
@@ -269,15 +274,23 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 
-	writeEv := func(v any) {
+	writeEv := func(v any) bool {
+		if err := r.Context().Err(); err != nil {
+			return false
+		}
 		b, _ := json.Marshal(v)
-		fmt.Fprintf(w, "data: %s\n\n", b)
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", b); err != nil {
+			return false
+		}
 		flusher.Flush()
+		return true
 	}
 	writeEv(map[string]any{"type": "session", "sessionId": body.SessionID})
 
 	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
 	cli.ThinkingLevel = llmCfg.ThinkingLevel
+	// Cancel LLM + SSH when the mobile client closes the SSE (user hit 停止).
+	cli.Ctx = r.Context()
 	_ = s.Store.AddChat(body.SessionID, "user", body.Message)
 	history, _ := agent.BuildMemoryMessages(s.Store, body.SessionID, body.Message, 16)
 
@@ -285,7 +298,7 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 	run := func(name string, args map[string]any) (string, error) {
 		switch name {
 		case "probe_host":
-			res, err := s.runSSH(body.HostID, probeScript)
+			res, err := s.runSSHContext(r.Context(), body.HostID, probeScript)
 			if err != nil {
 				return "", err
 			}
@@ -315,7 +328,7 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 				})
 				return "", fmt.Errorf("NEEDS_CONFIRM:%s:%s", lvl, cmd)
 			}
-			res, err := s.runSSH(body.HostID, cmd)
+			res, err := s.runSSHContext(r.Context(), body.HostID, cmd)
 			if err != nil {
 				return "", err
 			}
@@ -335,10 +348,15 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	events, _, err := cli.RunLoopStream(body.Message, history, run, 5, func(ev agent.LoopEvent) {
-		writeEv(ev)
+		_ = writeEv(ev)
 	})
 	if err != nil {
-		writeEv(map[string]any{"type": "error", "content": err.Error()})
+		// cancelled: client already gone — don't bother error event
+		if r.Context().Err() == nil {
+			_ = writeEv(map[string]any{"type": "error", "content": err.Error()})
+		} else {
+			return
+		}
 	}
 	for i := len(events) - 1; i >= 0; i-- {
 		if events[i].Type == "final" || events[i].Type == "assistant" {
@@ -348,10 +366,13 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if r.Context().Err() != nil {
+		return
+	}
 	_ = agent.MaybeRefreshMemory(cli, s.Store, body.SessionID, 20, 8)
 	mem, _ := s.Store.GetSessionMemory(body.SessionID)
-	writeEv(map[string]any{"type": "memory", "content": mem.Summary, "facts": mem.Facts})
-	writeEv(map[string]any{"type": "done", "sessionId": body.SessionID})
+	_ = writeEv(map[string]any{"type": "memory", "content": mem.Summary, "facts": mem.Facts})
+	_ = writeEv(map[string]any{"type": "done", "sessionId": body.SessionID})
 }
 
 func (s *Server) handleAgentPlan(w http.ResponseWriter, r *http.Request) {
@@ -448,7 +469,7 @@ func (s *Server) handleAgentExecStep(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	res, err := s.runSSH(body.HostID, body.Command)
+	res, err := s.runSSHContext(r.Context(), body.HostID, body.Command)
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return

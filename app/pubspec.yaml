@@ -1,7 +1,7 @@
 name: ssh_ai_agent
 description: Personal Android AI SSH ops tool (Flutter UI + local Go backend)
 publish_to: "none"
-version: 1.4.24+56
+version: 1.4.25+57
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

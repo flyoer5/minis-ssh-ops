@@ -1,3 +1,8 @@
+## 1.4.25
+
+- Real stop: cancel request context aborts LLM stream + SSH session (SIGKILL best-effort)
+- SSE write stops on client disconnect; skip memory/done after cancel
+
 ## 1.4.24
 
 - Fix: final reasoning no longer creates a second thinking card under the answer
