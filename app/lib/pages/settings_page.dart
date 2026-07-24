@@ -726,6 +726,41 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 value: state.hostCardCompact,
                 onChanged: (v) => state.setHostCardCompact(v),
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('流式 Markdown', style: TextStyle(fontSize: 13.5)),
+                subtitle: const Text(
+                  '边生成边渲 MD（可能抖动）；关闭则结束后再渲染',
+                  style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                ),
+                value: state.streamMarkdown,
+                onChanged: (v) => state.setStreamMarkdown(v),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('探针并发', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                  ),
+                  Text(
+                    '${state.probeConcurrency}',
+                    style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
+                  ),
+                ],
+              ),
+              Slider(
+                value: state.probeConcurrency.toDouble().clamp(1, 6),
+                min: 1,
+                max: 6,
+                divisions: 5,
+                label: '${state.probeConcurrency}',
+                onChanged: (v) => state.setProbeConcurrency(v.round()),
+              ),
+              const Text(
+                '刷新主机列表时同时探测的 SSH 数（1–6）',
+                style: TextStyle(fontSize: 11, color: AppColors.textFaint),
+              ),
               const SizedBox(height: 8),
               _fontSlider(
                 context: context,

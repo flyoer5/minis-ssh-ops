@@ -1,3 +1,9 @@
+## 1.4.38
+
+- Settings: 流式 Markdown toggle; probe concurrency 1–6 slider
+- Hosts: probe workers use probeConcurrency pref
+- Agent: optional live MD while streaming; session content truncated on save (12k)
+
 ## 1.4.37
 
 - Agent: auto-follow stream to bottom when near end (won't yank if user scrolled up)

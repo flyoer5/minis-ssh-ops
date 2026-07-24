@@ -222,6 +222,8 @@ mixin AgentChatController on ChangeNotifier {
   Future<void> _saveSessionsToPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final list = <Map<String, dynamic>>[];
+    // Keep SharedPreferences payload bounded (20 sessions × 80 msgs × ~12k chars).
+    const maxContent = 12000;
     for (final s in agentSessions.take(20)) {
       list.add({
         'id': s.id,
@@ -231,7 +233,9 @@ mixin AgentChatController on ChangeNotifier {
           for (final m in s.messages.take(80))
             {
               'role': m.role,
-              'content': m.content,
+              'content': m.content.length > maxContent
+                  ? '${m.content.substring(0, maxContent)}…'
+                  : m.content,
               'kind': m.kind.name,
               if (m.meta != null) 'meta': m.meta,
             },

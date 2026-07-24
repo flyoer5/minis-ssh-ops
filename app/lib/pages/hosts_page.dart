@@ -42,9 +42,6 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     }
   }
 
-  /// Limit concurrent SSH probes so a long host list does not stampede the network.
-  static const int _probeConcurrency = 3;
-
   Future<void> _probeMany(AppState state, {required bool force}) async {
     final ids = <String>[
       for (final h in state.hosts)
@@ -59,7 +56,9 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
         await _refreshProbe(state, ids[i], force: force);
       }
     }
-    final n = ids.length < _probeConcurrency ? ids.length : _probeConcurrency;
+    // From settings (1–6); clamp again defensively.
+    final limit = state.probeConcurrency.clamp(1, 6);
+    final n = ids.length < limit ? ids.length : limit;
     await Future.wait([for (var k = 0; k < n; k++) worker()]);
   }
 

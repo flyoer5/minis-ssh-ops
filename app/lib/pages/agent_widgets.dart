@@ -212,7 +212,10 @@ class _Bubble extends StatelessWidget {
       );
     }
 
-    // While streaming: plain text (avoids Markdown re-parse jitter). Final bubble uses MD.
+    // Default: plain while streaming (less MD re-parse jitter). Final uses MD.
+    // Settings → 流式 Markdown 可改为边流边渲。
+    final streamMd = context.read<AppState>().streamMarkdown;
+    final useMd = !streaming || streamMd;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, right: 4),
       child: Column(
@@ -223,13 +226,13 @@ class _Bubble extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 4),
               child: Text('已中断', style: TextStyle(fontSize: fs - 4, color: AppColors.warning, fontWeight: FontWeight.w700)),
             ),
-          if (streaming)
+          if (useMd)
+            _MdBody(data: msg.content, baseColor: AppColors.text, fontSize: fs)
+          else
             SelectableText(
               msg.content,
               style: TextStyle(fontSize: fs, height: 1.45, color: AppColors.text),
-            )
-          else
-            _MdBody(data: msg.content, baseColor: AppColors.text, fontSize: fs),
+            ),
           if (streaming)
             Padding(
               padding: const EdgeInsets.only(top: 2),

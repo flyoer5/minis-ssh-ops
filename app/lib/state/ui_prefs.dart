@@ -23,6 +23,13 @@ mixin UiPrefs on ChangeNotifier {
   /// Absolute remote paths for files page shortcuts (max 12).
   List<String> pathFavorites = [];
 
+  /// When true, render assistant Markdown while tokens stream (may jitter).
+  /// Default false: plain text while streaming, Markdown after final.
+  bool streamMarkdown = false;
+
+  /// Concurrent SSH probes when refreshing host list (1–6).
+  int probeConcurrency = 3;
+
   void loadUiPrefs(SharedPreferences prefs) {
     termFontSize = prefs.getDouble('termFontSize') ?? 13;
     agentFontSize = prefs.getDouble('agentFontSize') ?? 15;
@@ -35,6 +42,9 @@ mixin UiPrefs on ChangeNotifier {
     hostCardCompact = prefs.getBool('hostCardCompact') ?? false;
     final fav = prefs.getStringList('pathFavorites') ?? const <String>[];
     pathFavorites = List<String>.from(fav);
+    streamMarkdown = prefs.getBool('streamMarkdown') ?? false;
+    final pc = prefs.getInt('probeConcurrency') ?? 3;
+    probeConcurrency = pc.clamp(1, 6);
   }
 
   Map<String, dynamic> uiPrefsExport() => {
@@ -47,6 +57,8 @@ mixin UiPrefs on ChangeNotifier {
         'navMode': navMode,
         'hostCardCompact': hostCardCompact,
         'pathFavorites': pathFavorites,
+        'streamMarkdown': streamMarkdown,
+        'probeConcurrency': probeConcurrency,
       };
 
   Future<void> applyUiPrefsImport(Map pr) async {
@@ -64,6 +76,8 @@ mixin UiPrefs on ChangeNotifier {
           if (e != null && e.toString().trim().isNotEmpty) e.toString().trim(),
       ]);
     }
+    if (pr['streamMarkdown'] is bool) await setStreamMarkdown(pr['streamMarkdown'] as bool);
+    if (pr['probeConcurrency'] is num) await setProbeConcurrency((pr['probeConcurrency'] as num).toInt());
   }
 
   Future<void> setTermFontSize(double v) async {
@@ -151,5 +165,19 @@ mixin UiPrefs on ChangeNotifier {
   Future<void> removePathFavorite(String path) async {
     final list = List<String>.from(pathFavorites)..remove(path);
     await setPathFavorites(list);
+  }
+
+  Future<void> setStreamMarkdown(bool v) async {
+    streamMarkdown = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('streamMarkdown', v);
+    notifyListeners();
+  }
+
+  Future<void> setProbeConcurrency(int v) async {
+    probeConcurrency = v.clamp(1, 6);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('probeConcurrency', probeConcurrency);
+    notifyListeners();
   }
 }
