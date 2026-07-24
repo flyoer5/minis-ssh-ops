@@ -416,7 +416,14 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
         SnackBar(content: Text(saved != null && saved.isNotEmpty ? '已保存 $n（$size 字节）' : '下载失败，可稍后重试')),
       );
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) {
+        final raw = e.toString();
+        String msg = raw.replaceFirst(RegExp(r'^Exception:\s*'), '');
+        if (msg.toLowerCase().contains('too large') || msg.contains('file too large')) {
+          msg = '文件过大，当前单次下载上限约 8MB。可在服务器上压缩/拆分后再下，或用 scp。';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
     } finally {
       if (mounted) {
         setState(() {

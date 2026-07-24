@@ -91,7 +91,7 @@ func ListDir(p ConnectParams, remote string) (string, []FileEntry, error) {
 
 func ReadFile(p ConnectParams, remote string, maxBytes int64) ([]byte, error) {
 	if maxBytes <= 0 {
-		maxBytes = 2 << 20
+		maxBytes = 32 << 20
 	}
 	var data []byte
 	err := withSFTP(p, func(sc *sftp.Client) error {

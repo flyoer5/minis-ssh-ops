@@ -35,10 +35,33 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     super.dispose();
   }
 
+  int _lastMsgCount = 0;
+  int _lastTailLen = 0;
+
   void _bottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
     });
+  }
+
+  /// Keep view pinned to bottom during streaming, but only when the user is
+  /// already near the bottom (so manual scroll-up to read isn't yanked back).
+  void _autoFollow(AppState state) {
+    final msgs = state.agentMessages;
+    final count = msgs.length;
+    final tailLen = msgs.isEmpty ? 0 : msgs.last.content.length;
+    final grew = count != _lastMsgCount || tailLen != _lastTailLen;
+    _lastMsgCount = count;
+    _lastTailLen = tailLen;
+    if (!grew || !_busy) return;
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
+    final nearBottom = pos.maxScrollExtent - pos.pixels < 160;
+    if (nearBottom) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      });
+    }
   }
 
   String _busyHint = '处理中…';
@@ -316,6 +339,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   Widget build(BuildContext context) {
     super.build(context);
     final state = context.watch<AppState>();
+    _autoFollow(state);
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(

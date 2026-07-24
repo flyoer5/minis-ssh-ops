@@ -395,7 +395,7 @@ class ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> fsDownload(String hostId, String path, {int maxBytes = 8 * 1024 * 1024}) async {
+  Future<Map<String, dynamic>> fsDownload(String hostId, String path, {int maxBytes = 32 * 1024 * 1024}) async {
     final r = await _c
         .post(
           _u('/v1/hosts/$hostId/fs/download'),

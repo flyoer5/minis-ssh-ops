@@ -313,7 +313,7 @@ func (s *Server) handleFSDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.MaxBytes <= 0 {
-		body.MaxBytes = 8 << 20 // 8MiB
+		body.MaxBytes = 32 << 20 // 32MiB default download cap
 	}
 	p, err := s.connectParams(id)
 	if err != nil {

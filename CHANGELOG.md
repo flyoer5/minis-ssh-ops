@@ -1,3 +1,8 @@
+## 1.4.37
+
+- Agent: auto-follow stream to bottom when near end (won't yank if user scrolled up)
+- Files: download cap 8MB→32MB; clearer too-large snackbar
+
 ## 1.4.36
 
 - Agent polish: empty-state jump to hosts; retry last after stop/error
