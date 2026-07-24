@@ -1,3 +1,8 @@
+## 1.4.23
+
+- Fix: do not TrimSpace reasoning stream tokens (spaces between words)
+- Reasoning panel: soft wrap body instead of monospace glue look
+
 ## 1.4.22
 
 - Blink streaming cursor; terminal copy plain/raw; probe retry+copy; settings feature chips

@@ -996,10 +996,15 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
                 color: AppColors.bg,
                 border: Border(top: BorderSide(color: AppColors.surface2)),
               ),
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
               child: SelectableText(
+                // Prefer soft wrap + normal font so English thinking is readable.
                 widget.content,
-                style: TextStyle(fontSize: widget.fontSize - 2.5, height: 1.4, color: AppColors.monoGray, fontFamily: 'monospace'),
+                style: TextStyle(
+                  fontSize: widget.fontSize - 2,
+                  height: 1.45,
+                  color: AppColors.monoGray,
+                ),
               ),
             ),
         ],

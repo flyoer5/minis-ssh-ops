@@ -216,8 +216,9 @@ func (c *Client) postChatStream(body []byte, onDelta func(kind, text string)) (L
 				onDelta("assistant_delta", piece)
 			}
 		}
-		// reasoning delta
-		rpiece := strings.TrimSpace(d.ReasoningContent)
+		// reasoning delta — do NOT TrimSpace: stream tokens often are " word" with a
+		// leading space; trimming each piece produces "Theusersaid你好" glue.
+		rpiece := d.ReasoningContent
 		if rpiece == "" {
 			switch v := d.Reasoning.(type) {
 			case string:
