@@ -15,6 +15,14 @@ class ApiClient {
     this.localToken = '',
   });
 
+  void dispose() {
+    try {
+      _streamClient?.close();
+    } catch (_) {}
+    _streamClient = null;
+    _c.close();
+  }
+
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         if (localToken.isNotEmpty) 'X-Local-Token': localToken,

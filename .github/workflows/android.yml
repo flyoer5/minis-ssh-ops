@@ -19,6 +19,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
+          cache-dependency-path: backend/go.sum
+
+      - name: Go unit tests
+        working-directory: backend
+        run: go test ./...
 
       - name: Build Go backend (linux smoke)
         working-directory: backend
@@ -54,11 +59,17 @@ jobs:
         working-directory: app
         run: flutter pub get
 
+      - name: Flutter unit tests
+        working-directory: app
+        run: flutter test
+
       - name: Build debug APK (arm64)
         working-directory: app
         run: flutter build apk --debug --target-platform android-arm64
 
+      # Release is slower; skip on PRs — still run on main/push and workflow_dispatch.
       - name: Build release APK (arm64)
+        if: github.event_name != 'pull_request'
         working-directory: app
         run: flutter build apk --release --target-platform android-arm64
 
@@ -67,9 +78,11 @@ jobs:
           VER=$(grep '^version:' app/pubspec.yaml | head -1 | awk '{print $2}' | cut -d+ -f1)
           mkdir -p dist
           cp app/build/app/outputs/flutter-apk/app-debug.apk "dist/ssh-ai-agent-${VER}-debug.apk"
-          cp app/build/app/outputs/flutter-apk/app-release.apk "dist/ssh-ai-agent-${VER}-release.apk"
           cp app/build/app/outputs/flutter-apk/app-debug.apk dist/ssh-ai-agent-latest-debug.apk
-          cp app/build/app/outputs/flutter-apk/app-release.apk dist/ssh-ai-agent-latest-release.apk
+          if [ -f app/build/app/outputs/flutter-apk/app-release.apk ]; then
+            cp app/build/app/outputs/flutter-apk/app-release.apk "dist/ssh-ai-agent-${VER}-release.apk"
+            cp app/build/app/outputs/flutter-apk/app-release.apk dist/ssh-ai-agent-latest-release.apk
+          fi
           (cd dist && sha256sum *.apk > SHA256SUMS.txt)
           cat dist/SHA256SUMS.txt
           echo "VERSION=$VER" >> "$GITHUB_ENV"
@@ -83,6 +96,7 @@ jobs:
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
         with:
           name: app-release
           path: |

@@ -1,3 +1,16 @@
+## 1.4.30
+
+- Perf: throttle Agent stream UI notifies (~33ms) for assistant/reasoning deltas
+- Cleanup: remove dead AppState terminal buffer / runTerminal / runExec paths (~110 lines)
+- Files: ListView `itemExtent: 48` + cacheExtent for large directories
+- ApiClient.dispose + AppState.dispose
+- Tests: Go `risk.Classify` unit tests; CI runs `go test` + `flutter test`
+- CI: PR builds debug only; release APK on main/push / workflow_dispatch
+- Host cards: settings toggle **精简** (MEM+HDD only) via `hostCardCompact`
+- Probe refresh concurrency limited to 3
+- AppState: extract `UiPrefs` mixin (fonts/nav/host card/confirmWrites)
+- Cancel agent flushes pending stream notify
+
 ## 1.4.29
 
 - Nav: bottom bar 56; settings switch **底部栏 / 左上角菜单** (`navMode`)

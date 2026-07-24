@@ -707,6 +707,9 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                         ? const Center(child: Text('空', style: TextStyle(color: Colors.white38)))
                         : ListView.builder(
                             itemCount: pane.entries.length,
+                            // Fixed row height for smoother scroll on large dirs.
+                            itemExtent: 48,
+                            cacheExtent: 400,
                             itemBuilder: (_, i) {
                               final e = pane.entries[i] as Map;
                               final isDir = e['isDir'] == true;
@@ -743,8 +746,9 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                   });
                                 },
                                 child: Container(
+                                  height: 48,
                                   color: sel ? AppColors.selectBlue : Colors.transparent,
-                                  padding: const EdgeInsets.fromLTRB(8, 7, 4, 7),
+                                  padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
                                   child: Row(
                                     children: [
                                       if (pane.selecting)

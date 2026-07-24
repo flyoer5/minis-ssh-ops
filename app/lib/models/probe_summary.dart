@@ -26,7 +26,17 @@ class ProbeSummary {
         final e = (v['stderr'] ?? '').toString().trim();
         if (s.isNotEmpty) return s;
         if (e.isNotEmpty) return e;
-        return 'exit ${v['exitCode']}';
+        // Empty stdout/stderr: missing data → '-'.
+        // Non-zero exit without body → 错误: so hasErr / offline detection works.
+        final code = v['exitCode'];
+        int? n;
+        if (code is int) {
+          n = code;
+        } else if (code != null) {
+          n = int.tryParse(code.toString());
+        }
+        if (n != null && n != 0) return '错误: exit $n';
+        return '-';
       }
       if (v == null) return '-';
       return v.toString();

@@ -37,12 +37,29 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     final state = context.watch<AppState>();
     if (!_autoStarted && state.backendOk && state.hosts.isNotEmpty) {
       _autoStarted = true;
-      for (final h in state.hosts) {
-        if (h is Map && h['id'] is String) {
-          unawaited(_refreshProbe(state, h['id'] as String));
-        }
+      unawaited(_probeMany(state, force: false));
+    }
+  }
+
+  /// Limit concurrent SSH probes so a long host list does not stampede the network.
+  static const int _probeConcurrency = 3;
+
+  Future<void> _probeMany(AppState state, {required bool force}) async {
+    final ids = <String>[
+      for (final h in state.hosts)
+        if (h is Map && h['id'] is String) h['id'] as String,
+    ];
+    if (ids.isEmpty) return;
+    var next = 0;
+    Future<void> worker() async {
+      while (true) {
+        final i = next++;
+        if (i >= ids.length) return;
+        await _refreshProbe(state, ids[i], force: force);
       }
     }
+    final n = ids.length < _probeConcurrency ? ids.length : _probeConcurrency;
+    await Future.wait([for (var k = 0; k < n; k++) worker()]);
   }
 
   Future<void> _refreshProbe(AppState state, String id, {bool force = false}) async {
@@ -80,10 +97,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
 
   Future<void> _refreshAll(AppState state) async {
     await state.refreshHosts();
-    await Future.wait([
-      for (final h in state.hosts)
-        if (h is Map && h['id'] is String) _refreshProbe(state, h['id'] as String),
-    ]);
+    await _probeMany(state, force: true);
   }
 
   @override
@@ -192,6 +206,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                   summary: _summary[id],
                                   probedAt: state.probeCacheTime(id),
                                   fontSize: state.uiFontSize,
+                                  compact: state.hostCardCompact,
                                   onSelect: () => state.selectHost(id),
                                   onRefresh: () => _refreshProbe(state, id, force: true),
                                   onMenu: () => _hostMenu(context, state, h),
@@ -495,6 +510,8 @@ class _StatusCard extends StatelessWidget {
   final ProbeSummary? summary;
   final DateTime? probedAt;
   final double fontSize;
+  /// When true, only MEM + HDD rows (no CPU / uptime footer).
+  final bool compact;
   final VoidCallback onSelect;
   final VoidCallback onRefresh;
   final VoidCallback onMenu;
@@ -508,6 +525,7 @@ class _StatusCard extends StatelessWidget {
     required this.summary,
     this.probedAt,
     this.fontSize = 14,
+    this.compact = false,
     required this.onSelect,
     required this.onRefresh,
     required this.onMenu,
@@ -688,14 +706,16 @@ class _StatusCard extends StatelessWidget {
                 )
               else ...[
                 // ServerStatus style: label | value (no duplicate %) | bar
-                // CPU utilization % (sampled /proc/stat)
-                _metricRow(
-                  'CPU',
-                  cpuPctS == '—' ? cpuFull : cpuPctS,
-                  cpuP,
-                  AppColors.metricBlue,
-                ),
-                const SizedBox(height: 5),
+                if (!compact) ...[
+                  // CPU utilization % (sampled /proc/stat)
+                  _metricRow(
+                    'CPU',
+                    cpuPctS == '—' ? cpuFull : cpuPctS,
+                    cpuP,
+                    AppColors.metricBlue,
+                  ),
+                  const SizedBox(height: 5),
+                ],
                 // MEM: prefer "used/total" only; % comes from bar + optional once
                 _metricRow(
                   'MEM',
@@ -733,29 +753,39 @@ class _StatusCard extends StatelessWidget {
                   diskP,
                   AppColors.metricTeal,
                 ),
-                const SizedBox(height: 6),
-                // uptime + OS + probe age
-                Text(
-                  [
-                    if (up != '—') '⏱ $up',
-                    if (sys != '—') sys,
-                    if (_ageText.isNotEmpty) _ageText,
-                  ].join('  ·  '),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: fontSize - 4,
-                    color: () {
-                      final at = probedAt;
-                      if (at == null) return AppColors.slateText;
-                      final sec = DateTime.now().difference(at).inSeconds;
-                      if (sec > 120) return AppColors.warnAlt; // stale
-                      return AppColors.slateText;
-                    }(),
-                    fontFamily: 'monospace',
-                    height: 1.25,
+                if (!compact) ...[
+                  const SizedBox(height: 6),
+                  // uptime + OS + probe age
+                  Text(
+                    [
+                      if (up != '—') '⏱ $up',
+                      if (sys != '—') sys,
+                      if (_ageText.isNotEmpty) _ageText,
+                    ].join('  ·  '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: fontSize - 4,
+                      color: () {
+                        final at = probedAt;
+                        if (at == null) return AppColors.slateText;
+                        final sec = DateTime.now().difference(at).inSeconds;
+                        if (sec > 120) return AppColors.warnAlt; // stale
+                        return AppColors.slateText;
+                      }(),
+                      fontFamily: 'monospace',
+                      height: 1.25,
+                    ),
                   ),
-                ),
+                ] else if (_ageText.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _ageText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: fontSize - 4, color: AppColors.slateText, fontFamily: 'monospace'),
+                  ),
+                ],
               ],
             ],
           ),

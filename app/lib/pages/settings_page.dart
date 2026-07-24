@@ -863,6 +863,18 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
               ),
               const SizedBox(height: 12),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('主机卡片精简', style: TextStyle(fontSize: 13.5)),
+                subtitle: Text(
+                  state.hostCardCompact ? '仅内存 + 硬盘' : 'CPU + 内存 + 硬盘 + 运行时间',
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                ),
+                value: state.hostCardCompact,
+                onChanged: (v) => state.setHostCardCompact(v),
+              ),
+              const SizedBox(height: 8),
               _fontSlider(
                 label: '终端字号',
                 value: state.termFontSize,
