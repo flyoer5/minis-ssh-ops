@@ -755,42 +755,52 @@ class AppState extends ChangeNotifier {
     ));
   }
 
-  /// Minis-like: consecutive assistant/final text chunks append into one bubble.
-  void _pushOrMergeAssistantText(String content, {String part = 'text'}) {
+  /// Normalize for duplicate detection (stream final vs deltas often differ by WS/newlines).
+  String _normText(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  /// Find the latest assistant text bubble (skip trailing status if any).
+  int _lastAssistantTextIndex() {
+    for (var i = agentMessages.length - 1; i >= 0; i--) {
+      final m = agentMessages[i];
+      if (m.role == 'assistant' && m.kind == ChatKind.text) return i;
+      // stop if we hit user message — different turn
+      if (m.role == 'user') break;
+      // skip status/reasoning after text (e.g. stop status shouldn't block coalesce)
+      if (m.kind == ChatKind.status || m.kind == ChatKind.reasoning) continue;
+      break;
+    }
+    return -1;
+  }
+
+  /// After token stream, full assistant/final must REPLACE the draft bubble, not create a second one.
+  void _coalesceAssistantFull(String content, {String part = 'text'}) {
     final t = content.trimRight();
     if (t.isEmpty) return;
-    if (agentMessages.isNotEmpty) {
-      final last = agentMessages.last;
-      final lastPart = last.meta?['part']?.toString();
-      final isText = last.role == 'assistant' &&
-          last.kind == ChatKind.text &&
-          (lastPart == null || lastPart == 'text' || lastPart == 'text_delta');
-      if (isText) {
-        // avoid exact duplicate final after assistant
-        if (last.content == t) return;
-        if (t.startsWith(last.content) && t.length > last.content.length) {
-          agentMessages[agentMessages.length - 1] = ChatMessage(
-            role: 'assistant',
-            content: t,
-            kind: ChatKind.text,
-            meta: {'part': part},
-            at: last.at,
-          );
-          return;
-        }
-        // append with blank line if both are non-empty sentences
-        final merged = last.content.endsWith('\n') || t.startsWith('\n')
-            ? '${last.content}$t'
-            : '${last.content}\n$t';
-        agentMessages[agentMessages.length - 1] = ChatMessage(
+    final idx = _lastAssistantTextIndex();
+    if (idx >= 0) {
+      final last = agentMessages[idx];
+      final a = _normText(last.content);
+      final b = _normText(t);
+      // identical / prefix / either contains the other → one bubble
+      if (a == b || b.startsWith(a) || a.startsWith(b) || a.contains(b) || b.contains(a)) {
+        agentMessages[idx] = ChatMessage(
           role: 'assistant',
-          content: merged,
+          content: t.length >= last.content.length ? t : last.content,
           kind: ChatKind.text,
           meta: {'part': part},
           at: last.at,
         );
         return;
       }
+      // Still same turn after streaming: prefer final as authoritative single bubble
+      agentMessages[idx] = ChatMessage(
+        role: 'assistant',
+        content: t,
+        kind: ChatKind.text,
+        meta: {'part': part},
+        at: last.at,
+      );
+      return;
     }
     agentMessages.add(ChatMessage(
       role: 'assistant',
@@ -798,6 +808,12 @@ class AppState extends ChangeNotifier {
       kind: ChatKind.text,
       meta: {'part': part},
     ));
+  }
+
+  /// Minis-like: consecutive assistant/final text chunks merge into one bubble.
+  void _pushOrMergeAssistantText(String content, {String part = 'text'}) {
+    // Full-frame events (assistant / final) always coalesce into one bubble.
+    _coalesceAssistantFull(content, part: part);
   }
 
   /// Find last open toolUse to complete (same name, prefer same command).
@@ -1049,32 +1065,8 @@ class AppState extends ChangeNotifier {
     } else if (type == 'final' && (content.isNotEmpty || reasoning.isNotEmpty)) {
       if (reasoning.isNotEmpty) _pushReasoning(reasoning);
       if (content.isNotEmpty) {
-        // After token stream, final often equals accumulated delta — merge/dedupe.
-        if (agentMessages.isNotEmpty) {
-          final last = agentMessages.last;
-          final lastPart = last.meta?['part']?.toString();
-          if (last.role == 'assistant' &&
-              last.kind == ChatKind.text &&
-              (lastPart == 'text_delta' || lastPart == 'text')) {
-            if (content == last.content ||
-                content.startsWith(last.content) ||
-                last.content.startsWith(content)) {
-              agentMessages[agentMessages.length - 1] = ChatMessage(
-                role: 'assistant',
-                content: content.length >= last.content.length ? content : last.content,
-                kind: ChatKind.text,
-                meta: {'part': 'text'},
-                at: last.at,
-              );
-            } else {
-              _pushOrMergeAssistantText(content, part: 'text');
-            }
-          } else {
-            _pushOrMergeAssistantText(content, part: 'text');
-          }
-        } else {
-          _pushOrMergeAssistantText(content, part: 'text');
-        }
+        // Stream already drew the bubble via assistant_delta; final must not spawn a second one.
+        _coalesceAssistantFull(content, part: 'text');
       }
     } else if (type == 'error' && content.isNotEmpty) {
       _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.error));

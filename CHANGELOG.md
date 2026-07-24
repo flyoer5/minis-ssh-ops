@@ -1,3 +1,7 @@
+## 1.4.21
+
+- Fix: streaming assistant_delta + final no longer creates duplicate bubbles
+
 ## 1.4.20
 
 - Agent stop UI (app bar + composer + busy row) and streaming cursor
