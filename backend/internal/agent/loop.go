@@ -112,7 +112,25 @@ func (c *Client) RunLoopStream(userText string, history []LoopMsg, run ToolRunne
 	}
 
 	for round := 0; round < maxRounds; round++ {
-		asst, err := c.chatTools(msgs)
+		// Prefer OpenAI-style token stream when a sink is present (SSE UI);
+		// otherwise keep non-stream batch chat for simple callers.
+		var asst LoopMsg
+		var err error
+		if sink != nil {
+			asst, err = c.chatToolsStream(msgs, func(kind, text string) {
+				if text == "" {
+					return
+				}
+				switch kind {
+				case "assistant_delta":
+					push(LoopEvent{Type: "assistant_delta", Content: text})
+				case "reasoning_delta":
+					push(LoopEvent{Type: "reasoning_delta", Content: text, Reasoning: text})
+				}
+			})
+		} else {
+			asst, err = c.chatTools(msgs)
+		}
 		if err != nil {
 			push(LoopEvent{Type: "error", Content: err.Error()})
 			return events, msgs, err
@@ -120,6 +138,7 @@ func (c *Client) RunLoopStream(userText string, history []LoopMsg, run ToolRunne
 		if len(asst.ToolCalls) == 0 {
 			text := strings.TrimSpace(asst.Content)
 			reason := strings.TrimSpace(asst.Reasoning)
+			// When tokens already streamed, final may only confirm; still emit for clients that key off it.
 			if reason != "" && text == "" {
 				push(LoopEvent{Type: "reasoning", Content: reason, Reasoning: reason})
 			}
@@ -130,6 +149,8 @@ func (c *Client) RunLoopStream(userText string, history []LoopMsg, run ToolRunne
 			return events, msgs, nil
 		}
 		msgs = append(msgs, LoopMsg{Role: "assistant", Content: asst.Content, ToolCalls: asst.ToolCalls})
+		// Tool-call turn: emit full reasoning/content once if not already fully covered by deltas
+		// (UI merges deltas; full event helps non-stream-aware clients.)
 		if strings.TrimSpace(asst.Reasoning) != "" {
 			push(LoopEvent{Type: "reasoning", Content: strings.TrimSpace(asst.Reasoning), Reasoning: strings.TrimSpace(asst.Reasoning)})
 		}

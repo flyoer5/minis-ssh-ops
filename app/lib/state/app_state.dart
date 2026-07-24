@@ -703,6 +703,58 @@ class AppState extends ChangeNotifier {
   /// Stable id for pairing toolUse → toolResult across SSE events.
   String _newToolId() => 't${DateTime.now().microsecondsSinceEpoch}';
 
+  /// Stream token: append to last assistant text bubble (or create one).
+  void _appendAssistantDelta(String piece) {
+    if (piece.isEmpty) return;
+    if (agentMessages.isNotEmpty) {
+      final last = agentMessages.last;
+      final lastPart = last.meta?['part']?.toString();
+      final isText = last.role == 'assistant' &&
+          last.kind == ChatKind.text &&
+          (lastPart == null || lastPart == 'text' || lastPart == 'text_delta');
+      if (isText) {
+        agentMessages[agentMessages.length - 1] = ChatMessage(
+          role: 'assistant',
+          content: last.content + piece,
+          kind: ChatKind.text,
+          meta: {'part': 'text_delta'},
+          at: last.at,
+        );
+        return;
+      }
+    }
+    agentMessages.add(ChatMessage(
+      role: 'assistant',
+      content: piece,
+      kind: ChatKind.text,
+      meta: {'part': 'text_delta'},
+    ));
+  }
+
+  /// Stream token: append to last reasoning bubble (or create one).
+  void _appendReasoningDelta(String piece) {
+    if (piece.isEmpty) return;
+    if (agentMessages.isNotEmpty) {
+      final last = agentMessages.last;
+      if (last.kind == ChatKind.reasoning) {
+        agentMessages[agentMessages.length - 1] = ChatMessage(
+          role: 'assistant',
+          content: last.content + piece,
+          kind: ChatKind.reasoning,
+          meta: {'part': 'reasoning'},
+          at: last.at,
+        );
+        return;
+      }
+    }
+    agentMessages.add(ChatMessage(
+      role: 'assistant',
+      content: piece,
+      kind: ChatKind.reasoning,
+      meta: {'part': 'reasoning'},
+    ));
+  }
+
   /// Minis-like: consecutive assistant/final text chunks append into one bubble.
   void _pushOrMergeAssistantText(String content, {String part = 'text'}) {
     final t = content.trimRight();
@@ -902,7 +954,14 @@ class AppState extends ChangeNotifier {
       if (facts.isNotEmpty || content.trim().isNotEmpty) {
         _pushMsg(ChatMessage(role: 'system', content: note, kind: ChatKind.status));
       }
+    } else if (type == 'reasoning_delta' && (reasoning.isNotEmpty || content.isNotEmpty)) {
+      // Token stream: append into open reasoning bubble
+      _appendReasoningDelta(reasoning.isNotEmpty ? reasoning : content);
+    } else if (type == 'assistant_delta' && content.isNotEmpty) {
+      // Token stream: append into open assistant text bubble
+      _appendAssistantDelta(content);
     } else if (type == 'reasoning' && (reasoning.isNotEmpty || content.trim().isNotEmpty)) {
+      // Full reasoning (non-stream or end-of-turn). Prefer replacing streamed draft if identical prefix.
       _pushReasoning(reasoning.isNotEmpty ? reasoning : content);
     } else if (type == 'assistant' && (content.isNotEmpty || reasoning.isNotEmpty)) {
       if (reasoning.isNotEmpty) _pushReasoning(reasoning);
@@ -990,7 +1049,32 @@ class AppState extends ChangeNotifier {
     } else if (type == 'final' && (content.isNotEmpty || reasoning.isNotEmpty)) {
       if (reasoning.isNotEmpty) _pushReasoning(reasoning);
       if (content.isNotEmpty) {
-        _pushOrMergeAssistantText(content, part: 'text');
+        // After token stream, final often equals accumulated delta — merge/dedupe.
+        if (agentMessages.isNotEmpty) {
+          final last = agentMessages.last;
+          final lastPart = last.meta?['part']?.toString();
+          if (last.role == 'assistant' &&
+              last.kind == ChatKind.text &&
+              (lastPart == 'text_delta' || lastPart == 'text')) {
+            if (content == last.content ||
+                content.startsWith(last.content) ||
+                last.content.startsWith(content)) {
+              agentMessages[agentMessages.length - 1] = ChatMessage(
+                role: 'assistant',
+                content: content.length >= last.content.length ? content : last.content,
+                kind: ChatKind.text,
+                meta: {'part': 'text'},
+                at: last.at,
+              );
+            } else {
+              _pushOrMergeAssistantText(content, part: 'text');
+            }
+          } else {
+            _pushOrMergeAssistantText(content, part: 'text');
+          }
+        } else {
+          _pushOrMergeAssistantText(content, part: 'text');
+        }
       }
     } else if (type == 'error' && content.isNotEmpty) {
       _pushMsg(ChatMessage(role: 'assistant', content: content, kind: ChatKind.error));

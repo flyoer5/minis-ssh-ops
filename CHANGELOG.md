@@ -1,3 +1,8 @@
+## 1.4.19
+
+- Big: OpenAI token streaming (assistant_delta / reasoning_delta) into Agent SSE
+- Big: ANSI color terminal (SGR / 256 / truecolor subset)
+
 ## 1.4.18
 
 - J: system share for audit CSV; finish AppColors cleanup; probe/theme unit tests

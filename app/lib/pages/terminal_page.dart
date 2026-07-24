@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:ssh_ai_agent/pages/ansi_text.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -81,49 +82,20 @@ class _TerminalPageState extends State<TerminalPage>
   }
 
   void _append(String s) {
+    // Keep SGR color sequences; drop only pure noise later in AnsiPainter.
     _buf.write(s);
     final t = _buf.toString();
-    if (t.length > 120000) {
+    if (t.length > 200000) {
+      // trim raw buffer (may cut mid-sequence occasionally; acceptable for scrollback)
       _buf
         ..clear()
-        ..write(t.substring(t.length - 60000));
+        ..write(t.substring(t.length - 100000));
     }
     if (!mounted) return;
     setState(() {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
     });
-  }
-
-  String _stripAnsi(String s) {
-    // Strip OSC/CSI and most terminal control sequences that become "□" in plain Text.
-    var t = s
-        .replaceAll(RegExp(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)?'), '')
-        .replaceAll(RegExp(r'\x1B\[[0-9;?]*[ -/]*[@-~]'), '')
-        .replaceAll(RegExp(r'\x1B[()][0-9A-Za-z]'), '')
-        .replaceAll(RegExp(r'\x1B.'), '')
-        .replaceAll('\r\n', '\n')
-        .replaceAll('\r', '');
-    final out = StringBuffer();
-    for (final cu in t.codeUnits) {
-      if (cu == 0x09 || cu == 0x0A) {
-        out.writeCharCode(cu);
-      } else if (cu == 0x08 || cu == 0x7F) {
-        final cur = out.toString();
-        if (cur.isNotEmpty && !cur.endsWith('\n')) {
-          out
-            ..clear()
-            ..write(cur.substring(0, cur.length - 1));
-        }
-      } else if (cu == 0xFFFD) {
-        // replacement char
-      } else if (cu >= 0x80 && cu <= 0x9F) {
-        // C1 controls
-      } else if (cu >= 0x20 && cu != 0x7F) {
-        out.writeCharCode(cu);
-      }
-    }
-    return out.toString();
   }
 
   void _connect(AppState state) {
@@ -173,12 +145,12 @@ class _TerminalPageState extends State<TerminalPage>
                 _append('\n[closed]\n');
               }
             } catch (_) {
-              _append(_stripAnsi(data));
+              _append(data);
             }
           } else if (data is List<int>) {
-            _append(_stripAnsi(utf8.decode(data, allowMalformed: true)));
+            _append(utf8.decode(data, allowMalformed: true));
           } else if (data is ByteBuffer) {
-            _append(_stripAnsi(utf8.decode(data.asUint8List(), allowMalformed: true)));
+            _append(utf8.decode(data.asUint8List(), allowMalformed: true));
           }
         },
         onError: (e) {
@@ -480,16 +452,11 @@ class _TerminalPageState extends State<TerminalPage>
                         padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
                         child: SingleChildScrollView(
                           controller: _scroll,
-                          child: Text(
-                            _buf.isEmpty
-                                ? (_connecting ? 'connecting…\n' : 'tap to type\n')
-                                : _buf.toString(),
-                            style: TextStyle(
-                              color: _fg,
-                              fontFamily: 'monospace',
+                          child: SelectableText.rich(
+                            AnsiPainter(
                               fontSize: fontSize,
-                              height: 1.28,
-                            ),
+                              defaultFg: _fg,
+                            ).build(_buf.isEmpty ? '' : _buf.toString()),
                           ),
                         ),
                       ),
