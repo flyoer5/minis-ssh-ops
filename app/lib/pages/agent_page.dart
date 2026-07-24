@@ -418,7 +418,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(color: Color(0xFF388BFD)),
+                          borderSide: const BorderSide(color: AppColors.linkFocus),
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
@@ -428,7 +428,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                   Material(
                     color: (_busy || !state.backendOk || state.selectedHostId == null)
                         ? AppColors.surface2
-                        : const Color(0xFF238636),
+                        : AppColors.sendGreen,
                     shape: const CircleBorder(),
                     child: IconButton(
                       onPressed: (_busy || !state.backendOk || state.selectedHostId == null) ? null : () => _send(state),
@@ -593,7 +593,7 @@ class _Bubble extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 8, left: 40),
           padding: EdgeInsets.symmetric(horizontal: 11, vertical: fs > 16 ? 9 : 7),
           decoration: const BoxDecoration(
-            color: Color(0xFF2563EB),
+            color: AppColors.userBubble,
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(12),
               topRight: Radius.circular(12),
@@ -643,9 +643,9 @@ class _Bubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.fromLTRB(10, 7, 10, 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF2D1214),
+          color: AppColors.errorPanel,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFF6E2A2E)),
+          border: Border.all(color: AppColors.errorBorder),
         ),
         child: _MdBody(data: msg.content, baseColor: AppColors.dangerSoft, fontSize: fs - 1),
       );
@@ -885,9 +885,9 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF12151C),
+        color: AppColors.thinkBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF2A3140)),
+        border: Border.all(color: AppColors.thinkBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -934,7 +934,7 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
               padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
               child: SelectableText(
                 widget.content,
-                style: TextStyle(fontSize: widget.fontSize - 2.5, height: 1.4, color: const Color(0xFF9CA3AF), fontFamily: 'monospace'),
+                style: TextStyle(fontSize: widget.fontSize - 2.5, height: 1.4, color: AppColors.monoGray, fontFamily: 'monospace'),
               ),
             ),
         ],
@@ -970,7 +970,7 @@ class _MdBody extends StatelessWidget {
       code: TextStyle(
         fontFamily: 'monospace',
         fontSize: fontSize - 1.5,
-        color: const Color(0xFFFF7B72),
+        color: AppColors.codeRed,
         backgroundColor: AppColors.surface2,
       ),
       codeblockDecoration: BoxDecoration(

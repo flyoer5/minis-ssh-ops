@@ -133,7 +133,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                   },
                                 ),
                           filled: true,
-                          fillColor: const Color(0xFF0F172A),
+                          fillColor: AppColors.slateFill,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -514,14 +514,14 @@ class _StatusCard extends StatelessWidget {
     if (p == null) return AppColors.slate;
     if (p >= 0.9) return AppColors.dangerAlt;
     if (p >= 0.75) return AppColors.warnAlt;
-    return const Color(0xFF22C55E);
+    return AppColors.metricGreen;
   }
 
   Color get _status {
     if (loading) return AppColors.warnBright;
     if (summary == null) return AppColors.slate;
     if (!summary!.ok) return AppColors.dangerAlt;
-    return const Color(0xFF22C55E);
+    return AppColors.metricGreen;
   }
 
   String get _statusText {
@@ -551,11 +551,11 @@ class _StatusCard extends StatelessWidget {
     final cpuP = _pct(cpuPctS) ?? _pct(cpuFull);
 
     return Material(
-      color: const Color(0xFF0F1419),
+      color: AppColors.cardBg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: selected ? const Color(0xFF3B82F6) : AppColors.slateDeep,
+          color: selected ? AppColors.selectBlue2 : AppColors.slateDeep,
           width: selected ? 1.5 : 1,
         ),
       ),
@@ -631,7 +631,7 @@ class _StatusCard extends StatelessWidget {
               if (summary == null && !loading)
                 const Padding(
                   padding: EdgeInsets.only(left: 4),
-                  child: Text('下拉或点同步获取探针数据', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                  child: Text('下拉或点同步获取探针数据', style: TextStyle(fontSize: 12, color: AppColors.slateMuted)),
                 )
               else ...[
                 // ServerStatus style: label | value (no duplicate %) | bar
@@ -640,7 +640,7 @@ class _StatusCard extends StatelessWidget {
                   'CPU',
                   cpuPctS == '—' ? cpuFull : cpuPctS,
                   cpuP,
-                  const Color(0xFF38BDF8),
+                  AppColors.metricBlue,
                 ),
                 const SizedBox(height: 5),
                 // MEM: prefer "used/total" only; % comes from bar + optional once
@@ -678,7 +678,7 @@ class _StatusCard extends StatelessWidget {
                     return diskPctS == '—' ? full : diskPctS;
                   }(),
                   diskP,
-                  const Color(0xFF34D399),
+                  AppColors.metricTeal,
                 ),
                 const SizedBox(height: 6),
                 // uptime + OS + probe age
@@ -694,10 +694,10 @@ class _StatusCard extends StatelessWidget {
                     fontSize: 10,
                     color: () {
                       final at = probedAt;
-                      if (at == null) return const Color(0xFF94A3B8);
+                      if (at == null) return AppColors.slateText;
                       final sec = DateTime.now().difference(at).inSeconds;
                       if (sec > 120) return AppColors.warnAlt; // stale
-                      return const Color(0xFF94A3B8);
+                      return AppColors.slateText;
                     }(),
                     fontFamily: 'monospace',
                     height: 1.25,
@@ -733,7 +733,7 @@ class _StatusCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.right,
-                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: Color(0xFFE2E8F0)),
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: AppColors.slateLine),
               ),
             ),
           ],
@@ -745,7 +745,7 @@ class _StatusCard extends StatelessWidget {
             value: progress?.clamp(0.0, 1.0) ?? 0,
             minHeight: 4,
             backgroundColor: AppColors.slateDeep,
-            color: progress == null ? const Color(0xFF334155) : c,
+            color: progress == null ? AppColors.slateBar : c,
           ),
         ),
       ],

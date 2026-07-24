@@ -885,7 +885,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           // —— 连通性 ——
           _section(
             icon: Icons.network_check,
-            accent: const Color(0xFF39D353),
+            accent: AppColors.accentMint,
             title: '连通性检测',
             subtitle: '测当前主机 SSH 与模型可达',
             children: [
@@ -1004,7 +1004,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           // —— 数据与诊断 ——
           _section(
             icon: Icons.medical_services_outlined,
-            accent: const Color(0xFFF778BA),
+            accent: AppColors.accentPink,
             title: '数据与诊断',
             subtitle: '导入导出 · 日志 · HostKey · 长期记忆',
             children: [

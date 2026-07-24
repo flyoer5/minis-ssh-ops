@@ -122,6 +122,54 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                     }
+                    "shareText" -> {
+                        try {
+                            val text = call.argument<String>("text") ?: ""
+                            val title = call.argument<String>("title") ?: "分享"
+                            val send = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, text)
+                                putExtra(Intent.EXTRA_SUBJECT, title)
+                            }
+                            startActivity(Intent.createChooser(send, title))
+                            result.success(true)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "shareText failed", e)
+                            result.error("SHARE", e.message, null)
+                        }
+                    }
+                    "shareFile" -> {
+                        executor.execute {
+                            try {
+                                val name = call.argument<String>("name") ?: "share.bin"
+                                val b64 = call.argument<String>("b64") ?: ""
+                                val mime = call.argument<String>("mime") ?: "application/octet-stream"
+                                val title = call.argument<String>("title") ?: "分享文件"
+                                val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+                                val uriStr = saveToDownloads(name, bytes)
+                                // Prefer content URI from MediaStore return; if plain path, use FileProvider-less file URI fallback via FileProvider? keep downloads content path.
+                                mainHandler.post {
+                                    try {
+                                        val uri = Uri.parse(uriStr)
+                                        val send = Intent(Intent.ACTION_SEND).apply {
+                                            type = mime
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            putExtra(Intent.EXTRA_SUBJECT, title)
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        startActivity(Intent.createChooser(send, title))
+                                        result.success(uriStr)
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "shareFile intent failed", e)
+                                        result.error("SHARE", e.message, null)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "shareFile failed", e)
+                                mainHandler.post { result.error("SHARE", e.message, null) }
+                            }
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }

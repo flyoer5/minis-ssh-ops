@@ -28,6 +28,42 @@ abstract final class AppColors {
   static const cyan = Color(0xFF4FC3F7);
   static const dangerAlt = Color(0xFFEF4444);
   static const warnAlt = Color(0xFFF59E0B);
+  static const sendGreen = Color(0xFF238636);
+  static const linkFocus = Color(0xFF388BFD);
+  static const userBubble = Color(0xFF2563EB);
+  static const errorPanel = Color(0xFF2D1214);
+  static const errorBorder = Color(0xFF6E2A2E);
+  static const thinkBg = Color(0xFF12151C);
+  static const thinkBorder = Color(0xFF2A3140);
+  static const codeRed = Color(0xFFFF7B72);
+  static const gray33 = Color(0xFF333333);
+  static const gray12 = Color(0xFF121212);
+  static const panelFocus = Color(0xFF1A2A33);
+  static const gray66 = Color(0xFF666666);
+  static const gray9e = Color(0xFF9E9E9E);
+  static const grayBd = Color(0xFFBDBDBD);
+  static const errPanelBg = Color(0xFF3D1F1F);
+  static const errTextSoft = Color(0xFFFF8A80);
+  static const selectBlue = Color(0xFF1A3A5C);
+  static const folder = Color(0xFFFFB74D);
+  static const fileBlue = Color(0xFF90CAF9);
+  static const pureBlack = Color(0xFF0A0A0A);
+  static const dividerSoft = Color(0xFF2A2A2A);
+  static const slateFill = Color(0xFF0F172A);
+  static const metricGreen = Color(0xFF22C55E);
+  static const cardBg = Color(0xFF0F1419);
+  static const selectBlue2 = Color(0xFF3B82F6);
+  static const slateMuted = Color(0xFF475569);
+  static const metricBlue = Color(0xFF38BDF8);
+  static const metricTeal = Color(0xFF34D399);
+  static const slateText = Color(0xFF94A3B8);
+  static const slateBar = Color(0xFF334155);
+  static const slateLine = Color(0xFFE2E8F0);
+  static const riskPurple = Color(0xFFA371F7);
+  static const accentMint = Color(0xFF39D353);
+  static const accentPink = Color(0xFFF778BA);
+  static const monoGray = Color(0xFF9CA3AF);
+  static const terminalBlack = Color(0xFF000000);
 }
 
 ThemeData buildAppTheme() {

@@ -39,7 +39,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
       case 'write':
         return AppColors.warning;
       case 'blocked':
-        return const Color(0xFFA371F7);
+        return AppColors.riskPurple;
       case 'read':
         return AppColors.success;
       default:
@@ -290,9 +290,35 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
     }
     await Clipboard.setData(ClipboardData(text: csv));
     if (!context.mounted) return;
-    final msg = savedPath != null && savedPath.isNotEmpty
-        ? '已导出 ${list.length} 条到下载目录，并复制到剪贴板'
-        : '已复制 ${list.length} 条 CSV 到剪贴板';
+    // Prefer system share sheet when native bridge is available.
+    var shared = false;
+    if (NativeBackend.isAndroidNative) {
+      try {
+        final name =
+            'ssh-audit-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('.', '').substring(0, 15)}.csv';
+        final b64 = base64Encode(utf8.encode(csv));
+        await NativeBackend.shareFile(
+          name: name,
+          b64: b64,
+          mime: 'text/csv',
+          title: '导出审计记录 (${list.length})',
+        );
+        shared = true;
+      } catch (_) {
+        try {
+          await NativeBackend.shareText(text: csv, title: '审计 CSV (${list.length})');
+          shared = true;
+        } catch (_) {
+          shared = false;
+        }
+      }
+    }
+
+    final msg = shared
+        ? '已打开系统分享（${list.length} 条），并复制到剪贴板'
+        : (savedPath != null && savedPath.isNotEmpty
+            ? '已导出 ${list.length} 条到下载目录，并复制到剪贴板'
+            : '已复制 ${list.length} 条 CSV 到剪贴板');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),

@@ -547,19 +547,19 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
 
   Widget _pane(BuildContext context, _Pane pane, int idx) {
     final focused = focus == idx;
-    final border = focused ? AppColors.cyan : const Color(0xFF333333);
+    final border = focused ? AppColors.cyan : AppColors.gray33;
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => focus = idx),
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF121212),
+            color: AppColors.gray12,
             border: Border.all(color: border, width: focused ? 1.5 : 0.5),
           ),
           child: Column(
             children: [
               Material(
-                color: focused ? const Color(0xFF1A2A33) : AppColors.darkBar,
+                color: focused ? AppColors.panelFocus : AppColors.darkBar,
                 child: Column(
                   children: [
                     // MT-style path strip: ~ / full/path   [↑] [↻]
@@ -572,11 +572,11 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
-                              color: focused ? AppColors.cyan : const Color(0xFF666666),
+                              color: focused ? AppColors.cyan : AppColors.gray66,
                             ),
                           ),
                           const SizedBox(width: 6),
-                          const Text('~', style: TextStyle(fontSize: 13, color: Color(0xFF9E9E9E), fontFamily: 'monospace')),
+                          const Text('~', style: TextStyle(fontSize: 13, color: AppColors.gray9e, fontFamily: 'monospace')),
                           const SizedBox(width: 4),
                           Expanded(
                             child: GestureDetector(
@@ -597,7 +597,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                 style: TextStyle(
                                   fontFamily: 'monospace',
                                   fontSize: 12,
-                                  color: focused ? Colors.white : const Color(0xFFBDBDBD),
+                                  color: focused ? Colors.white : AppColors.grayBd,
                                 ),
                               ),
                             ),
@@ -632,10 +632,10 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
               ),
               if (pane.err != null)
                 Material(
-                  color: const Color(0xFF3D1F1F),
+                  color: AppColors.errPanelBg,
                   child: Padding(
                     padding: const EdgeInsets.all(6),
-                    child: Text(pane.err!, style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 11)),
+                    child: Text(pane.err!, style: const TextStyle(color: AppColors.errTextSoft, fontSize: 11)),
                   ),
                 ),
               Expanded(
@@ -681,7 +681,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                   });
                                 },
                                 child: Container(
-                                  color: sel ? const Color(0xFF1A3A5C) : Colors.transparent,
+                                  color: sel ? AppColors.selectBlue : Colors.transparent,
                                   padding: const EdgeInsets.fromLTRB(8, 7, 4, 7),
                                   child: Row(
                                     children: [
@@ -700,7 +700,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                           child: Icon(
                                             isDir ? Icons.folder : Icons.insert_drive_file_outlined,
                                             size: 22,
-                                            color: isDir ? const Color(0xFFFFB74D) : const Color(0xFF90CAF9),
+                                            color: isDir ? AppColors.folder : AppColors.fileBlue,
                                           ),
                                         ),
                                       Expanded(
@@ -722,7 +722,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                                 ].where((s) => s.toString().isNotEmpty).join('  ·  '),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E), fontFamily: 'monospace'),
+                                                style: const TextStyle(fontSize: 11, color: AppColors.gray9e, fontFamily: 'monospace'),
                                               ),
                                           ],
                                         ),
@@ -730,7 +730,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                       if (!isDir && sizeStr.isNotEmpty && mtime.isEmpty)
                                         Padding(
                                           padding: const EdgeInsets.only(right: 4),
-                                          child: Text(sizeStr, style: const TextStyle(fontSize: 11, color: Color(0xFFBDBDBD), fontFamily: 'monospace')),
+                                          child: Text(sizeStr, style: const TextStyle(fontSize: 11, color: AppColors.grayBd, fontFamily: 'monospace')),
                                         ),
                                       if (!pane.selecting)
                                         IconButton(
@@ -902,7 +902,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
           ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
+      backgroundColor: AppColors.pureBlack,
       appBar: AppBar(
         backgroundColor: AppColors.darkBar,
         toolbarHeight: 44,
@@ -919,7 +919,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
           ? Row(
               children: [
                 _pane(context, _left, 0),
-                Container(width: 1, color: const Color(0xFF2A2A2A)),
+                Container(width: 1, color: AppColors.dividerSoft),
                 _pane(context, _right, 1),
               ],
             )

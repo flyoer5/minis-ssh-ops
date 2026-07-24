@@ -36,7 +36,7 @@ class _TerminalPageState extends State<TerminalPage>
   String _status = '';
   String _prev = '';
 
-  static const _bg = Color(0xFF000000);
+  static const _bg = AppColors.terminalBlack;
   static const _fg = AppColors.text;
   static const _green = AppColors.success;
   static const _muted = AppColors.textMuted;

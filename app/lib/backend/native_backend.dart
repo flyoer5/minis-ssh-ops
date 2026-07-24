@@ -61,4 +61,34 @@ class NativeBackend {
     });
     return v?.toString() ?? '';
   }
+
+  /// System share sheet for plain text.
+  static Future<void> shareText({required String text, String title = '分享'}) async {
+    if (!isAndroidNative) {
+      throw PlatformException(code: 'UNSUPPORTED', message: 'only Android');
+    }
+    await _channel.invokeMethod('shareText', {
+      'text': text,
+      'title': title,
+    });
+  }
+
+  /// Save bytes to Downloads then open system share sheet for the file.
+  static Future<String> shareFile({
+    required String name,
+    required String b64,
+    String mime = 'application/octet-stream',
+    String title = '分享文件',
+  }) async {
+    if (!isAndroidNative) {
+      throw PlatformException(code: 'UNSUPPORTED', message: 'only Android');
+    }
+    final v = await _channel.invokeMethod<dynamic>('shareFile', {
+      'name': name,
+      'b64': b64,
+      'mime': mime,
+      'title': title,
+    });
+    return v?.toString() ?? '';
+  }
 }
