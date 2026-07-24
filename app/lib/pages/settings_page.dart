@@ -728,6 +728,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               ),
               const SizedBox(height: 8),
               _fontSlider(
+                context: context,
                 label: '终端字号',
                 value: state.termFontSize,
                 min: 10,
@@ -737,6 +738,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               ),
               const SizedBox(height: 6),
               _fontSlider(
+                context: context,
                 label: 'Agent 正文字号',
                 value: state.agentFontSize,
                 min: 12,
@@ -746,6 +748,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               ),
               const SizedBox(height: 6),
               _fontSlider(
+                context: context,
                 label: '记录字号',
                 value: state.recordsFontSize,
                 min: 11,
@@ -755,6 +758,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               ),
               const SizedBox(height: 6),
               _fontSlider(
+                context: context,
                 label: '界面列表字号',
                 value: state.uiFontSize,
                 min: 11,
@@ -764,6 +768,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               ),
               const SizedBox(height: 6),
               _fontSlider(
+                context: context,
                 label: '编辑器默认字号',
                 value: state.editorFontSize,
                 min: 10,

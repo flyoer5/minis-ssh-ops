@@ -60,6 +60,7 @@ part of 'settings_page.dart';
   }
 
   Widget _fontSlider({
+    required BuildContext context,
     required String label,
     required double value,
     required double min,
