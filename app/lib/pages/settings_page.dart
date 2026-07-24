@@ -492,7 +492,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.45',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.46',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
@@ -503,6 +503,28 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 '主机探针 · Agent · 终端 · SFTP · 审计',
                 style: TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
+              if (state.backendFeatures.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final f in state.backendFeatures)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface2,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Text(
+                          f,
+                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace'),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ],
           ),
 
@@ -692,16 +714,16 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                     : 'auto',
                 decoration: const InputDecoration(
                   labelText: '思考级别',
-                  helperText: 'none 关闭 · auto 开启 · low→xhigh 强度',
+                  helperText: '关闭 · 自动 · 低→极高（影响推理强度与延迟）',
                   isDense: true,
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'none', child: Text('none · 关闭思考')),
-                  DropdownMenuItem(value: 'auto', child: Text('auto · 开启（默认）')),
-                  DropdownMenuItem(value: 'low', child: Text('low')),
-                  DropdownMenuItem(value: 'medium', child: Text('medium')),
-                  DropdownMenuItem(value: 'high', child: Text('high')),
-                  DropdownMenuItem(value: 'xhigh', child: Text('xhigh')),
+                  DropdownMenuItem(value: 'none', child: Text('关闭思考')),
+                  DropdownMenuItem(value: 'auto', child: Text('自动（默认）')),
+                  DropdownMenuItem(value: 'low', child: Text('低')),
+                  DropdownMenuItem(value: 'medium', child: Text('中')),
+                  DropdownMenuItem(value: 'high', child: Text('高')),
+                  DropdownMenuItem(value: 'xhigh', child: Text('极高')),
                 ],
                 onChanged: (v) {
                   if (v != null) setState(() => thinkingLevel = v);

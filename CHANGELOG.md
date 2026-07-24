@@ -1,3 +1,10 @@
+## 1.4.46
+
+- Settings: Chinese thinking levels; about shows backend feature chips
+- Hosts: probe age 秒/分钟/小时/天前
+- Records: pull-to-refresh; export prefix jishu-audit-
+- Agent sessions: richer empty state
+
 ## 1.4.45
 
 - Hosts: Online/Offline → 在线/离线

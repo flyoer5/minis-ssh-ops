@@ -248,44 +248,57 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
             ),
           ),
           Expanded(
-            child: list.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 28),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            query.trim().isNotEmpty || filter != 'all' || hostFilter != 'all'
-                                ? Icons.search_off
-                                : Icons.receipt_long_outlined,
-                            size: 40,
-                            color: AppColors.textFaint,
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            query.trim().isNotEmpty || filter != 'all' || hostFilter != 'all'
-                                ? '没有匹配的记录'
-                                : '暂无审计记录',
-                            style: TextStyle(fontSize: fs, color: AppColors.textMuted, fontWeight: FontWeight.w600),
-                          ),
-                          if (query.trim().isNotEmpty || filter != 'all' || hostFilter != 'all') ...[
-                            const SizedBox(height: 12),
-                            TextButton(
-                              onPressed: () => setState(() {
-                                filter = 'all';
-                                hostFilter = 'all';
-                                query = '';
-                                _q.clear();
-                              }),
-                              child: const Text('清除筛选'),
+            child: RefreshIndicator(
+              onRefresh: () => state.refreshAudit(),
+              child: list.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.18),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 28),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              query.trim().isNotEmpty || filter != 'all' || hostFilter != 'all'
+                                  ? Icons.search_off
+                                  : Icons.receipt_long_outlined,
+                              size: 40,
+                              color: AppColors.textFaint,
                             ),
+                            const SizedBox(height: 10),
+                            Text(
+                              query.trim().isNotEmpty || filter != 'all' || hostFilter != 'all'
+                                  ? '没有匹配的记录'
+                                  : '暂无审计记录',
+                              style: TextStyle(fontSize: fs, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                            ),
+                            if (query.trim().isNotEmpty || filter != 'all' || hostFilter != 'all') ...[
+                              const SizedBox(height: 12),
+                              TextButton(
+                                onPressed: () => setState(() {
+                                  filter = 'all';
+                                  hostFilter = 'all';
+                                  query = '';
+                                  _q.clear();
+                                }),
+                                child: const Text('清除筛选'),
+                              ),
+                            ] else ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                '下拉可刷新',
+                                style: TextStyle(fontSize: fs - 2, color: AppColors.textFaint),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   )
                 : ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.only(bottom: 16),
                     itemCount: list.length,
                     separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.surface2),
@@ -349,6 +362,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                       );
                     },
                   ),
+            ),
           ),
         ],
       ),
@@ -386,7 +400,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
     if (NativeBackend.isAndroidNative) {
       try {
         final name =
-            'ssh-audit-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('.', '').substring(0, 15)}.csv';
+            'jishu-audit-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('.', '').substring(0, 15)}.csv';
         final b64 = base64Encode(utf8.encode(csv));
         savedPath = await NativeBackend.saveBytesToDownloads(name: name, b64: b64);
       } catch (_) {
@@ -400,7 +414,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
     if (NativeBackend.isAndroidNative) {
       try {
         final name =
-            'ssh-audit-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('.', '').substring(0, 15)}.csv';
+            'jishu-audit-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('.', '').substring(0, 15)}.csv';
         final b64 = base64Encode(utf8.encode(csv));
         await NativeBackend.shareFile(
           name: name,

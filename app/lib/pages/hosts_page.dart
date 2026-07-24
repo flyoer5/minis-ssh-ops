@@ -562,12 +562,12 @@ class _StatusCard extends StatelessWidget {
     if (at == null || summary == null) return '';
     final sec = DateTime.now().difference(at).inSeconds;
     if (sec < 5) return '刚刚';
-    if (sec < 60) return '${sec}s 前';
+    if (sec < 60) return '$sec 秒前';
     final min = sec ~/ 60;
-    if (min < 60) return '${min}m 前';
+    if (min < 60) return '$min 分钟前';
     final h = min ~/ 60;
-    if (h < 48) return '${h}h 前';
-    return '${h ~/ 24}d 前';
+    if (h < 48) return '$h 小时前';
+    return '${h ~/ 24} 天前';
   }
 
   String _v(String label) {

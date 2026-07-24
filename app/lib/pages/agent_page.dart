@@ -210,11 +210,23 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                     child: list.isEmpty
                         ? const Center(
                             child: Padding(
-                              padding: EdgeInsets.all(24),
-                              child: Text(
-                                '还没有历史。发几条消息后点「新会话」即可归档。',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: AppColors.textMuted),
+                              padding: EdgeInsets.symmetric(horizontal: 28),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.history, size: 40, color: AppColors.textFaint),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    '还没有历史会话',
+                                    style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    '发几条消息后点右上角「新会话」即可归档到这里。',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 12.5, color: AppColors.textFaint, height: 1.4),
+                                  ),
+                                ],
                               ),
                             ),
                           )
