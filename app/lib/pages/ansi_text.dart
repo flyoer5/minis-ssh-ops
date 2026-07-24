@@ -55,9 +55,13 @@ class AnsiPainter {
   }
 
   TextSpan build(String raw) {
-    // Drop OSC / charset / other non-SGR CSI first; keep SGR for color.
+    // Drop OSC / charset / private modes first; keep plain SGR for color.
+    // Important: ESC[?2004h (bracketed paste) MUST be stripped whole — old
+    // regex only allowed [0-9;]* params so "?2004h" leaked as visible text.
     var s = raw
         .replaceAll(RegExp(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)?'), '')
+        .replaceAll(RegExp(r'\x1B\[\?[0-9;]*[A-Za-z]'), '') // DEC private: ?2004h/l etc.
+        .replaceAll(RegExp(r'\x1B\[>[0-9;]*[A-Za-z]'), '') // private >
         .replaceAll(RegExp(r'\x1B[()][0-9A-Za-z]'), '')
         .replaceAll('\r\n', '\n')
         .replaceAll('\r', '\n');
@@ -95,7 +99,9 @@ class AnsiPainter {
       spans.add(TextSpan(text: text, style: style()));
     }
 
-    final re = RegExp(r'\x1B\[([0-9;]*)([A-Za-z])|\x1B.');
+    // CSI: ESC [ [param bytes 0x30-0x3F]* [intermediate 0x20-0x2F]* final(A-Za-z@-~)
+    // Also bare ESC+char. Private-mode CSI already stripped above.
+    final re = RegExp(r'\x1B\[([0-9;]*)([A-Za-z@-~])|\x1B.');
     var i = 0;
     for (final m in re.allMatches(s)) {
       if (m.start > i) {
@@ -224,6 +230,8 @@ class AnsiPainter {
 String stripAnsi(String s) {
   var t = s
       .replaceAll(RegExp(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)?'), '')
+      .replaceAll(RegExp(r'\x1B\[\?[0-9;]*[A-Za-z@-~]'), '')
+      .replaceAll(RegExp(r'\x1B\[>[0-9;]*[A-Za-z@-~]'), '')
       .replaceAll(RegExp(r'\x1B\[[0-9;?]*[ -/]*[@-~]'), '')
       .replaceAll(RegExp(r'\x1B[()][0-9A-Za-z]'), '')
       .replaceAll(RegExp(r'\x1B.'), '')

@@ -1,3 +1,7 @@
+## 1.4.32
+
+- Terminal: strip DEC private CSI (ESC[?2004h bracketed paste) so prompt is not prefixed with ?2004h
+
 ## 1.4.31
 
 - Hosts: password **or PEM private key** (+ optional passphrase) in add/edit sheet; card shows key/password icon
