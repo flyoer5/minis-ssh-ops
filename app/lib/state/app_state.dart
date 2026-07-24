@@ -8,11 +8,12 @@ import 'package:ssh_ai_agent/backend/native_backend.dart';
 import 'package:ssh_ai_agent/models/agent_session.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/models/probe_summary.dart';
+import 'package:ssh_ai_agent/state/ui_prefs.dart';
 
 export 'package:ssh_ai_agent/models/agent_session.dart';
 export 'package:ssh_ai_agent/models/probe_summary.dart';
 
-class AppState extends ChangeNotifier {
+class AppState extends ChangeNotifier with UiPrefs {
   AppState(this.api);
 
   final ApiClient api;
@@ -39,13 +40,6 @@ class AppState extends ChangeNotifier {
   int? _lastPlanMsgIndex;
   final List<AgentSession> agentSessions = [];
   bool agentBusy = false;
-
-  /// Navigation chrome: bottom bar (default) or top-left menu.
-  /// Values: `bottom` | `menu`
-  String navMode = 'bottom';
-
-  bool get navIsMenu => navMode == 'menu';
-  bool get navIsBottom => !navIsMenu;
 
   String get hostLabel => hostLabelFor(selectedHostId);
 
@@ -93,13 +87,7 @@ class AppState extends ChangeNotifier {
 
   // --- Probe cache (hostId -> summary json + epoch ms) ---
   final Map<String, Map<String, dynamic>> probeCache = {};
-  // --- UI prefs ---
-  double termFontSize = 13;
-  double agentFontSize = 15; // assistant body base
-  double recordsFontSize = 13;
-  double uiFontSize = 14; // hosts / files list chrome
-  double editorFontSize = 13; // remote file editor default
-  bool confirmWrites = false; // reserved; agent auto-runs non-blocked
+  // UI prefs (fonts/nav/host card) live in UiPrefs mixin
   bool batteryIgnored = true;
   bool onboarded = true;
   bool bootstrapped = false;
@@ -112,16 +100,9 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     api.baseUrl = prefs.getString('baseUrl') ?? api.baseUrl;
     api.localToken = prefs.getString('localToken') ?? api.localToken;
-    termFontSize = prefs.getDouble('termFontSize') ?? 13;
-    agentFontSize = prefs.getDouble('agentFontSize') ?? 15;
-    recordsFontSize = prefs.getDouble('recordsFontSize') ?? 13;
-    uiFontSize = prefs.getDouble('uiFontSize') ?? 14;
-    editorFontSize = prefs.getDouble('editorFontSize') ?? 13;
     selectedHostId = prefs.getString('selectedHostId') ?? selectedHostId;
     onboarded = true; // onboarding removed
-    confirmWrites = prefs.getBool('confirmWrites') ?? false;
-    final nm = prefs.getString('navMode') ?? 'bottom';
-    navMode = (nm == 'menu') ? 'menu' : 'bottom';
+    loadUiPrefs(prefs);
     _loadSessionsFromPrefs(prefs);
 
     if (NativeBackend.isAndroidNative) {
@@ -266,47 +247,12 @@ class AppState extends ChangeNotifier {
     });
   }
 
-  Future<void> setTermFontSize(double v) async {
-    termFontSize = v.clamp(10, 22);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('termFontSize', termFontSize);
-    notifyListeners();
-  }
 
-  Future<void> setAgentFontSize(double v) async {
-    agentFontSize = v.clamp(12, 20);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('agentFontSize', agentFontSize);
-    notifyListeners();
-  }
 
-  Future<void> setRecordsFontSize(double v) async {
-    recordsFontSize = v.clamp(11, 18);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('recordsFontSize', recordsFontSize);
-    notifyListeners();
-  }
 
-  Future<void> setUiFontSize(double v) async {
-    uiFontSize = v.clamp(11, 20);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('uiFontSize', uiFontSize);
-    notifyListeners();
-  }
 
-  Future<void> setEditorFontSize(double v) async {
-    editorFontSize = v.clamp(10, 24);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('editorFontSize', editorFontSize);
-    notifyListeners();
-  }
 
-  Future<void> setNavMode(String mode) async {
-    navMode = mode == 'menu' ? 'menu' : 'bottom';
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('navMode', navMode);
-    notifyListeners();
-  }
+
 
   Future<void> requestBatteryExempt() async {
     await NativeBackend.requestIgnoreBatteryOptimizations();
@@ -460,6 +406,7 @@ class AppState extends ChangeNotifier {
   void cancelAgentChat() {
     api.cancelAgentStream();
     agentBusy = false;
+    _flushStreamNotify();
     _pushMsg(ChatMessage(role: 'assistant', content: '已取消', kind: ChatKind.status));
     notifyListeners();
   }
@@ -535,12 +482,6 @@ class AppState extends ChangeNotifier {
     await prefs.setString('agentSessionsJson', jsonEncode(list));
   }
 
-  Future<void> setConfirmWrites(bool v) async {
-    confirmWrites = v;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('confirmWrites', v);
-    notifyListeners();
-  }
 
   Future<String> exportConfigJson({bool includeSecrets = false}) async {
     final hostsOut = <Map<String, dynamic>>[];
@@ -564,15 +505,7 @@ class AppState extends ChangeNotifier {
       'exportedAt': DateTime.now().toIso8601String(),
       'hosts': hostsOut,
       'llm': llmOut,
-      'prefs': {
-        'termFontSize': termFontSize,
-        'agentFontSize': agentFontSize,
-        'recordsFontSize': recordsFontSize,
-        'uiFontSize': uiFontSize,
-        'editorFontSize': editorFontSize,
-        'confirmWrites': confirmWrites,
-        'navMode': navMode,
-      },
+      'prefs': uiPrefsExport(),
       'note': includeSecrets
           ? 'secrets not exported via this path'
           : 'passwords/keys not included',
@@ -618,27 +551,7 @@ class AppState extends ChangeNotifier {
     }
     final pr = obj['prefs'];
     if (pr is Map) {
-      if (pr['termFontSize'] is num) {
-        await setTermFontSize((pr['termFontSize'] as num).toDouble());
-      }
-      if (pr['agentFontSize'] is num) {
-        await setAgentFontSize((pr['agentFontSize'] as num).toDouble());
-      }
-      if (pr['recordsFontSize'] is num) {
-        await setRecordsFontSize((pr['recordsFontSize'] as num).toDouble());
-      }
-      if (pr['uiFontSize'] is num) {
-        await setUiFontSize((pr['uiFontSize'] as num).toDouble());
-      }
-      if (pr['editorFontSize'] is num) {
-        await setEditorFontSize((pr['editorFontSize'] as num).toDouble());
-      }
-      if (pr['confirmWrites'] is bool) {
-        await setConfirmWrites(pr['confirmWrites'] as bool);
-      }
-      if (pr['navMode'] is String) {
-        await setNavMode(pr['navMode'] as String);
-      }
+      await applyUiPrefsImport(pr);
     }
     await refreshHosts();
     await refreshLlm();

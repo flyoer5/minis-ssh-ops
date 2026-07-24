@@ -6,6 +6,10 @@
 - ApiClient.dispose + AppState.dispose
 - Tests: Go `risk.Classify` unit tests; CI runs `go test` + `flutter test`
 - CI: PR builds debug only; release APK on main/push / workflow_dispatch
+- Host cards: settings toggle **精简** (MEM+HDD only) via `hostCardCompact`
+- Probe refresh concurrency limited to 3
+- AppState: extract `UiPrefs` mixin (fonts/nav/host card/confirmWrites)
+- Cancel agent flushes pending stream notify
 
 ## 1.4.29
 
