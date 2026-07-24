@@ -1,3 +1,10 @@
+## 1.4.28
+
+- K: stream plain-text body (Markdown only after final) to reduce MD reparse jitter
+- K: reasoning_merge pure helpers + unit tests; final/stream dedupe by compact text
+- K: reasoning_delta keeps leading spaces (no trim on raw field)
+- K: cancel path logs session/host when SSE client stops
+
 ## 1.4.27
 
 - UI/editor font size prefs (hosts+files lists, editor default)

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ssh_ai_agent/api/client.dart';
+import 'package:ssh_ai_agent/agent/reasoning_merge.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 
@@ -719,37 +720,6 @@ class AppState extends ChangeNotifier {
     return false;
   }
 
-  String _normReason(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-  /// Strip all whitespace — stream tokens may lose spaces while final has them;
-  /// those must still count as the *same* thought, not two paragraphs.
-  String _compactReason(String s) => s.replaceAll(RegExp(r'\s+'), '').toLowerCase();
-
-  /// Prefer the better-formatted copy (more spaces / longer readable text).
-  String _preferReasoning(String a, String b) {
-    final ca = _compactReason(a);
-    final cb = _compactReason(b);
-    if (ca.isEmpty) return b;
-    if (cb.isEmpty) return a;
-    // Same thought (possibly one missing spaces)
-    if (ca == cb || ca.contains(cb) || cb.contains(ca)) {
-      // Prefer version that still has word spacing
-      final spaceA = RegExp(r'\s').allMatches(a).length;
-      final spaceB = RegExp(r'\s').allMatches(b).length;
-      if (spaceB != spaceA) return spaceB > spaceA ? b : a;
-      return b.length >= a.length ? b : a;
-    }
-    // Different thoughts: only then stack
-    return '${a.trimRight()}\n\n${b.trimLeft()}';
-  }
-
-  bool _isSameOrSubReason(String a, String b) {
-    final ca = _compactReason(a);
-    final cb = _compactReason(b);
-    if (ca.isEmpty || cb.isEmpty) return false;
-    return ca == cb || ca.contains(cb) || cb.contains(ca);
-  }
-
   /// Minis-like: reasoning is a foldable block *above* the answer for this turn.
   /// Never append a new thinking card after assistant text (final often re-sends full reasoning).
   void _pushReasoning(String reasoning) {
@@ -758,20 +728,8 @@ class AppState extends ChangeNotifier {
     final idx = _lastReasoningIndexInTurn();
     if (idx >= 0) {
       final last = agentMessages[idx];
-      // final re-sends full text after deltas — always coalesce into ONE card
-      final merged = _preferReasoning(last.content, r);
-      // If same thought (whitespace-only difference), never create a second paragraph
-      if (_isSameOrSubReason(last.content, r) || merged == last.content || merged == r) {
-        agentMessages[idx] = ChatMessage(
-          role: 'assistant',
-          content: merged,
-          kind: ChatKind.reasoning,
-          meta: {'part': 'reasoning'},
-          at: last.at,
-        );
-        return;
-      }
-      // Truly different segment in same turn (e.g. pre-tool vs post-tool)
+      // Stream (maybe glued) + final (spaced) → ONE card via pure merge helper
+      final merged = mergeReasoningForTurn(last.content, r);
       agentMessages[idx] = ChatMessage(
         role: 'assistant',
         content: merged,
@@ -902,6 +860,7 @@ class AppState extends ChangeNotifier {
   }
 
   /// After token stream, full assistant/final must REPLACE the draft bubble, not create a second one.
+  /// Also seals part from `text_delta` → `text` so UI switches from plain to Markdown once.
   void _coalesceAssistantFull(String content, {String part = 'text'}) {
     final t = content.trimRight();
     if (t.isEmpty) return;
@@ -910,23 +869,16 @@ class AppState extends ChangeNotifier {
       final last = agentMessages[idx];
       final a = _normText(last.content);
       final b = _normText(t);
+      String body = t;
       // identical / prefix / either contains the other → one bubble
       if (a == b || b.startsWith(a) || a.startsWith(b) || a.contains(b) || b.contains(a)) {
-        agentMessages[idx] = ChatMessage(
-          role: 'assistant',
-          content: t.length >= last.content.length ? t : last.content,
-          kind: ChatKind.text,
-          meta: {'part': part},
-          at: last.at,
-        );
-        return;
+        body = t.length >= last.content.length ? t : last.content;
       }
-      // Still same turn after streaming: prefer final as authoritative single bubble
       agentMessages[idx] = ChatMessage(
         role: 'assistant',
-        content: t,
+        content: body,
         kind: ChatKind.text,
-        meta: {'part': part},
+        meta: {'part': 'text'}, // seal: leave streaming plain-text mode
         at: last.at,
       );
       return;
@@ -935,7 +887,7 @@ class AppState extends ChangeNotifier {
       role: 'assistant',
       content: t,
       kind: ChatKind.text,
-      meta: {'part': part},
+      meta: {'part': 'text'},
     ));
   }
 
@@ -1091,7 +1043,9 @@ class AppState extends ChangeNotifier {
     final content = (raw['content'] ?? '').toString();
     final name = (raw['name'] ?? '').toString();
     final command = (raw['command'] ?? '').toString();
-    final reasoning = (raw['reasoning'] ?? '').toString().trim();
+    // Keep raw reasoning for deltas — a token may be only " " (leading space).
+    final reasoningRaw = (raw['reasoning'] ?? '').toString();
+    final reasoning = reasoningRaw.trim();
     if (type == 'memory') {
       // optional silent update; show short status once
       final facts = (raw['facts'] ?? '').toString().trim();
@@ -1099,9 +1053,10 @@ class AppState extends ChangeNotifier {
       if (facts.isNotEmpty || content.trim().isNotEmpty) {
         _pushMsg(ChatMessage(role: 'system', content: note, kind: ChatKind.status));
       }
-    } else if (type == 'reasoning_delta' && (reasoning.isNotEmpty || content.isNotEmpty)) {
-      // Token stream: append into open reasoning bubble
-      _appendReasoningDelta(reasoning.isNotEmpty ? reasoning : content);
+    } else if (type == 'reasoning_delta' && (reasoningRaw.isNotEmpty || content.isNotEmpty)) {
+      // Prefer content field, else untrimmed reasoning (preserve spaces)
+      final piece = content.isNotEmpty ? content : reasoningRaw;
+      _appendReasoningDelta(piece);
     } else if (type == 'assistant_delta' && content.isNotEmpty) {
       // Token stream: append into open assistant text bubble
       _appendAssistantDelta(content);
@@ -1193,8 +1148,19 @@ class AppState extends ChangeNotifier {
       );
     } else if (type == 'final' && (content.isNotEmpty || reasoning.isNotEmpty)) {
       // final often re-sends full reasoning after deltas + answer already rendered.
-      // Only coalesce into existing turn reasoning — never stack under the reply.
-      if (reasoning.isNotEmpty) _pushReasoning(reasoning);
+      // Coalesce only — never stack a second thinking card under the reply.
+      if (reasoning.isNotEmpty) {
+        final ri = _lastReasoningIndexInTurn();
+        if (ri >= 0) {
+          // Prefer replacing stream draft with final (usually better spaced).
+          _pushReasoning(reasoning);
+        } else if (!_turnHasAssistantText()) {
+          _pushReasoning(reasoning);
+        } else {
+          // Answer already shown and no prior reasoning bubble — put above answer once.
+          _pushReasoning(reasoning);
+        }
+      }
       if (content.isNotEmpty) {
         // Stream already drew the bubble via assistant_delta; final must not spawn a second one.
         _coalesceAssistantFull(content, part: 'text');

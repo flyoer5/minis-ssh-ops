@@ -706,18 +706,24 @@ class _Bubble extends StatelessWidget {
       );
     }
 
+    // While streaming: plain text (avoids Markdown re-parse jitter). Final bubble uses MD.
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, right: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _MdBody(data: msg.content, baseColor: AppColors.text, fontSize: fs),
-                    if (streaming)
+          if (streaming)
+            SelectableText(
+              msg.content,
+              style: TextStyle(fontSize: fs, height: 1.45, color: AppColors.text),
+            )
+          else
+            _MdBody(data: msg.content, baseColor: AppColors.text, fontSize: fs),
+          if (streaming)
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: _BlinkCursor(fontSize: fs),
             ),
-
         ],
       ),
     );

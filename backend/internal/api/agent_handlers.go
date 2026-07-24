@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -348,15 +349,18 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	events, _, err := cli.RunLoopStream(body.Message, history, run, 5, func(ev agent.LoopEvent) {
-		_ = writeEv(ev)
+		if !writeEv(ev) {
+			// Client closed SSE mid-event — request context should already be cancelled.
+			log.Printf("agent stream: write failed session=%s (client stop?)", body.SessionID)
+		}
 	})
 	if err != nil {
 		// cancelled: client already gone — don't bother error event
-		if r.Context().Err() == nil {
-			_ = writeEv(map[string]any{"type": "error", "content": err.Error()})
-		} else {
+		if r.Context().Err() != nil {
+			log.Printf("agent stream: cancelled session=%s host=%s err=%v", body.SessionID, body.HostID, err)
 			return
 		}
+		_ = writeEv(map[string]any{"type": "error", "content": err.Error()})
 	}
 	for i := len(events) - 1; i >= 0; i-- {
 		if events[i].Type == "final" || events[i].Type == "assistant" {
