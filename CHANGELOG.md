@@ -1,3 +1,9 @@
+## 1.4.41
+
+- Agent: top host/backend status strip + 选主机
+- Files: empty-directory illustration
+- Records: empty state distinguishes no data vs no search hits (clear filters)
+
 ## 1.4.40
 
 - Hosts: empty state with add CTA

@@ -388,6 +388,47 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       ),
       body: Column(
         children: [
+          // Compact host / backend strip
+          Material(
+            color: AppColors.surface,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: !state.backendOk
+                          ? AppColors.danger
+                          : (state.selectedHostId == null ? AppColors.textFaint : AppColors.success),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      !state.backendOk
+                          ? '后端未连接'
+                          : (state.selectedHostId == null ? '未选主机' : state.hostLabel),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                    ),
+                  ),
+                  if (state.selectedHostId == null)
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: AppColors.accentSoft,
+                      ),
+                      onPressed: () => NavScope.maybeOf(context)?.go(0),
+                      child: const Text('选主机', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                ],
+              ),
+            ),
+          ),
           Expanded(
             child: state.agentMessages.isEmpty
                 ? Center(

@@ -231,7 +231,42 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
           ),
           Expanded(
             child: list.isEmpty
-                ? Center(child: Text('暂无审计记录', style: TextStyle(fontSize: fs, color: AppColors.textMuted)))
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            query.trim().isNotEmpty || filter != 'all' || hostFilter != 'all'
+                                ? Icons.search_off
+                                : Icons.receipt_long_outlined,
+                            size: 40,
+                            color: AppColors.textFaint,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            query.trim().isNotEmpty || filter != 'all' || hostFilter != 'all'
+                                ? '没有匹配的记录'
+                                : '暂无审计记录',
+                            style: TextStyle(fontSize: fs, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                          ),
+                          if (query.trim().isNotEmpty || filter != 'all' || hostFilter != 'all') ...[
+                            const SizedBox(height: 12),
+                            TextButton(
+                              onPressed: () => setState(() {
+                                filter = 'all';
+                                hostFilter = 'all';
+                                query = '';
+                                _q.clear();
+                              }),
+                              child: const Text('清除筛选'),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  )
                 : ListView.separated(
                     padding: const EdgeInsets.only(bottom: 16),
                     itemCount: list.length,

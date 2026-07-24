@@ -808,7 +808,23 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                 child: pane.loading
                     ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)))
                     : pane.entries.isEmpty
-                        ? const Center(child: Text('空', style: TextStyle(color: Colors.white38)))
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.folder_open, size: 36, color: Colors.white24),
+                                const SizedBox(height: 8),
+                                const Text('此目录为空', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  pane.path.isEmpty ? '/' : pane.path,
+                                  style: const TextStyle(color: Colors.white24, fontSize: 11, fontFamily: 'monospace'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          )
                         : ListView.builder(
                             itemCount: pane.entries.length,
                             // Fixed row height for smoother scroll on large dirs.
