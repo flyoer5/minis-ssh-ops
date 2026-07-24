@@ -518,6 +518,27 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     );
   }
 
+  Widget _portChip(String baseUrl) {
+    var label = '端口 ?';
+    try {
+      final u = Uri.tryParse(baseUrl);
+      if (u != null && u.hasPort) {
+        label = '端口 ${u.port}';
+      } else if (u != null && u.host.isNotEmpty) {
+        label = u.scheme == 'https' ? '端口 443' : '端口 80';
+      }
+    } catch (_) {}
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F6FEB).withAlpha(0x22),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFF1F6FEB).withAlpha(0x55)),
+      ),
+      child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF79C0FF))),
+    );
+  }
+
   Widget _statusChip(bool ok, String text) {
     final c = ok ? const Color(0xFF3FB950) : const Color(0xFFF85149);
     return Container(
@@ -593,14 +614,20 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               Wrap(
                 spacing: 8,
                 runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   _statusChip(state.backendOk, state.backendOk ? '已连接' : '未连接'),
-                  if (state.backendOk)
-                    Text(
-                      state.api.baseUrl,
-                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF8B949E)),
-                    ),
+                  _portChip(state.api.baseUrl),
+                  Text(
+                    state.api.baseUrl,
+                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF8B949E)),
+                  ),
                 ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                '本地后端端口按 applicationId 派生（17890+hash%1024），避免与其它安装包抢同一端口。',
+                style: TextStyle(fontSize: 11, color: Color(0xFF6E7681), height: 1.35),
               ),
               if (state.backendNote != null) ...[
                 const SizedBox(height: 6),

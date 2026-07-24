@@ -1,3 +1,7 @@
+## 1.4.15
+
+- G: denser multi-select bar; audit CSV export; settings show derived backend port
+
 ## 1.4.14
 
 - F: HostKey manager sheet (list/delete/clear + TOFU help)

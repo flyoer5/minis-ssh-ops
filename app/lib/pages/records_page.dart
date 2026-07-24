@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 
@@ -91,6 +92,12 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
         backgroundColor: const Color(0xFF0D1117),
         title: Text('记录', style: TextStyle(fontSize: fs + 1, fontWeight: FontWeight.w700)),
         actions: [
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: '导出 CSV',
+            onPressed: list.isEmpty ? null : () => _exportCsv(context, state, list),
+            icon: const Icon(Icons.download_outlined, size: 20),
+          ),
           IconButton(
             visualDensity: VisualDensity.compact,
             tooltip: '刷新',
@@ -235,6 +242,61 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  String _csvEscape(String s) {
+    if (s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r')) {
+      return '"${s.replaceAll('"', '""')}"';
+    }
+    return s;
+  }
+
+  Future<void> _exportCsv(BuildContext context, AppState state, List<Map> list) async {
+    final buf = StringBuffer();
+    buf.writeln('createdAt,host,hostId,risk,exitCode,command,stdout,stderr');
+    for (final e in list) {
+      final hostId = e['hostId']?.toString() ?? '';
+      final hostName = _hostLabel(state, hostId);
+      final at = _fmtLocal(e['createdAt']?.toString() ?? '');
+      final row = [
+        at,
+        hostName,
+        hostId,
+        e['risk']?.toString() ?? '',
+        '${e['exitCode'] ?? ''}',
+        e['command']?.toString() ?? '',
+        e['stdout']?.toString() ?? '',
+        e['stderr']?.toString() ?? '',
+      ].map(_csvEscape).join(',');
+      buf.writeln(row);
+    }
+    final csv = buf.toString();
+    await Clipboard.setData(ClipboardData(text: csv));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('已复制 ${list.length} 条 CSV 到剪贴板'),
+        action: SnackBarAction(
+          label: '预览',
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (c) => AlertDialog(
+                title: const Text('CSV 预览'),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  height: 320,
+                  child: SingleChildScrollView(
+                    child: SelectableText(csv, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                  ),
+                ),
+                actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭'))],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

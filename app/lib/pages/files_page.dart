@@ -779,28 +779,47 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
 
     final List<Widget> actions = active.selecting
         ? [
+            // G: denser multi-select — primary copy/move, rest in ⋯
             IconButton(
+              visualDensity: VisualDensity.compact,
               tooltip: '复制到另一栏',
               onPressed: active.selected.isEmpty ? null : () => _copyToOther(),
               icon: const Icon(Icons.copy_all, size: 20),
             ),
             IconButton(
+              visualDensity: VisualDensity.compact,
               tooltip: '移动到另一栏',
               onPressed: active.selected.isEmpty ? null : _moveToOther,
               icon: const Icon(Icons.drive_file_move_outline, size: 20),
             ),
-            IconButton(
-              tooltip: '删除',
-              onPressed: active.selected.isEmpty ? null : () => _deletePaths(active.selected, ask: true),
-              icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFF85149)),
-            ),
-            IconButton(
-              tooltip: '取消多选',
-              onPressed: () => setState(() {
-                active.selecting = false;
-                active.selected.clear();
-              }),
-              icon: const Icon(Icons.close, size: 20),
+            PopupMenuButton<String>(
+              tooltip: '更多',
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.more_vert, size: 20),
+              color: const Color(0xFF1E1E1E),
+              onSelected: (v) {
+                switch (v) {
+                  case 'delete':
+                    if (active.selected.isNotEmpty) {
+                      _deletePaths(active.selected, ask: true);
+                    }
+                    break;
+                  case 'cancel':
+                    setState(() {
+                      active.selecting = false;
+                      active.selected.clear();
+                    });
+                    break;
+                }
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'delete',
+                  enabled: active.selected.isNotEmpty,
+                  child: const Text('删除选中', style: TextStyle(color: Color(0xFFF85149))),
+                ),
+                const PopupMenuItem(value: 'cancel', child: Text('取消多选')),
+              ],
             ),
           ]
         : [
