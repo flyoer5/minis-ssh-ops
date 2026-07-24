@@ -1,3 +1,8 @@
+## 1.4.39
+
+- Files multi-select: 全选 / 反选
+- Agent: trim live transcript to 200 messages; busy hint 可点停止
+
 ## 1.4.38
 
 - Settings: 流式 Markdown toggle; probe concurrency 1–6 slider

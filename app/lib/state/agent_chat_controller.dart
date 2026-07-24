@@ -267,7 +267,16 @@ mixin AgentChatController on ChangeNotifier {
 
   void _pushMsg(ChatMessage m) {
     agentMessages.add(m);
+    _trimLiveMessages();
     notifyListeners();
+  }
+
+  /// Keep the open transcript from growing without bound (memory / jank).
+  void _trimLiveMessages() {
+    const maxLive = 200;
+    if (agentMessages.length <= maxLive) return;
+    // Keep the earliest user message of the tail window if possible.
+    agentMessages.removeRange(0, agentMessages.length - maxLive);
   }
 
   /// Index of the latest reasoning bubble in the *current turn* (after last user msg).
@@ -369,6 +378,7 @@ mixin AgentChatController on ChangeNotifier {
       kind: ChatKind.text,
       meta: {'part': 'text_delta'},
     ));
+    _trimLiveMessages();
   }
 
   /// Stream token: append into current-turn reasoning bubble (never after answer text).
@@ -583,7 +593,7 @@ mixin AgentChatController on ChangeNotifier {
       return;
     }
     if (agentBusy) {
-      _pushMsg(ChatMessage(role: 'assistant', content: '上一轮还在进行，可点取消', kind: ChatKind.status));
+      _pushMsg(ChatMessage(role: 'assistant', content: '上一轮还在进行，可点停止', kind: ChatKind.status));
       return;
     }
     agentBusy = true;

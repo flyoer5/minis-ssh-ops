@@ -970,6 +970,28 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
               color: AppColors.darkBar,
               onSelected: (v) {
                 switch (v) {
+                  case 'all':
+                    setState(() {
+                      active.selected
+                        ..clear()
+                        ..addAll([
+                          for (final e in active.entries)
+                            if (e is Map && e['path'] != null) e['path'].toString(),
+                        ]);
+                    });
+                    break;
+                  case 'invert':
+                    setState(() {
+                      final all = {
+                        for (final e in active.entries)
+                          if (e is Map && e['path'] != null) e['path'].toString(),
+                      };
+                      final next = all.difference(active.selected);
+                      active.selected
+                        ..clear()
+                        ..addAll(next);
+                    });
+                    break;
                   case 'delete':
                     if (active.selected.isNotEmpty) {
                       _deletePaths(active.selected, ask: true);
@@ -984,6 +1006,16 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                 }
               },
               itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'all',
+                  enabled: active.entries.isNotEmpty,
+                  child: Text('全选（${active.entries.length}）'),
+                ),
+                PopupMenuItem(
+                  value: 'invert',
+                  enabled: active.entries.isNotEmpty,
+                  child: const Text('反选'),
+                ),
                 PopupMenuItem(
                   value: 'delete',
                   enabled: active.selected.isNotEmpty,
