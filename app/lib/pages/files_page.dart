@@ -34,6 +34,9 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
   /// name | size | mtime
   String sortBy = 'name';
   bool sortAsc = true;
+  bool _transferring = false;
+  String _transferLabel = '';
+  double? _transferProgress; // null = indeterminate
 
   _Pane get active => focus == 0 ? _left : _right;
   _Pane get inactive => focus == 0 ? _right : _left;
@@ -353,21 +356,40 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     final s = context.read<AppState>();
     final id = s.selectedHostId;
     if (id == null) return;
+    setState(() {
+      _transferring = true;
+      _transferLabel = '下载 $name…';
+      _transferProgress = null;
+    });
     try {
       final r = await s.api.fsDownload(id, filePath);
       final b64 = r['b64']?.toString() ?? '';
       final n = r['name']?.toString() ?? name;
       final size = r['size'] ?? 0;
+      if (mounted) {
+        setState(() {
+          _transferLabel = '保存到下载目录…';
+          _transferProgress = 0.85;
+        });
+      }
       String? saved;
       try {
         saved = await NativeBackend.saveBytesToDownloads(name: n, b64: b64);
       } catch (_) {}
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(saved != null ? '已保存 $size 字节' : '下载失败，可稍后重试')),
+        SnackBar(content: Text(saved != null && saved.isNotEmpty ? '已保存 $n（$size 字节）' : '下载失败，可稍后重试')),
       );
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _transferring = false;
+          _transferLabel = '';
+          _transferProgress = null;
+        });
+      }
     }
   }
 
@@ -409,15 +431,28 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       return;
     }
     final destDir = inactive.path.isEmpty ? '/' : inactive.path;
+    final items = srcs.toList();
     var okN = 0;
     var failN = 0;
     var files = 0;
     var dirs = 0;
-    for (final src in srcs) {
+    setState(() {
+      _transferring = true;
+      _transferLabel = '复制 0/${items.length}…';
+      _transferProgress = 0;
+    });
+    for (var i = 0; i < items.length; i++) {
+      final src = items[i];
       final name = src.split('/').where((e) => e.isNotEmpty).isEmpty
           ? src
           : src.split('/').where((e) => e.isNotEmpty).last;
       final dest = destDir.endsWith('/') ? '$destDir$name' : '$destDir/$name';
+      if (mounted) {
+        setState(() {
+          _transferLabel = '复制 ${i + 1}/${items.length} · $name';
+          _transferProgress = (i) / items.length;
+        });
+      }
       try {
         final r = await s.api.fsCopy(id, src: src, dest: dest, confirmed: true);
         okN++;
@@ -426,6 +461,13 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       } catch (_) {
         failN++;
       }
+    }
+    if (mounted) {
+      setState(() {
+        _transferring = false;
+        _transferLabel = '';
+        _transferProgress = null;
+      });
     }
     await _load(inactive);
     if (mounted) {
@@ -446,13 +488,26 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       return;
     }
     final destDir = inactive.path.isEmpty ? '/' : inactive.path;
+    final items = srcs.toList();
     var okN = 0;
     var failN = 0;
-    for (final src in srcs) {
+    setState(() {
+      _transferring = true;
+      _transferLabel = '移动 0/${items.length}…';
+      _transferProgress = 0;
+    });
+    for (var i = 0; i < items.length; i++) {
+      final src = items[i];
       final name = src.split('/').where((e) => e.isNotEmpty).isEmpty
           ? src
           : src.split('/').where((e) => e.isNotEmpty).last;
       final dest = destDir.endsWith('/') ? '$destDir$name' : '$destDir/$name';
+      if (mounted) {
+        setState(() {
+          _transferLabel = '移动 ${i + 1}/${items.length} · $name';
+          _transferProgress = i / items.length;
+        });
+      }
       try {
         await s.api.fsMove(id, src: src, dest: dest, confirmed: true);
         okN++;
@@ -460,10 +515,15 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
         failN++;
       }
     }
-    setState(() {
-      active.selecting = false;
-      active.selected.clear();
-    });
+    if (mounted) {
+      setState(() {
+        _transferring = false;
+        _transferLabel = '';
+        _transferProgress = null;
+        active.selecting = false;
+        active.selected.clear();
+      });
+    }
     await _load(active);
     await _load(inactive);
     if (mounted) {
@@ -906,6 +966,34 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       appBar: AppBar(
         backgroundColor: AppColors.darkBar,
         toolbarHeight: 44,
+        bottom: _transferring
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(34),
+                child: Container(
+                  width: double.infinity,
+                  color: AppColors.surface,
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _transferLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                      ),
+                      const SizedBox(height: 4),
+                      LinearProgressIndicator(
+                        value: _transferProgress,
+                        minHeight: 3,
+                        backgroundColor: AppColors.surface2,
+                        color: AppColors.accentSoft,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : null,
         titleSpacing: 8,
         title: Text(
           active.selecting

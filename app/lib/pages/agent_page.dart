@@ -289,7 +289,6 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                             },
                           ),
                   ),
-                  ),
                 ],
               ),
             );
@@ -314,18 +313,22 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
         ),
         actions: [
           if (_busy || state.agentBusy)
-            TextButton(
-              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-              onPressed: () {
-                state.cancelAgentChat();
-                setState(() => _busy = false);
-              },
-              child: const Text('取消', style: TextStyle(fontSize: 13)),
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: TextButton.icon(
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: AppColors.danger,
+                ),
+                onPressed: () => _stopGeneration(state),
+                icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                label: const Text('停止', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              ),
             ),
           IconButton(
             visualDensity: VisualDensity.compact,
             tooltip: '历史会话',
-            onPressed: () => _showSessions(state),
+            onPressed: (_busy || state.agentBusy) ? null : () => _showSessions(state),
             icon: const Icon(Icons.history, size: 20),
           ),
           IconButton(
@@ -360,24 +363,46 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                     itemBuilder: (_, i) {
                       if (_busy && i == state.agentMessages.length) {
                         return Padding(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
                           child: Row(
                             children: [
-                              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                              const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentSoft),
+                              ),
                               const SizedBox(width: 10),
-                              Text(_busyHint, style: const TextStyle(fontSize: 12, color: Colors.white54)),
+                              Expanded(
+                                child: Text(
+                                  _busyHint,
+                                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                                ),
+                              ),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  foregroundColor: AppColors.danger,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                ),
+                                onPressed: () => _stopGeneration(state),
+                                child: const Text('停止', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                              ),
                             ],
                           ),
                         );
                       }
                       final m = state.agentMessages[i];
-                      // Key by tool id+part so toolUse→toolResult rebuilds fold state
+                      // Stable key (no content hash) so token stream doesn't rebuild tree every delta
                       final id = m.meta?['id']?.toString() ?? '${m.at.microsecondsSinceEpoch}';
                       final part = m.meta?['part']?.toString() ?? m.kind.name;
+                      final streaming = _busy &&
+                          i == state.agentMessages.length - 1 &&
+                          (part == 'text_delta' || part == 'text' || part == 'reasoning');
                       return _Bubble(
-                        key: ValueKey('$id|$part|${m.role}|${m.content.hashCode}'),
+                        key: ValueKey('$id|$part|${m.role}'),
                         msg: m,
                         fontSize: state.agentFontSize,
+                        streaming: streaming,
                       );
                     },
                   ),
@@ -398,13 +423,18 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                     child: TextField(
                       controller: _input,
                       focusNode: _focus,
+                      enabled: !(_busy || state.agentBusy),
                       minLines: 1,
                       maxLines: 6,
                       style: TextStyle(fontSize: state.agentFontSize, color: AppColors.text),
                       textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _send(state),
+                      onSubmitted: (_) {
+                        if (!(_busy || state.agentBusy)) _send(state);
+                      },
                       decoration: InputDecoration(
-                        hintText: state.selectedHostId == null ? '先选主机' : '消息',
+                        hintText: state.selectedHostId == null
+                            ? '先选主机'
+                            : ((_busy || state.agentBusy) ? '生成中…点停止可中断' : '消息'),
                         hintStyle: const TextStyle(color: AppColors.textFaint),
                         filled: true,
                         fillColor: AppColors.surface,
@@ -425,14 +455,30 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                     ),
                   ),
                   const SizedBox(width: 8),
+                  // Send ↔ Stop toggle
                   Material(
-                    color: (_busy || !state.backendOk || state.selectedHostId == null)
-                        ? AppColors.surface2
-                        : AppColors.sendGreen,
+                    color: (_busy || state.agentBusy)
+                        ? AppColors.danger
+                        : ((!state.backendOk || state.selectedHostId == null)
+                            ? AppColors.surface2
+                            : AppColors.sendGreen),
                     shape: const CircleBorder(),
                     child: IconButton(
-                      onPressed: (_busy || !state.backendOk || state.selectedHostId == null) ? null : () => _send(state),
-                      icon: const Icon(Icons.arrow_upward, color: Colors.white, size: 18),
+                      tooltip: (_busy || state.agentBusy) ? '停止生成' : '发送',
+                      onPressed: (!state.backendOk || state.selectedHostId == null)
+                          ? null
+                          : () {
+                              if (_busy || state.agentBusy) {
+                                _stopGeneration(state);
+                              } else {
+                                _send(state);
+                              }
+                            },
+                      icon: Icon(
+                        (_busy || state.agentBusy) ? Icons.stop_rounded : Icons.arrow_upward,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ],
@@ -442,6 +488,14 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
         ],
       ),
     );
+  }
+
+  void _stopGeneration(AppState state) {
+    state.cancelAgentChat();
+    if (mounted) setState(() {
+      _busy = false;
+      _busyHint = '已停止';
+    });
   }
 
   Future<void> _handleHostKeyMismatch(AppState state) async {
@@ -552,7 +606,8 @@ class _ConfirmPlanCard extends StatelessWidget {
 class _Bubble extends StatelessWidget {
   final ChatMessage msg;
   final double fontSize;
-  const _Bubble({super.key, required this.msg, this.fontSize = 15});
+  final bool streaming;
+  const _Bubble({super.key, required this.msg, this.fontSize = 15, this.streaming = false});
 
   Future<void> _copy(BuildContext context, String text) async {
     await Clipboard.setData(ClipboardData(text: text));
@@ -651,10 +706,19 @@ class _Bubble extends StatelessWidget {
       );
     }
 
-    // —— text (assistant): Markdown ——
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, right: 4),
-      child: _MdBody(data: msg.content, baseColor: AppColors.text, fontSize: fs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _MdBody(data: msg.content, baseColor: AppColors.text, fontSize: fs),
+          if (streaming)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text('▍', style: TextStyle(fontSize: fs, color: AppColors.accentSoft, height: 1)),
+            ),
+        ],
+      ),
     );
   }
 

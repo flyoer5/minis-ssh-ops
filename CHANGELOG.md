@@ -1,3 +1,8 @@
+## 1.4.20
+
+- Agent stop UI (app bar + composer + busy row) and streaming cursor
+- Files copy/move/download progress banner
+
 ## 1.4.19
 
 - Big: OpenAI token streaming (assistant_delta / reasoning_delta) into Agent SSE
