@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +16,10 @@ class AppState extends ChangeNotifier {
   AppState(this.api);
 
   final ApiClient api;
+
+  /// Coalesce high-frequency stream token notifies (~30fps max).
+  Timer? _streamNotifyTimer;
+  bool _streamNotifyPending = false;
   bool backendOk = false;
   List<String> backendFeatures = [];
   String? backendVersion;
@@ -24,7 +29,6 @@ class AppState extends ChangeNotifier {
   List<dynamic> hosts = [];
   Map<String, dynamic>? llm;
   String? selectedHostId;
-  String lastExecOutput = '';
 
   // --- Agent chat ---
   Map<String, dynamic>? lastPlan;
@@ -42,14 +46,6 @@ class AppState extends ChangeNotifier {
 
   bool get navIsMenu => navMode == 'menu';
   bool get navIsBottom => !navIsMenu;
-
-  // --- Terminal ---
-  final StringBuffer _termBuf = StringBuffer();
-  final List<String> terminalHistory = [];
-  static const int _maxHist = 100;
-  static const int _maxTermChars = 120000;
-
-  String get terminalBuffer => _termBuf.toString();
 
   String get hostLabel => hostLabelFor(selectedHostId);
 
@@ -92,18 +88,6 @@ class AppState extends ChangeNotifier {
     return agentSessions.where((s) => s.hostId == null || s.hostId == hostId).toList();
   }
 
-  String get terminalPrompt {
-    if (selectedHostId == null) return 'ssh> ';
-    for (final h in hosts) {
-      if (h is Map && h['id'] == selectedHostId) {
-        final user = h['username'] ?? 'user';
-        final host = (h['host'] as String?) ?? 'host';
-        final short = host.contains('.') ? host.split('.').first : host;
-        return '$user@$short:~\$ ';
-      }
-    }
-    return 'ssh> ';
-  }
 
   List<dynamic> audit = [];
 
@@ -375,68 +359,6 @@ class AppState extends ChangeNotifier {
     return DateTime.fromMillisecondsSinceEpoch(at);
   }
 
-  void setLastExecOutput(String text) {
-    lastExecOutput = text;
-    notifyListeners();
-  }
-
-  // ---------- Terminal ----------
-
-  void clearTerminal() {
-    _termBuf.clear();
-    notifyListeners();
-  }
-
-  void appendTerminal(String text, {bool dim = false, bool error = false}) {
-    // dim/error only used by UI via prefixes if needed; keep plain for copy
-    _termBuf.write(text);
-    _trimTerm();
-    notifyListeners();
-  }
-
-  void _trimTerm() {
-    final s = _termBuf.toString();
-    if (s.length > _maxTermChars) {
-      _termBuf.clear();
-      _termBuf.write(s.substring(s.length - (_maxTermChars ~/ 2)));
-    }
-  }
-
-  Future<Map<String, dynamic>> runTerminal(String command, {bool confirmed = false}) async {
-    final id = selectedHostId;
-    if (id == null) {
-      throw StateError('no host');
-    }
-    if (terminalHistory.isEmpty || terminalHistory.last != command) {
-      terminalHistory.add(command);
-      if (terminalHistory.length > _maxHist) {
-        terminalHistory.removeAt(0);
-      }
-    }
-    _termBuf.writeln('$terminalPrompt$command');
-    notifyListeners();
-
-    final res = await api.exec(id, command, confirmed: confirmed, sessionId: 'terminal');
-    final out = StringBuffer();
-    final stdout = (res['stdout'] ?? '').toString();
-    final stderr = (res['stderr'] ?? '').toString();
-    // Real SSH feel: print stdout/stderr only; no risk/meta spam.
-    if (stdout.isNotEmpty) {
-      out.write(stdout.endsWith('\n') ? stdout : '$stdout\n');
-    }
-    if (stderr.isNotEmpty) {
-      out.write(stderr.endsWith('\n') ? stderr : '$stderr\n');
-    }
-    final exit = res['exitCode'];
-    if (exit is int && exit != 0 && stdout.isEmpty && stderr.isEmpty) {
-      out.writeln('exit $exit');
-    }
-    _termBuf.write(out);
-    lastExecOutput = out.toString();
-    _trimTerm();
-    notifyListeners();
-    return res;
-  }
 
   // ---------- Agent chat ----------
 
@@ -1016,6 +938,25 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  void _scheduleStreamNotify() {
+    _streamNotifyPending = true;
+    if (_streamNotifyTimer?.isActive == true) return;
+    _streamNotifyTimer = Timer(const Duration(milliseconds: 33), () {
+      if (!_streamNotifyPending) return;
+      _streamNotifyPending = false;
+      notifyListeners();
+    });
+  }
+
+  void _flushStreamNotify() {
+    _streamNotifyTimer?.cancel();
+    _streamNotifyTimer = null;
+    if (_streamNotifyPending) {
+      _streamNotifyPending = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> agentChat(String userText) async {
     final id = selectedHostId;
     if (id == null) {
@@ -1045,7 +986,13 @@ class AppState extends ChangeNotifier {
             }
             if (type == 'done') return;
             _ingestAgentEvent(raw);
-            notifyListeners();
+            // Token deltas: throttle UI rebuilds. Structural events: flush now.
+            if (type == 'assistant_delta' || type == 'reasoning_delta') {
+              _scheduleStreamNotify();
+            } else {
+              _flushStreamNotify();
+              notifyListeners();
+            }
           },
         );
       } catch (_) {
@@ -1055,6 +1002,7 @@ class AppState extends ChangeNotifier {
           if (raw is Map) _ingestAgentEvent(Map<String, dynamic>.from(raw));
         }
       }
+      _flushStreamNotify();
       notifyListeners();
     } catch (e) {
       final msg = e.toString();
@@ -1065,8 +1013,16 @@ class AppState extends ChangeNotifier {
       }
     } finally {
       agentBusy = false;
+      _flushStreamNotify();
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    _streamNotifyTimer?.cancel();
+    api.dispose();
+    super.dispose();
   }
 
   void _ingestAgentEvent(Map<String, dynamic> raw) {
@@ -1265,9 +1221,6 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> runAllReadSteps() async {
-    // rssh-style: never auto-run; user presses 运行 on each card.
-  }
 
   Future<String> testHostSsh([String? hostId]) async {
     final id = hostId ?? selectedHostId;
@@ -1288,30 +1241,6 @@ class AppState extends ChangeNotifier {
     return res.toString().length > 20 ? '模型可达' : res.toString();
   }
 
-  Future<void> runExec(String command, {bool confirmed = false}) async {
-    final id = selectedHostId;
-    if (id == null) {
-      setLastExecOutput('请先选择主机');
-      return;
-    }
-    try {
-      final res = await api.exec(id, command, confirmed: confirmed);
-      setLastExecOutput(
-        'risk=${res['risk']} exit=${res['exitCode']} (${res['durationMs']}ms)\n'
-        '${res['stdout'] ?? ''}${res['stderr'] ?? ''}',
-      );
-    } on ApiException catch (e) {
-      if (e.status == 409) {
-        setLastExecOutput('需要确认后执行（risk=${e.body?['risk']}）\n命令: $command\n请点「确认并执行」');
-      } else {
-        setLastExecOutput('$e');
-      }
-      rethrow;
-    } catch (e) {
-      setLastExecOutput('$e');
-      rethrow;
-    }
-  }
 
   Future<void> runProbe([String? hostId]) async {
     await runProbeSummary(hostId);
@@ -1331,14 +1260,10 @@ class AppState extends ChangeNotifier {
       final res = await api.probe(id);
       final summary = ProbeSummary.fromProbeJson(res);
       putProbeCache(id, summary);
-      lastExecOutput = summary.detail.isEmpty
-          ? summary.oneLine
-          : (summary.oneLine + '\n\n' + summary.detail);
       notifyListeners();
       return summary;
     } catch (e) {
       final friendly = friendlyProbeError(e);
-      lastExecOutput = '探测失败: ${friendly['short']}\n${friendly['detail']}';
       final summary = ProbeSummary(
         ok: false,
         oneLine: friendly['short']!,

@@ -1,3 +1,12 @@
+## 1.4.30
+
+- Perf: throttle Agent stream UI notifies (~33ms) for assistant/reasoning deltas
+- Cleanup: remove dead AppState terminal buffer / runTerminal / runExec paths (~110 lines)
+- Files: ListView `itemExtent: 48` + cacheExtent for large directories
+- ApiClient.dispose + AppState.dispose
+- Tests: Go `risk.Classify` unit tests; CI runs `go test` + `flutter test`
+- CI: PR builds debug only; release APK on main/push / workflow_dispatch
+
 ## 1.4.29
 
 - Nav: bottom bar 56; settings switch **底部栏 / 左上角菜单** (`navMode`)
