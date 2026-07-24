@@ -3,6 +3,7 @@ import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
+import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -567,6 +568,8 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
+        leading: NavMenuButton.leadingOf(context),
+        leadingWidth: NavMenuButton.leadingWidthOf(context),
         toolbarHeight: 44,
         backgroundColor: AppColors.bg,
         titleSpacing: 12,
@@ -835,8 +838,31 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             icon: Icons.text_fields,
             accent: AppColors.chipBlue,
             title: '显示与字体',
-            subtitle: '终端 / Agent / 记录 / 列表 / 编辑器',
+            subtitle: '导航 / 终端 / Agent / 记录 / 列表 / 编辑器',
             children: [
+              const Text('导航方式', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.text)),
+              const SizedBox(height: 6),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'bottom', label: Text('底部栏'), icon: Icon(Icons.space_dashboard_outlined, size: 16)),
+                  ButtonSegment(value: 'menu', label: Text('左上角菜单'), icon: Icon(Icons.menu, size: 16)),
+                ],
+                selected: {state.navMode},
+                onSelectionChanged: (s) {
+                  if (s.isEmpty) return;
+                  state.setNavMode(s.first);
+                },
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  textStyle: WidgetStatePropertyAll(const TextStyle(fontSize: 12)),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                state.navIsMenu ? '点左上角 ☰ 切换页面，内容区更高' : '底部六项导航（高度 56）',
+                style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 12),
               _fontSlider(
                 label: '终端字号',
                 value: state.termFontSize,

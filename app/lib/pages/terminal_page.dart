@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/pages/ansi_text.dart';
@@ -339,7 +340,15 @@ class _TerminalPageState extends State<TerminalPage>
     final state = context.watch<AppState>();
     final fontSize = state.termFontSize;
     if (state.selectedHostId == null) {
-      return const Scaffold(body: Center(child: Text('先选主机')));
+      return Scaffold(
+        appBar: AppBar(
+          toolbarHeight: 44,
+          leading: NavMenuButton.leadingOf(context),
+          leadingWidth: NavMenuButton.leadingWidthOf(context),
+          title: const Text('终端'),
+        ),
+        body: const Center(child: Text('先选主机')),
+      );
     }
 
     return Scaffold(
@@ -347,19 +356,20 @@ class _TerminalPageState extends State<TerminalPage>
       body: SafeArea(
         child: Column(
           children: [
-            // Single slim bar: ● host · status | A-/A+ | 键盘 | ⋯
+            // Single slim bar: menu | ● host · status | A-/A+ | 键盘 | ⋯
             Material(
               color: _bar,
               child: Container(
                 height: 36,
-                padding: const EdgeInsets.only(left: 10, right: 2),
+                padding: const EdgeInsets.only(left: 0, right: 2),
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: AppColors.surface2)),
                 ),
                 child: Row(
                   children: [
+                    const NavMenuButton(color: _fg),
                     Icon(Icons.circle, size: 8, color: _connected ? _green : Colors.redAccent),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text.rich(
                         TextSpan(

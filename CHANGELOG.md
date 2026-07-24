@@ -1,3 +1,9 @@
+## 1.4.29
+
+- Nav: bottom bar 56; settings switch **底部栏 / 左上角菜单** (`navMode`)
+- Split models: `AgentSession`, `ProbeSummary` out of AppState (re-export kept)
+- Agent: first-class `ChatKind.toolUse` / `toolResult` (+ legacy meta.part)
+
 ## 1.4.28
 
 - K: stream plain-text body (Markdown only after final) to reduce MD reparse jitter
