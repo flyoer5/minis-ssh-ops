@@ -1,3 +1,8 @@
+## 1.4.14
+
+- F: HostKey manager sheet (list/delete/clear + TOFU help)
+- F: long-term memory list/view/delete APIs + settings UI
+
 ## 1.4.13
 
 - E: package-derived backend port; records host filter; probe detail sheet; editor remote size/mode

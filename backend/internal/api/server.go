@@ -53,6 +53,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/audit", s.handleAudit)
 	s.mux.HandleFunc("GET /v1/known-hosts", s.handleListKnownHosts)
 	s.mux.HandleFunc("DELETE /v1/known-hosts", s.handleDeleteKnownHost)
+	s.mux.HandleFunc("GET /v1/session-memory", s.handleListSessionMemory)
+	s.mux.HandleFunc("DELETE /v1/session-memory", s.handleDeleteSessionMemory)
 	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/list", s.handleFSList)
 	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/read", s.handleFSRead)
 	s.mux.HandleFunc("POST /v1/hosts/{id}/fs/write", s.handleFSWrite)
@@ -117,7 +119,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"service":   "ssh-ai-agent-backend",
-		"version":   "1.4.13",
+		"version":   "1.4.14",
 		"startedAt": s.StartedAt.Format(time.RFC3339),
 		"listenHint": "127.0.0.1 only",
 		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu","stream","models","longmem","fscopy","fsmove"},

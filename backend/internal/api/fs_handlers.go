@@ -352,6 +352,20 @@ func (s *Server) handleListKnownHosts(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteKnownHost(w http.ResponseWriter, r *http.Request) {
 	// Prefer query params (DELETE body is unreliable on some clients).
+	// all=1 clears every trusted key.
+	if r.URL.Query().Get("all") == "1" || r.URL.Query().Get("all") == "true" {
+		if s.HostKeys == nil {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": 0})
+			return
+		}
+		n, err := s.HostKeys.Clear()
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": n})
+		return
+	}
 	host := r.URL.Query().Get("host")
 	port := 22
 	if p := r.URL.Query().Get("port"); p != "" {
@@ -383,4 +397,35 @@ func (s *Server) handleDeleteKnownHost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) handleListSessionMemory(w http.ResponseWriter, r *http.Request) {
+	list, err := s.Store.ListSessionMemories()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"entries": list})
+}
+
+func (s *Server) handleDeleteSessionMemory(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("all") == "1" || r.URL.Query().Get("all") == "true" {
+		n, err := s.Store.DeleteAllSessionMemory()
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": n})
+		return
+	}
+	sid := r.URL.Query().Get("sessionId")
+	if sid == "" {
+		writeErr(w, http.StatusBadRequest, "sessionId required (or all=1)")
+		return
+	}
+	if err := s.Store.DeleteSessionMemory(sid); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sessionId": sid})
 }

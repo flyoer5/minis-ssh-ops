@@ -80,6 +80,335 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m), behavior: SnackBarBehavior.floating));
   }
 
+
+  Future<void> _openHostKeySheet(AppState state) async {
+    try {
+      final r = await state.api.listKnownHosts();
+      var entries = List<Map>.from(((r['entries'] as List?) ?? []).whereType<Map>());
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: const Color(0xFF161B22),
+        builder: (c) {
+          return StatefulBuilder(
+            builder: (c, setLocal) {
+              return DraggableScrollableSheet(
+                expand: false,
+                initialChildSize: 0.62,
+                maxChildSize: 0.92,
+                minChildSize: 0.4,
+                builder: (_, sc) => Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('HostKey（TOFU）', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                                SizedBox(height: 4),
+                                Text(
+                                  '首次连接自动信任并记住指纹；重装系统后若指纹变化需删除旧记录再连。',
+                                  style: TextStyle(fontSize: 12, color: Color(0xFF8B949E), height: 1.35),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.close)),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                      child: Row(
+                        children: [
+                          Text('${entries.length} 条信任记录', style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
+                          const Spacer(),
+                          if (entries.isNotEmpty)
+                            TextButton(
+                              onPressed: () async {
+                                final ok = await showDialog<bool>(
+                                  context: c,
+                                  builder: (d) => AlertDialog(
+                                    title: const Text('清空全部 HostKey？'),
+                                    content: const Text('下次连接所有主机都会重新弹出信任流程。'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('取消')),
+                                      FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('清空')),
+                                    ],
+                                  ),
+                                );
+                                if (ok != true) return;
+                                final res = await state.api.clearKnownHosts();
+                                final n = res['deleted'];
+                                setLocal(() => entries = []);
+                                if (mounted) _toast('已清空 $n 条');
+                              },
+                              child: const Text('全部清空', style: TextStyle(color: Color(0xFFF85149))),
+                            ),
+                          IconButton(
+                            tooltip: '刷新',
+                            onPressed: () async {
+                              final r2 = await state.api.listKnownHosts();
+                              setLocal(() {
+                                entries = List<Map>.from(((r2['entries'] as List?) ?? []).whereType<Map>());
+                              });
+                            },
+                            icon: const Icon(Icons.refresh, size: 20),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1, color: Color(0xFF30363D)),
+                    Expanded(
+                      child: entries.isEmpty
+                          ? const Center(child: Text('暂无信任记录', style: TextStyle(color: Color(0xFF8B949E))))
+                          : ListView.separated(
+                              controller: sc,
+                              itemCount: entries.length,
+                              separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF21262D)),
+                              itemBuilder: (_, i) {
+                                final e = entries[i];
+                                final host = e['host']?.toString() ?? '';
+                                final port = e['port'] is int ? e['port'] as int : int.tryParse('${e['port']}') ?? 22;
+                                final fp = e['fingerprint']?.toString() ?? '';
+                                final kt = e['keyType']?.toString() ?? '';
+                                return ListTile(
+                                  dense: true,
+                                  title: Text('$host:$port', style: const TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.w600)),
+                                  subtitle: Text(
+                                    [
+                                      if (kt.isNotEmpty) kt,
+                                      if (fp.isNotEmpty) 'SHA256:$fp',
+                                    ].join(' · '),
+                                    maxLines: 3,
+                                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF8B949E)),
+                                  ),
+                                  trailing: IconButton(
+                                    tooltip: '删除并重新信任',
+                                    icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFF85149)),
+                                    onPressed: () async {
+                                      final ok = await showDialog<bool>(
+                                        context: c,
+                                        builder: (d) => AlertDialog(
+                                          title: Text('删除 $host:$port？'),
+                                          content: const Text('下次连接该主机将按首次连接重新记录指纹。'),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('取消')),
+                                            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('删除')),
+                                          ],
+                                        ),
+                                      );
+                                      if (ok != true) return;
+                                      await state.api.deleteKnownHost(host, port);
+                                      setLocal(() {
+                                        entries = entries.where((x) {
+                                          final h = x['host']?.toString() ?? '';
+                                          final p = x['port'] is int ? x['port'] as int : int.tryParse('${x['port']}') ?? 22;
+                                          return !(h == host && p == port);
+                                        }).toList();
+                                      });
+                                      if (mounted) _toast('已删除 $host:$port');
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    } catch (e) {
+      _toast('$e');
+    }
+  }
+
+  Future<void> _openLongMemSheet(AppState state) async {
+    try {
+      final r = await state.api.listSessionMemory();
+      var entries = List<Map>.from(((r['entries'] as List?) ?? []).whereType<Map>());
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: const Color(0xFF161B22),
+        builder: (c) {
+          return StatefulBuilder(
+            builder: (c, setLocal) {
+              return DraggableScrollableSheet(
+                expand: false,
+                initialChildSize: 0.65,
+                maxChildSize: 0.94,
+                minChildSize: 0.4,
+                builder: (_, sc) => Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Agent 长期记忆', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                                SizedBox(height: 4),
+                                Text(
+                                  '会话变长后会把旧轮次折叠成 summary/facts，供后续对话引用。可按会话查看或清空。',
+                                  style: TextStyle(fontSize: 12, color: Color(0xFF8B949E), height: 1.35),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.close)),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                      child: Row(
+                        children: [
+                          Text('${entries.length} 条', style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E))),
+                          const Spacer(),
+                          if (entries.isNotEmpty)
+                            TextButton(
+                              onPressed: () async {
+                                final ok = await showDialog<bool>(
+                                  context: c,
+                                  builder: (d) => AlertDialog(
+                                    title: const Text('清空全部长期记忆？'),
+                                    content: const Text('不会删除聊天记录，只清 summary/facts。'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('取消')),
+                                      FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('清空')),
+                                    ],
+                                  ),
+                                );
+                                if (ok != true) return;
+                                final res = await state.api.deleteSessionMemory(all: true);
+                                setLocal(() => entries = []);
+                                if (mounted) _toast('已清空 ${res['deleted'] ?? ''} 条记忆');
+                              },
+                              child: const Text('全部清空', style: TextStyle(color: Color(0xFFF85149))),
+                            ),
+                          IconButton(
+                            tooltip: '刷新',
+                            onPressed: () async {
+                              final r2 = await state.api.listSessionMemory();
+                              setLocal(() {
+                                entries = List<Map>.from(((r2['entries'] as List?) ?? []).whereType<Map>());
+                              });
+                            },
+                            icon: const Icon(Icons.refresh, size: 20),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1, color: Color(0xFF30363D)),
+                    Expanded(
+                      child: entries.isEmpty
+                          ? const Center(child: Text('暂无长期记忆', style: TextStyle(color: Color(0xFF8B949E))))
+                          : ListView.separated(
+                              controller: sc,
+                              padding: const EdgeInsets.only(bottom: 16),
+                              itemCount: entries.length,
+                              separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF21262D)),
+                              itemBuilder: (_, i) {
+                                final e = entries[i];
+                                final sid = e['sessionId']?.toString() ?? '';
+                                final sum = e['summary']?.toString() ?? '';
+                                final facts = e['facts']?.toString() ?? '';
+                                final updated = e['updatedAt']?.toString() ?? '';
+                                final shortId = sid.length > 12 ? '${sid.substring(0, 12)}…' : sid;
+                                return ListTile(
+                                  isThreeLine: true,
+                                  title: Text(shortId, style: const TextStyle(fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.w700)),
+                                  subtitle: Text(
+                                    [
+                                      if (updated.isNotEmpty) updated,
+                                      if (sum.isNotEmpty) sum,
+                                      if (facts.isNotEmpty) facts,
+                                    ].where((s) => s.trim().isNotEmpty).join('\n'),
+                                    maxLines: 5,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12, color: Color(0xFF8B949E), height: 1.3),
+                                  ),
+                                  trailing: IconButton(
+                                    tooltip: '删除',
+                                    icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFF85149)),
+                                    onPressed: () async {
+                                      final ok = await showDialog<bool>(
+                                        context: c,
+                                        builder: (d) => AlertDialog(
+                                          title: const Text('删除此会话记忆？'),
+                                          content: Text(shortId, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('取消')),
+                                            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('删除')),
+                                          ],
+                                        ),
+                                      );
+                                      if (ok != true) return;
+                                      await state.api.deleteSessionMemory(sessionId: sid);
+                                      setLocal(() {
+                                        entries = entries.where((x) => x['sessionId']?.toString() != sid).toList();
+                                      });
+                                      if (mounted) _toast('已删除记忆');
+                                    },
+                                  ),
+                                  onTap: () {
+                                    showDialog(
+                                      context: c,
+                                      builder: (d) => AlertDialog(
+                                        title: Text(shortId, style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+                                        content: SizedBox(
+                                          width: double.maxFinite,
+                                          child: SingleChildScrollView(
+                                            child: SelectableText(
+                                              [
+                                                if (updated.isNotEmpty) '更新: $updated',
+                                                if (sum.isNotEmpty) 'SUMMARY:\n$sum',
+                                                if (facts.isNotEmpty) 'FACTS:\n$facts',
+                                              ].join('\n\n'),
+                                              style: const TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.35),
+                                            ),
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () {
+                                              Clipboard.setData(ClipboardData(text: 'SUMMARY:\n$sum\n\nFACTS:\n$facts'));
+                                              Navigator.pop(d);
+                                            },
+                                            child: const Text('复制'),
+                                          ),
+                                          TextButton(onPressed: () => Navigator.pop(d), child: const Text('关闭')),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    } catch (e) {
+      _toast('$e');
+    }
+  }
+
   Widget _section({
     required IconData icon,
     required Color accent,
@@ -649,7 +978,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             icon: Icons.medical_services_outlined,
             accent: const Color(0xFFF778BA),
             title: '数据与诊断',
-            subtitle: '导入导出 · 日志 · HostKey',
+            subtitle: '导入导出 · 日志 · HostKey · 长期记忆',
             children: [
               Wrap(
                 spacing: 8,
@@ -757,54 +1086,14 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                     label: const Text('后端日志'),
                   ),
                   FilledButton.tonalIcon(
-                    onPressed: !state.backendOk
-                        ? null
-                        : () async {
-                            try {
-                              final r = await state.api.listKnownHosts();
-                              final entries = (r['entries'] as List?) ?? [];
-                              if (!context.mounted) return;
-                              await showDialog(
-                                context: context,
-                                builder: (c) => AlertDialog(
-                                  title: const Text('已知主机密钥 (TOFU)'),
-                                  content: SizedBox(
-                                    width: double.maxFinite,
-                                    height: 320,
-                                    child: entries.isEmpty
-                                        ? const Center(child: Text('暂无记录'))
-                                        : ListView.builder(
-                                            itemCount: entries.length,
-                                            itemBuilder: (_, i) {
-                                              final e = entries[i] as Map;
-                                              final host = e['host']?.toString() ?? '';
-                                              final port = e['port'] is int ? e['port'] as int : int.tryParse('${e['port']}') ?? 22;
-                                              final fp = e['fingerprint']?.toString() ?? '';
-                                              return ListTile(
-                                                dense: true,
-                                                title: Text('$host:$port', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                                                subtitle: Text(fp, maxLines: 2, style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
-                                                trailing: IconButton(
-                                                  icon: const Icon(Icons.delete_outline, size: 18),
-                                                  onPressed: () async {
-                                                    await state.api.deleteKnownHost(host, port);
-                                                    if (c.mounted) Navigator.pop(c);
-                                                    _toast('已删除，下次连接将重新信任');
-                                                  },
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                  ),
-                                  actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭'))],
-                                ),
-                              );
-                            } catch (e) {
-                              _toast('$e');
-                            }
-                          },
+                    onPressed: !state.backendOk ? null : () => _openHostKeySheet(state),
                     icon: const Icon(Icons.vpn_key_outlined, size: 16),
                     label: const Text('HostKey'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: !state.backendOk ? null : () => _openLongMemSheet(state),
+                    icon: const Icon(Icons.psychology_outlined, size: 16),
+                    label: const Text('长期记忆'),
                   ),
                 ],
               ),

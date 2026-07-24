@@ -414,6 +414,36 @@ class ApiClient {
     _ensureOk(r);
   }
 
+  Future<Map<String, dynamic>> clearKnownHosts() async {
+    final uri = Uri.parse('$baseUrl/v1/known-hosts').replace(queryParameters: {
+      'all': '1',
+    });
+    final r = await _c.delete(uri, headers: _headers).timeout(const Duration(seconds: 10));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> listSessionMemory() async {
+    final r = await _c.get(_u('/v1/session-memory'), headers: _headers).timeout(const Duration(seconds: 15));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> deleteSessionMemory({String? sessionId, bool all = false}) async {
+    final q = <String, String>{};
+    if (all) {
+      q['all'] = '1';
+    } else if (sessionId != null && sessionId.isNotEmpty) {
+      q['sessionId'] = sessionId;
+    } else {
+      throw Exception('sessionId or all required');
+    }
+    final uri = Uri.parse('$baseUrl/v1/session-memory').replace(queryParameters: q);
+    final r = await _c.delete(uri, headers: _headers).timeout(const Duration(seconds: 15));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
   void _ensureOk(http.Response r) {
     if (r.statusCode >= 200 && r.statusCode < 300) return;
     String msg = r.body;

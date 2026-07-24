@@ -122,3 +122,15 @@ func (s *HostKeyStore) Delete(host string, port int) error {
 	s.mu.Unlock()
 	return s.save()
 }
+
+// Clear removes every trusted host key (next connect re-TOFU).
+func (s *HostKeyStore) Clear() (int, error) {
+	s.mu.Lock()
+	n := len(s.m)
+	s.m = map[string]hostKeyEntry{}
+	s.mu.Unlock()
+	if err := s.save(); err != nil {
+		return 0, err
+	}
+	return n, nil
+}

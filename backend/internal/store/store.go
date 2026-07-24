@@ -157,6 +157,37 @@ func (s *Store) DeleteSessionMemory(sessionID string) error {
 	return err
 }
 
+// ListSessionMemories returns all durable agent memories, newest first.
+func (s *Store) ListSessionMemories() ([]SessionMemory, error) {
+	rows, err := s.db.Query(
+		`SELECT session_id, summary, facts, covered_until_id, updated_at
+		 FROM session_memory
+		 ORDER BY updated_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]SessionMemory, 0)
+	for rows.Next() {
+		var m SessionMemory
+		if err := rows.Scan(&m.SessionID, &m.Summary, &m.Facts, &m.CoveredUntilID, &m.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// DeleteAllSessionMemory clears every long-term memory row.
+func (s *Store) DeleteAllSessionMemory() (int64, error) {
+	res, err := s.db.Exec(`DELETE FROM session_memory`)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // CountChat returns total messages in a session.
 func (s *Store) CountChat(sessionID string) (int, error) {
 	var n int
