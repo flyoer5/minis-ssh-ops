@@ -188,6 +188,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                   loading: _loading.contains(id),
                                   summary: _summary[id],
                                   probedAt: state.probeCacheTime(id),
+                                  fontSize: state.uiFontSize,
                                   onSelect: () => state.selectHost(id),
                                   onRefresh: () => _refreshProbe(state, id, force: true),
                                   onMenu: () => _hostMenu(context, state, h),
@@ -490,6 +491,7 @@ class _StatusCard extends StatelessWidget {
   final bool loading;
   final ProbeSummary? summary;
   final DateTime? probedAt;
+  final double fontSize;
   final VoidCallback onSelect;
   final VoidCallback onRefresh;
   final VoidCallback onMenu;
@@ -502,6 +504,7 @@ class _StatusCard extends StatelessWidget {
     required this.loading,
     required this.summary,
     this.probedAt,
+    this.fontSize = 14,
     required this.onSelect,
     required this.onRefresh,
     required this.onMenu,
@@ -631,12 +634,12 @@ class _StatusCard extends StatelessWidget {
                       name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.2),
+                      style: TextStyle(fontSize: fontSize + 1, fontWeight: FontWeight.w700, letterSpacing: 0.2),
                     ),
                   ),
                   Text(
                     _statusText,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _status),
+                    style: TextStyle(fontSize: fontSize - 3, fontWeight: FontWeight.w700, color: _status),
                   ),
                   if (onShowDetail != null)
                     IconButton(
@@ -738,7 +741,7 @@ class _StatusCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: fontSize - 4,
                     color: () {
                       final at = probedAt;
                       if (at == null) return AppColors.slateText;
@@ -772,7 +775,7 @@ class _StatusCard extends StatelessWidget {
           children: [
             SizedBox(
               width: 36,
-              child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: accent, letterSpacing: 0.5)),
+              child: Text(label, style: TextStyle(fontSize: fontSize - 3, fontWeight: FontWeight.w800, color: accent, letterSpacing: 0.5)),
             ),
             Expanded(
               child: Text(
@@ -780,7 +783,7 @@ class _StatusCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.right,
-                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: AppColors.slateLine),
+                style: TextStyle(fontSize: fontSize - 2, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: AppColors.slateLine),
               ),
             ),
           ],

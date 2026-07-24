@@ -656,7 +656,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontFamily: 'monospace',
-                                  fontSize: 12,
+                                  fontSize: fs - 2,
                                   color: focused ? Colors.white : AppColors.grayBd,
                                 ),
                               ),
@@ -771,7 +771,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                               name,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                              style: TextStyle(fontSize: fs, fontWeight: FontWeight.w500),
                                             ),
                                             if (mtime.isNotEmpty || (!isDir && sizeStr.isNotEmpty))
                                               Text(
@@ -782,7 +782,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                                 ].where((s) => s.toString().isNotEmpty).join('  ·  '),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontSize: 11, color: AppColors.gray9e, fontFamily: 'monospace'),
+                                                style: TextStyle(fontSize: fs - 3, color: AppColors.gray9e, fontFamily: 'monospace'),
                                               ),
                                           ],
                                         ),
@@ -961,6 +961,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
             ),
           ];
 
+    final fs = state.uiFontSize;
     return Scaffold(
       backgroundColor: AppColors.pureBlack,
       appBar: AppBar(
@@ -999,7 +1000,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
           active.selecting
               ? '已选 ${active.selected.length}'
               : (dualPane ? '文件 · ${focus == 0 ? "左" : "右"}' : '文件'),
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: fs + 1, fontWeight: FontWeight.w600),
         ),
         actions: actions,
       ),

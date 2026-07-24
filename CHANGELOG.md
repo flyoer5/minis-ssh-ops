@@ -1,3 +1,8 @@
+## 1.4.27
+
+- UI/editor font size prefs (hosts+files lists, editor default)
+- Editor: synced line gutter, undo/redo, compact toolbar, case-sensitive find, scroll-to-match
+
 ## 1.4.26
 
 - Fix: reasoning no longer duplicated (stream without spaces + final with spaces merged as one)

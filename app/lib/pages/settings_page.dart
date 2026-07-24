@@ -835,7 +835,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             icon: Icons.text_fields,
             accent: AppColors.chipBlue,
             title: '显示与字体',
-            subtitle: '分别调整终端 / Agent / 记录',
+            subtitle: '终端 / Agent / 记录 / 列表 / 编辑器',
             children: [
               _fontSlider(
                 label: '终端字号',
@@ -863,6 +863,24 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 onChanged: (v) => state.setRecordsFontSize(v),
                 hint: '审计列表与详情',
               ),
+              const SizedBox(height: 6),
+              _fontSlider(
+                label: '界面列表字号',
+                value: state.uiFontSize,
+                min: 11,
+                max: 20,
+                onChanged: (v) => state.setUiFontSize(v),
+                hint: '主机卡片、文件列表等',
+              ),
+              const SizedBox(height: 6),
+              _fontSlider(
+                label: '编辑器默认字号',
+                value: state.editorFontSize,
+                min: 10,
+                max: 24,
+                onChanged: (v) => state.setEditorFontSize(v),
+                hint: '远程文件编辑器打开时的默认大小',
+              ),
               const SizedBox(height: 8),
               // live preview chips
               Container(
@@ -888,11 +906,25 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                     ),
                     const SizedBox(height: 4),
                     Text(
+                      '主机 · 文件列表  root@vps',
+                      style: TextStyle(fontSize: state.uiFontSize, color: AppColors.textCode),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
                       '\$ preview · terminal',
                       style: TextStyle(
                         fontSize: state.termFontSize,
                         fontFamily: 'monospace',
                         color: AppColors.success,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'editor · main.go',
+                      style: TextStyle(
+                        fontSize: state.editorFontSize,
+                        fontFamily: 'monospace',
+                        color: AppColors.chipBlue,
                       ),
                     ),
                   ],

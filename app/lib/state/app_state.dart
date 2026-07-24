@@ -112,6 +112,8 @@ class AppState extends ChangeNotifier {
   double termFontSize = 13;
   double agentFontSize = 15; // assistant body base
   double recordsFontSize = 13;
+  double uiFontSize = 14; // hosts / files list chrome
+  double editorFontSize = 13; // remote file editor default
   bool confirmWrites = false; // reserved; agent auto-runs non-blocked
   bool batteryIgnored = true;
   bool onboarded = true;
@@ -128,6 +130,8 @@ class AppState extends ChangeNotifier {
     termFontSize = prefs.getDouble('termFontSize') ?? 13;
     agentFontSize = prefs.getDouble('agentFontSize') ?? 15;
     recordsFontSize = prefs.getDouble('recordsFontSize') ?? 13;
+    uiFontSize = prefs.getDouble('uiFontSize') ?? 14;
+    editorFontSize = prefs.getDouble('editorFontSize') ?? 13;
     selectedHostId = prefs.getString('selectedHostId') ?? selectedHostId;
     onboarded = true; // onboarding removed
     confirmWrites = prefs.getBool('confirmWrites') ?? false;
@@ -293,6 +297,20 @@ class AppState extends ChangeNotifier {
     recordsFontSize = v.clamp(11, 18);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('recordsFontSize', recordsFontSize);
+    notifyListeners();
+  }
+
+  Future<void> setUiFontSize(double v) async {
+    uiFontSize = v.clamp(11, 20);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('uiFontSize', uiFontSize);
+    notifyListeners();
+  }
+
+  Future<void> setEditorFontSize(double v) async {
+    editorFontSize = v.clamp(10, 24);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('editorFontSize', editorFontSize);
     notifyListeners();
   }
 
@@ -601,6 +619,8 @@ class AppState extends ChangeNotifier {
         'termFontSize': termFontSize,
         'agentFontSize': agentFontSize,
         'recordsFontSize': recordsFontSize,
+        'uiFontSize': uiFontSize,
+        'editorFontSize': editorFontSize,
         'confirmWrites': confirmWrites,
       },
       'note': includeSecrets
@@ -656,6 +676,12 @@ class AppState extends ChangeNotifier {
       }
       if (pr['recordsFontSize'] is num) {
         await setRecordsFontSize((pr['recordsFontSize'] as num).toDouble());
+      }
+      if (pr['uiFontSize'] is num) {
+        await setUiFontSize((pr['uiFontSize'] as num).toDouble());
+      }
+      if (pr['editorFontSize'] is num) {
+        await setEditorFontSize((pr['editorFontSize'] as num).toDouble());
       }
       if (pr['confirmWrites'] is bool) {
         await setConfirmWrites(pr['confirmWrites'] as bool);
