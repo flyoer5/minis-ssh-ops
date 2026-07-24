@@ -695,6 +695,35 @@ class AppState extends ChangeNotifier {
 
   String _normReason(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
 
+  /// Strip all whitespace — stream tokens may lose spaces while final has them;
+  /// those must still count as the *same* thought, not two paragraphs.
+  String _compactReason(String s) => s.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+
+  /// Prefer the better-formatted copy (more spaces / longer readable text).
+  String _preferReasoning(String a, String b) {
+    final ca = _compactReason(a);
+    final cb = _compactReason(b);
+    if (ca.isEmpty) return b;
+    if (cb.isEmpty) return a;
+    // Same thought (possibly one missing spaces)
+    if (ca == cb || ca.contains(cb) || cb.contains(ca)) {
+      // Prefer version that still has word spacing
+      final spaceA = RegExp(r'\s').allMatches(a).length;
+      final spaceB = RegExp(r'\s').allMatches(b).length;
+      if (spaceB != spaceA) return spaceB > spaceA ? b : a;
+      return b.length >= a.length ? b : a;
+    }
+    // Different thoughts: only then stack
+    return '${a.trimRight()}\n\n${b.trimLeft()}';
+  }
+
+  bool _isSameOrSubReason(String a, String b) {
+    final ca = _compactReason(a);
+    final cb = _compactReason(b);
+    if (ca.isEmpty || cb.isEmpty) return false;
+    return ca == cb || ca.contains(cb) || cb.contains(ca);
+  }
+
   /// Minis-like: reasoning is a foldable block *above* the answer for this turn.
   /// Never append a new thinking card after assistant text (final often re-sends full reasoning).
   void _pushReasoning(String reasoning) {
@@ -703,25 +732,23 @@ class AppState extends ChangeNotifier {
     final idx = _lastReasoningIndexInTurn();
     if (idx >= 0) {
       final last = agentMessages[idx];
-      final a = _normReason(last.content);
-      final b = _normReason(r);
-      // Same / prefix / overlap → keep one block (prefer longer full text)
-      if (a == b || b.startsWith(a) || a.startsWith(b) || a.contains(b) || b.contains(a)) {
-        if (r.length >= last.content.length) {
-          agentMessages[idx] = ChatMessage(
-            role: 'assistant',
-            content: r,
-            kind: ChatKind.reasoning,
-            meta: {'part': 'reasoning'},
-            at: last.at,
-          );
-        }
+      // final re-sends full text after deltas — always coalesce into ONE card
+      final merged = _preferReasoning(last.content, r);
+      // If same thought (whitespace-only difference), never create a second paragraph
+      if (_isSameOrSubReason(last.content, r) || merged == last.content || merged == r) {
+        agentMessages[idx] = ChatMessage(
+          role: 'assistant',
+          content: merged,
+          kind: ChatKind.reasoning,
+          meta: {'part': 'reasoning'},
+          at: last.at,
+        );
         return;
       }
-      // Different segment in same turn (e.g. pre-tool vs post-tool): merge into one card
+      // Truly different segment in same turn (e.g. pre-tool vs post-tool)
       agentMessages[idx] = ChatMessage(
         role: 'assistant',
-        content: '${last.content}\n\n$r',
+        content: merged,
         kind: ChatKind.reasoning,
         meta: {'part': 'reasoning'},
         at: last.at,

@@ -1,3 +1,7 @@
+## 1.4.26
+
+- Fix: reasoning no longer duplicated (stream without spaces + final with spaces merged as one)
+
 ## 1.4.25
 
 - Real stop: cancel request context aborts LLM stream + SSH session (SIGKILL best-effort)
