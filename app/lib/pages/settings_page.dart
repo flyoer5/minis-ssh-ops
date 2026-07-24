@@ -170,7 +170,25 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                     const Divider(height: 1, color: AppColors.border),
                     Expanded(
                       child: entries.isEmpty
-                          ? const Center(child: Text('暂无信任记录', style: TextStyle(color: AppColors.textMuted)))
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 28),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.verified_user_outlined, size: 36, color: AppColors.textFaint),
+                                    SizedBox(height: 10),
+                                    Text('暂无信任主机密钥', style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                                    SizedBox(height: 6),
+                                    Text(
+                                      '首次连接新主机会提示 TOFU 信任指纹，确认后出现在这里。',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 12, color: AppColors.textFaint, height: 1.35),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
                           : ListView.separated(
                               controller: sc,
                               itemCount: entries.length,
@@ -318,7 +336,25 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                     const Divider(height: 1, color: AppColors.border),
                     Expanded(
                       child: entries.isEmpty
-                          ? const Center(child: Text('暂无长期记忆', style: TextStyle(color: AppColors.textMuted)))
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 28),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.psychology_outlined, size: 36, color: AppColors.textFaint),
+                                    SizedBox(height: 10),
+                                    Text('暂无长期记忆', style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                                    SizedBox(height: 6),
+                                    Text(
+                                      'Agent 在会话中沉淀的摘要与事实会列在此处，便于跨会话复用。',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 12, color: AppColors.textFaint, height: 1.35),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
                           : ListView.separated(
                               controller: sc,
                               padding: const EdgeInsets.only(bottom: 16),
@@ -456,7 +492,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.44',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.45',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),

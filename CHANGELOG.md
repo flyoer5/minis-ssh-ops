@@ -1,3 +1,9 @@
+## 1.4.45
+
+- Hosts: Online/Offline → 在线/离线
+- Agent sessions: relative times (刚刚 / n 分钟前 / 今天)
+- Settings: richer empty states for TOFU known-hosts and long-term memory
+
 ## 1.4.44
 
 - Settings: version chip shows live backendVersion (no more hard-coded 1.4.9)

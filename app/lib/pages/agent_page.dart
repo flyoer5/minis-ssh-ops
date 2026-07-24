@@ -44,6 +44,25 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     }
   }
 
+  String _relTime(DateTime when) {
+    final now = DateTime.now();
+    final diff = now.difference(when);
+    String two(int n) => n.toString().padLeft(2, '0');
+    if (diff.isNegative || diff.inSeconds < 45) return '刚刚';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
+    if (diff.inHours < 24 && now.day == when.day) {
+      return '今天 ${two(when.hour)}:${two(when.minute)}';
+    }
+    final yday = now.subtract(const Duration(days: 1));
+    if (yday.year == when.year && yday.month == when.month && yday.day == when.day) {
+      return '昨天 ${two(when.hour)}:${two(when.minute)}';
+    }
+    if (now.year == when.year) {
+      return '${two(when.month)}-${two(when.day)} ${two(when.hour)}:${two(when.minute)}';
+    }
+    return '${when.year}-${two(when.month)}-${two(when.day)} ${two(when.hour)}:${two(when.minute)}';
+  }
+
   @override
   void dispose() {
     _scroll.removeListener(_onScrollPos);
@@ -245,9 +264,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                                   final hostHint = s.hostId == null ? '' : state.hostLabelFor(s.hostId);
                                   final open = state.agentSessionId == s.id;
                                   final when = s.updatedAt;
-                                  final ts =
-                                      '${when.month.toString().padLeft(2, '0')}-${when.day.toString().padLeft(2, '0')} '
-                                      '${when.hour.toString().padLeft(2, '0')}:${when.minute.toString().padLeft(2, '0')}';
+                                  final ts = _relTime(when);
                                   return Column(
                                     children: [
                                       ListTile(

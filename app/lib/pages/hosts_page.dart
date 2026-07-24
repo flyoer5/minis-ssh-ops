@@ -301,7 +301,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
               Text(addr, style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontFamily: 'monospace')),
               const SizedBox(height: 8),
               Text(
-                s.ok ? 'Online · ${s.oneLine}' : s.oneLine,
+                s.ok ? '在线 · ${s.oneLine}' : s.oneLine,
                 style: TextStyle(color: s.ok ? AppColors.success : AppColors.danger, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
@@ -340,7 +340,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                       final buf = StringBuffer()
                         ..writeln(name)
                         ..writeln(addr)
-                        ..writeln(s.ok ? 'Online' : s.oneLine)
+                        ..writeln(s.ok ? '在线' : s.oneLine)
                         ..writeln(s.detail.isNotEmpty ? s.detail : s.oneLine);
                       await Clipboard.setData(ClipboardData(text: buf.toString()));
                       if (context.mounted) {
@@ -623,11 +623,11 @@ class _StatusCard extends StatelessWidget {
   String get _statusText {
     if (loading) return '探测中';
     if (summary == null) return '未探测';
-    if (summary!.ok) return 'Online';
+    if (summary!.ok) return '在线';
     // prefer short friendly oneLine (超时/认证失败/…) over generic Offline
     final o = summary!.oneLine.trim();
-    if (o.isNotEmpty && o != '离线' && o != '—') return o;
-    return 'Offline';
+    if (o.isNotEmpty && o != '离线' && o != '—' && o.toLowerCase() != 'offline') return o;
+    return '离线';
   }
 
   @override
