@@ -94,7 +94,7 @@ class SshAiAgentApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (_) => AppState(ApiClient())..bootstrap(),
       child: MaterialApp(
-        title: 'SSH AI Agent',
+        title: '机枢',
         theme: buildAppTheme(),
         builder: (context, child) {
           // Keep ErrorWidget theme-consistent even outside routes.

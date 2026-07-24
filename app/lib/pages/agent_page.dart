@@ -444,7 +444,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            state.selectedHostId == null ? '先选一台主机' : '向 Agent 发消息',
+                            state.selectedHostId == null ? '先选一台主机' : '向 机枢 发消息',
                             style: TextStyle(
                               fontSize: state.agentFontSize,
                               fontWeight: FontWeight.w700,

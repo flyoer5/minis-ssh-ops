@@ -63,7 +63,7 @@ class BackendService : Service() {
     private fun createChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val mgr = getSystemService(NotificationManager::class.java)
-        val ch = NotificationChannel(CHANNEL, "SSH AI 后端", NotificationManager.IMPORTANCE_LOW)
+        val ch = NotificationChannel(CHANNEL, "机枢后端", NotificationManager.IMPORTANCE_LOW)
         ch.description = "保持本地 Go 运维后端存活"
         mgr?.createNotificationChannel(ch)
     }
@@ -80,7 +80,7 @@ class BackendService : Service() {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
         }
-        return b.setContentTitle("SSH AI Agent")
+        return b.setContentTitle("机枢")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentIntent(pi)

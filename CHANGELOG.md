@@ -1,3 +1,10 @@
+## 1.4.42
+
+- Brand: rename to 机枢 (launcher label, Material title, FGS notification, settings about)
+- New launcher icon (dark navy + cyan terminal hub) + adaptive icons
+- Hosts: long-press menu → 复制地址
+- Agent empty copy: 向 机枢 发消息; settings tagline SSH 运维 Agent · 主机枢纽
+
 ## 1.4.41
 
 - Agent: top host/backend status strip + 选主机

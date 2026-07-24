@@ -354,6 +354,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   Future<void> _hostMenu(BuildContext context, AppState state, Map<String, dynamic> h) async {
     final id = h['id'] as String;
     final name = (h['name'] as String?)?.isNotEmpty == true ? h['name'] as String : '${h['host']}';
+    final addr = '${h['username']}@${h['host']}:${h['port']}';
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -367,6 +368,12 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
               onTap: () => Navigator.pop(c, 'edit'),
             ),
             ListTile(
+              leading: const Icon(Icons.copy_all),
+              title: const Text('复制地址'),
+              subtitle: Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+              onTap: () => Navigator.pop(c, 'copy'),
+            ),
+            ListTile(
               leading: const Icon(Icons.delete_outline, color: AppColors.danger),
               title: const Text('删除', style: TextStyle(color: AppColors.danger)),
               onTap: () => Navigator.pop(c, 'delete'),
@@ -376,6 +383,15 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
       ),
     );
     if (action == null || !context.mounted) return;
+    if (action == 'copy') {
+      await Clipboard.setData(ClipboardData(text: addr));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已复制主机地址'), duration: Duration(seconds: 1)),
+        );
+      }
+      return;
+    }
     if (action == 'edit') {
       await _showEdit(context, state, h);
       return;

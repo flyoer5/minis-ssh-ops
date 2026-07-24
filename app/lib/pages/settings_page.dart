@@ -440,7 +440,14 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               Row(
                 children: [
                   const Expanded(
-                    child: Text('SSH AI Agent', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('机枢', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                        SizedBox(height: 2),
+                        Text('SSH 运维 Agent · 主机枢纽', style: TextStyle(fontSize: 11, color: AppColors.textFaint)),
+                      ],
+                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

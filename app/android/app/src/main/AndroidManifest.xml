@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
     <application
-        android:label="SSH AI Agent"
+        android:label="机枢"
         android:name=".SshAiApp"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
