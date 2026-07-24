@@ -95,6 +95,40 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     _load(pane);
   }
 
+  /// Tap path strip → type absolute path and jump (MT-like address bar).
+  Future<void> _editPath(_Pane pane) async {
+    final ctrl = TextEditingController(text: pane.path.isEmpty ? '/' : pane.path);
+    final next = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('跳转到路径'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+          decoration: const InputDecoration(
+            hintText: '/var/log',
+            helperText: '输入绝对路径后确定',
+          ),
+          onSubmitted: (v) => Navigator.pop(c, v),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text), child: const Text('打开')),
+        ],
+      ),
+    );
+    if (next == null) return;
+    var p = next.trim();
+    if (p.isEmpty) p = '/';
+    if (!p.startsWith('/')) p = '/$p';
+    // collapse // 
+    while (p.contains('//')) {
+      p = p.replaceAll('//', '/');
+    }
+    _go(pane, p);
+  }
+
   void _sortEntries(List<dynamic> list) {
     int cmp(dynamic a, dynamic b) {
       final am = a as Map, bm = b as Map;
@@ -359,8 +393,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     if (id == null) return;
     setState(() {
       _transferring = true;
-      _transferLabel = '下载 $name…';
-      _transferProgress = null;
+      _transferLabel = '拉取 $name…';
+      _transferProgress = null; // indeterminate while server reads file
     });
     try {
       final r = await s.api.fsDownload(id, filePath);
@@ -369,8 +403,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       final size = r['size'] ?? 0;
       if (mounted) {
         setState(() {
-          _transferLabel = '保存到下载目录…';
-          _transferProgress = 0.85;
+          _transferLabel = '写入手机 · ${_fmtSize(size)}';
+          _transferProgress = 0.7;
         });
       }
       String? saved;
@@ -643,6 +677,10 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                           Expanded(
                             child: GestureDetector(
                               onTap: () => setState(() => focus = idx),
+                              onTap: () async {
+                                setState(() => focus = idx);
+                                await _editPath(pane);
+                              },
                               onLongPress: () async {
                                 final path = pane.path.isEmpty ? '/' : pane.path;
                                 await Clipboard.setData(ClipboardData(text: path));
@@ -660,6 +698,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                   fontFamily: 'monospace',
                                   fontSize: fs - 2,
                                   color: focused ? Colors.white : AppColors.grayBd,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: focused ? AppColors.cyan.withAlpha(0x55) : AppColors.gray66,
                                 ),
                               ),
                             ),
@@ -668,6 +708,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                            tooltip: '上级',
                             icon: const Icon(Icons.arrow_upward, size: 18),
                             onPressed: () {
                               setState(() => focus = idx);

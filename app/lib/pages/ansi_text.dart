@@ -59,10 +59,16 @@ class AnsiPainter {
     // Important: ESC[?2004h (bracketed paste) MUST be stripped whole — old
     // regex only allowed [0-9;]* params so "?2004h" leaked as visible text.
     var s = raw
+        // OSC: ESC ] ... BEL or ST
         .replaceAll(RegExp(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)?'), '')
-        .replaceAll(RegExp(r'\x1B\[\?[0-9;]*[A-Za-z]'), '') // DEC private: ?2004h/l etc.
-        .replaceAll(RegExp(r'\x1B\[>[0-9;]*[A-Za-z]'), '') // private >
+        // DEC/private CSI: ESC [ ? ... letter  (bracketed paste, alt screen, etc.)
+        .replaceAll(RegExp(r'\x1B\[\?[0-9;]*[ -/]*[@-~]'), '')
+        .replaceAll(RegExp(r'\x1B\[>[0-9;]*[ -/]*[@-~]'), '')
+        .replaceAll(RegExp(r'\x1B\[![0-9;]*[ -/]*[@-~]'), '')
+        // Full CSI including intermediates (safe drop of non-SGR handled in loop)
         .replaceAll(RegExp(r'\x1B[()][0-9A-Za-z]'), '')
+        // VT keypad / application modes often appear as ESC = / ESC >
+        .replaceAll(RegExp(r'\x1B[=><]'), '')
         .replaceAll('\r\n', '\n')
         .replaceAll('\r', '\n');
 
@@ -230,10 +236,12 @@ class AnsiPainter {
 String stripAnsi(String s) {
   var t = s
       .replaceAll(RegExp(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)?'), '')
-      .replaceAll(RegExp(r'\x1B\[\?[0-9;]*[A-Za-z@-~]'), '')
-      .replaceAll(RegExp(r'\x1B\[>[0-9;]*[A-Za-z@-~]'), '')
+      .replaceAll(RegExp(r'\x1B\[\?[0-9;]*[ -/]*[@-~]'), '')
+      .replaceAll(RegExp(r'\x1B\[>[0-9;]*[ -/]*[@-~]'), '')
+      .replaceAll(RegExp(r'\x1B\[![0-9;]*[ -/]*[@-~]'), '')
       .replaceAll(RegExp(r'\x1B\[[0-9;?]*[ -/]*[@-~]'), '')
       .replaceAll(RegExp(r'\x1B[()][0-9A-Za-z]'), '')
+      .replaceAll(RegExp(r'\x1B[=><]'), '')
       .replaceAll(RegExp(r'\x1B.'), '')
       .replaceAll('\r\n', '\n')
       .replaceAll('\r', '\n');

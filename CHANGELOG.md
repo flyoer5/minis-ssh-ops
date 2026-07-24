@@ -1,3 +1,10 @@
+## 1.4.33
+
+- Polish: stronger terminal CSI strip (private modes, alt screen, keypad)
+- Files: tap path bar to type absolute path and jump
+- Records: keyword search (command/stdout/stderr/host)
+- Download progress labels clearer (pull → write phone)
+
 ## 1.4.32
 
 - Terminal: strip DEC private CSI (ESC[?2004h bracketed paste) so prompt is not prefixed with ?2004h

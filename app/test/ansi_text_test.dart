@@ -11,6 +11,13 @@ void main() {
     expect(plain.contains('root@host'), isTrue);
   });
 
+  test('strips alt-screen and application keypad noise', () {
+    final raw = '\x1B[?1049h\x1B=hello\x1B>\x1B[?1049l';
+    final plain = stripAnsi(raw);
+    expect(plain.contains('1049'), isFalse);
+    expect(plain.contains('hello'), isTrue);
+  });
+
   test('AnsiPainter does not leak private mode text', () {
     final raw = '\x1B[?2004hroot@iZ4b7992okxrztZ:~# ';
     final span = AnsiPainter().build(raw);

@@ -18,9 +18,17 @@ class RecordsPage extends StatefulWidget {
 class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClientMixin {
   String filter = 'all';
   String hostFilter = 'all';
+  final TextEditingController _q = TextEditingController();
+  String query = '';
 
   @override
   bool get wantKeepAlive => false;
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
 
   String _fmtLocal(String raw) {
     final s = raw.trim();
@@ -88,6 +96,23 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
     if (hostFilter != 'all') {
       list = list.where((e) => (e['hostId']?.toString() ?? '') == hostFilter).toList();
     }
+    final q = query.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = list.where((e) {
+        final cmd = (e['command']?.toString() ?? '').toLowerCase();
+        final out = (e['stdout']?.toString() ?? '').toLowerCase();
+        final err = (e['stderr']?.toString() ?? '').toLowerCase();
+        final hid = (e['hostId']?.toString() ?? '').toLowerCase();
+        final risk = (e['risk']?.toString() ?? '').toLowerCase();
+        final hostName = _hostLabel(state, e['hostId']?.toString() ?? '').toLowerCase();
+        return cmd.contains(q) ||
+            out.contains(q) ||
+            err.contains(q) ||
+            hid.contains(q) ||
+            risk.contains(q) ||
+            hostName.contains(q);
+      }).toList();
+    }
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -115,6 +140,30 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+            child: TextField(
+              controller: _q,
+              onChanged: (v) => setState(() => query = v),
+              style: TextStyle(fontSize: fs - 1),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: '搜索命令 / 输出 / 主机…',
+                prefixIcon: const Icon(Icons.search, size: 18),
+                suffixIcon: query.isEmpty
+                    ? null
+                    : IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.clear, size: 16),
+                        onPressed: () {
+                          _q.clear();
+                          setState(() => query = '');
+                        },
+                      ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              ),
+            ),
+          ),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
