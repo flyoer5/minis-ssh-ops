@@ -23,12 +23,30 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   final _focus = FocusNode();
   bool _busy = false;
   bool _onlyCurrentHost = true;
+  bool _showJumpBottom = false;
 
   @override
   bool get wantKeepAlive => true;
 
   @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScrollPos);
+  }
+
+  void _onScrollPos() {
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
+    final near = pos.maxScrollExtent - pos.pixels < 160;
+    final show = !near && pos.maxScrollExtent > 80;
+    if (_showJumpBottom != show && mounted) {
+      setState(() => _showJumpBottom = show);
+    }
+  }
+
+  @override
   void dispose() {
+    _scroll.removeListener(_onScrollPos);
     _input.dispose();
     _scroll.dispose();
     _focus.dispose();
@@ -40,7 +58,10 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
 
   void _bottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      if (_scroll.hasClients) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        if (_showJumpBottom && mounted) setState(() => _showJumpBottom = false);
+      }
     });
   }
 
@@ -470,60 +491,103 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                               icon: const Icon(Icons.dns_outlined, size: 18),
                               label: const Text('去选主机'),
                             ),
+                          ] else ...[
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                for (final s in const [
+                                  '查看系统负载与磁盘',
+                                  '最近有哪些失败服务',
+                                  '总结 /var/log 关键错误',
+                                ])
+                                  ActionChip(
+                                    label: Text(s, style: TextStyle(fontSize: state.agentFontSize - 3)),
+                                    onPressed: (_busy || state.agentBusy)
+                                        ? null
+                                        : () {
+                                            _input.text = s;
+                                            _send(state);
+                                          },
+                                  ),
+                              ],
+                            ),
                           ],
                         ],
                       ),
                     ),
                   )
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-                    itemCount: state.agentMessages.length + (_busy ? 1 : 0),
-                    itemBuilder: (_, i) {
-                      if (_busy && i == state.agentMessages.length) {
-                        return Padding(
-                          padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
-                          child: Row(
-                            children: [
-                              const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentSoft),
+                : Stack(
+                    children: [
+                      ListView.builder(
+                        controller: _scroll,
+                        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                        itemCount: state.agentMessages.length + (_busy ? 1 : 0),
+                        itemBuilder: (_, i) {
+                          if (_busy && i == state.agentMessages.length) {
+                            return Padding(
+                              padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
+                              child: Row(
+                                children: [
+                                  const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentSoft),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _busyHint,
+                                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                      foregroundColor: AppColors.danger,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    ),
+                                    onPressed: () => _stopGeneration(state),
+                                    child: const Text('停止', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _busyHint,
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                                ),
-                              ),
-                              TextButton(
-                                style: TextButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                  foregroundColor: AppColors.danger,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                ),
-                                onPressed: () => _stopGeneration(state),
-                                child: const Text('停止', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                              ),
-                            ],
+                            );
+                          }
+                          final m = state.agentMessages[i];
+                          // Stable key (no content hash) so token stream doesn't rebuild tree every delta
+                          final id = m.meta?['id']?.toString() ?? '${m.at.microsecondsSinceEpoch}';
+                          final part = m.meta?['part']?.toString() ?? m.kind.name;
+                          final streaming = _busy &&
+                              i == state.agentMessages.length - 1 &&
+                              (part == 'text_delta' || part == 'text' || part == 'reasoning');
+                          return _Bubble(
+                            key: ValueKey('$id|$part|${m.role}'),
+                            msg: m,
+                            fontSize: state.agentFontSize,
+                            streaming: streaming,
+                          );
+                        },
+                      ),
+                      if (_showJumpBottom)
+                        Positioned(
+                          right: 12,
+                          bottom: 8,
+                          child: Material(
+                            color: AppColors.surface2,
+                            elevation: 2,
+                            shape: const CircleBorder(),
+                            child: IconButton(
+                              tooltip: '回到底部',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: _bottom,
+                              icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.accentSoft),
+                            ),
                           ),
-                        );
-                      }
-                      final m = state.agentMessages[i];
-                      // Stable key (no content hash) so token stream doesn't rebuild tree every delta
-                      final id = m.meta?['id']?.toString() ?? '${m.at.microsecondsSinceEpoch}';
-                      final part = m.meta?['part']?.toString() ?? m.kind.name;
-                      final streaming = _busy &&
-                          i == state.agentMessages.length - 1 &&
-                          (part == 'text_delta' || part == 'text' || part == 'reasoning');
-                      return _Bubble(
-                        key: ValueKey('$id|$part|${m.role}'),
-                        msg: m,
-                        fontSize: state.agentFontSize,
-                        streaming: streaming,
-                      );
-                    },
+                        ),
+                    ],
                   ),
           ),
           if (_canRetryLast(state))

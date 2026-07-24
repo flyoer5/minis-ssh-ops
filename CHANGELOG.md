@@ -1,3 +1,10 @@
+## 1.4.43
+
+- Agent: quick-start chips on empty chat; jump-to-bottom when scrolled up
+- Hosts: title shows online/total count
+- Terminal: connecting banner (AppColors); disconnected banner themed
+- Records: relative-friendly list times (刚刚 / n 分钟前 / 今天 HH:MM)
+
 ## 1.4.42
 
 - Brand: rename to 机枢 (launcher label, Material title, FGS notification, settings about)

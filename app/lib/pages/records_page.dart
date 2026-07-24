@@ -30,15 +30,33 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
     super.dispose();
   }
 
-  String _fmtLocal(String raw) {
+  String _fmtLocal(String raw, {bool relative = false}) {
     final s = raw.trim();
     if (s.isEmpty) return '';
     final dt0 = DateTime.tryParse(s);
     if (dt0 == null) return s;
     final dt = dt0.toLocal();
     String two(int n) => n.toString().padLeft(2, '0');
-    return '${dt.year}-${two(dt.month)}-${two(dt.day)} '
+    final abs = '${dt.year}-${two(dt.month)}-${two(dt.day)} '
         '${two(dt.hour)}:${two(dt.minute)}:${two(dt.second)}';
+    if (!relative) return abs;
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.isNegative || diff.inSeconds < 45) return '刚刚';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
+    if (diff.inHours < 24 && now.day == dt.day) {
+      return '今天 ${two(dt.hour)}:${two(dt.minute)}';
+    }
+    if (diff.inHours < 48) {
+      final yday = now.subtract(const Duration(days: 1));
+      if (yday.year == dt.year && yday.month == dt.month && yday.day == dt.day) {
+        return '昨天 ${two(dt.hour)}:${two(dt.minute)}';
+      }
+    }
+    if (now.year == dt.year) {
+      return '${two(dt.month)}-${two(dt.day)} ${two(dt.hour)}:${two(dt.minute)}';
+    }
+    return abs;
   }
 
   Color _riskColor(String risk) {
@@ -276,7 +294,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                       final risk = e['risk']?.toString() ?? '';
                       final cmd = e['command']?.toString() ?? '';
                       final exit = e['exitCode'];
-                      final at = _fmtLocal(e['createdAt']?.toString() ?? '');
+                      final at = _fmtLocal(e['createdAt']?.toString() ?? '', relative: true);
                       final hostId = e['hostId']?.toString() ?? '';
                       final hostName = _hostLabel(state, hostId);
                       final rc = _riskColor(risk);

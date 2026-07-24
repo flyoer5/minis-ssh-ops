@@ -104,13 +104,23 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   Widget build(BuildContext context) {
     super.build(context);
     final state = context.watch<AppState>();
+    final total = state.hosts.length;
+    final online = state.hosts.where((h) {
+      final id = h['id']?.toString();
+      if (id == null) return false;
+      final s = _summary[id];
+      return s != null && s.ok;
+    }).length;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 44,
         leading: NavMenuButton.leadingOf(context),
         leadingWidth: NavMenuButton.leadingWidthOf(context),
         titleSpacing: 4,
-        title: const Text('主机', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        title: Text(
+          total == 0 ? '主机' : '主机 · $online/$total 在线',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
         actions: [
           IconButton(
             visualDensity: VisualDensity.compact,

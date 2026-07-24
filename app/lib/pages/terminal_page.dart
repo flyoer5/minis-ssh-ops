@@ -629,27 +629,52 @@ class _TerminalPageState extends State<TerminalPage>
                   ),
                 ),
               ),
-            if (!_connected && !_connecting && _hostId != null)
+            if (_connecting && _hostId != null)
               Material(
-                color: const Color(0x33D29922),
+                color: AppColors.accent.withAlpha(0x28),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   child: Row(
                     children: [
-                      const Icon(Icons.link_off, size: 16, color: Color(0xFFD29922)),
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentSoft),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _status.isEmpty ? '连接中…' : _status,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, color: AppColors.accentSoft),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (!_connected && !_connecting && _hostId != null)
+              Material(
+                color: AppColors.warning.withAlpha(0x33),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.link_off, size: 16, color: AppColors.warning),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _status.isEmpty ? '未连接' : _status,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12, color: Color(0xFFD29922)),
+                          style: const TextStyle(fontSize: 12, color: AppColors.warning),
                         ),
                       ),
                       TextButton(
                         style: TextButton.styleFrom(
                           visualDensity: VisualDensity.compact,
-                          foregroundColor: const Color(0xFFD29922),
+                          foregroundColor: AppColors.warning,
                         ),
                         onPressed: () => _connect(state),
                         child: const Text('重连', style: TextStyle(fontWeight: FontWeight.w700)),
