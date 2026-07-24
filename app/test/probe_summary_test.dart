@@ -40,6 +40,19 @@ void main() {
         'memory': {'stdout': ''},
       });
       expect(s.ok, isFalse);
+      expect(s.oneLine, '离线');
+    });
+
+    test('marks error when uname has non-zero exit only', () {
+      final s = ProbeSummary.fromProbeJson({
+        'uname': {'stdout': '', 'exitCode': 1},
+        'uptime': {'stdout': ''},
+        'load': {'stdout': ''},
+        'cpu': {'stdout': ''},
+        'disk': {'stdout': ''},
+        'memory': {'stdout': ''},
+      });
+      expect(s.ok, isFalse);
     });
   });
 

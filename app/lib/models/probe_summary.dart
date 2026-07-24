@@ -26,7 +26,14 @@ class ProbeSummary {
         final e = (v['stderr'] ?? '').toString().trim();
         if (s.isNotEmpty) return s;
         if (e.isNotEmpty) return e;
-        return 'exit ${v['exitCode']}';
+        // Empty stdout/stderr: missing data → '-' so ok stays false for uname.
+        // Only surface exit code when non-zero (real command failure without body).
+        final code = v['exitCode'];
+        if (code is int && code != 0) return 'exit $code';
+        if (code != null && code.toString() != '0' && code.toString().isNotEmpty && code.toString() != 'null') {
+          return 'exit $code';
+        }
+        return '-';
       }
       if (v == null) return '-';
       return v.toString();
