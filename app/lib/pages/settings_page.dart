@@ -455,7 +455,10 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       color: AppColors.accentDeep.withAlpha(0x33),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text('1.4.9', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue)),
+                    child: Text(
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.44',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
+                    ),
                   ),
                 ],
               ),

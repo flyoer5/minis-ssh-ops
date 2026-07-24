@@ -948,7 +948,39 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     super.build(context);
     final state = context.watch<AppState>();
     if (state.selectedHostId == null) {
-      return const Scaffold(body: Center(child: Text('先选主机')));
+      return Scaffold(
+        appBar: AppBar(
+          toolbarHeight: 44,
+          leading: NavMenuButton.leadingOf(context),
+          leadingWidth: NavMenuButton.leadingWidthOf(context),
+          title: const Text('文件', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.folder_open, size: 40, color: AppColors.textFaint),
+                const SizedBox(height: 12),
+                const Text('先选一台主机', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                const SizedBox(height: 6),
+                const Text(
+                  '双栏 SFTP 浏览、编辑、上传下载都需要先绑定主机。',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12.5, color: AppColors.textFaint, height: 1.4),
+                ),
+                const SizedBox(height: 14),
+                FilledButton.tonalIcon(
+                  onPressed: () => NavScope.maybeOf(context)?.go(0),
+                  icon: const Icon(Icons.dns_outlined, size: 18),
+                  label: const Text('去选主机'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
     void swapPanes() {
       setState(() {

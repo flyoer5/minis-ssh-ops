@@ -442,7 +442,31 @@ class _TerminalPageState extends State<TerminalPage>
           leadingWidth: NavMenuButton.leadingWidthOf(context),
           title: const Text('终端'),
         ),
-        body: const Center(child: Text('先选主机')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.terminal, size: 40, color: AppColors.textFaint),
+                const SizedBox(height: 12),
+                const Text('先选一台主机', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                const SizedBox(height: 6),
+                const Text(
+                  '终端会通过 WebSocket 挂到该主机的交互式 shell。',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12.5, color: AppColors.textFaint, height: 1.4),
+                ),
+                const SizedBox(height: 14),
+                FilledButton.tonalIcon(
+                  onPressed: () => NavScope.maybeOf(context)?.go(0),
+                  icon: const Icon(Icons.dns_outlined, size: 18),
+                  label: const Text('去选主机'),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 

@@ -373,6 +373,21 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+              leading: const Icon(Icons.smart_toy_outlined),
+              title: const Text('用 Agent 打开'),
+              onTap: () => Navigator.pop(c, 'agent'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.terminal),
+              title: const Text('打开终端'),
+              onTap: () => Navigator.pop(c, 'term'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_open),
+              title: const Text('打开文件'),
+              onTap: () => Navigator.pop(c, 'files'),
+            ),
+            ListTile(
               leading: const Icon(Icons.edit_outlined),
               title: const Text('编辑'),
               onTap: () => Navigator.pop(c, 'edit'),
@@ -393,6 +408,17 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
       ),
     );
     if (action == null || !context.mounted) return;
+    if (action == 'agent' || action == 'term' || action == 'files') {
+      state.selectHost(id);
+      final tab = switch (action) {
+        'agent' => 1,
+        'term' => 2,
+        'files' => 3,
+        _ => 0,
+      };
+      NavScope.maybeOf(context)?.go(tab);
+      return;
+    }
     if (action == 'copy') {
       await Clipboard.setData(ClipboardData(text: addr));
       if (context.mounted) {

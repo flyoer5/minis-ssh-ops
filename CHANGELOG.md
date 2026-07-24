@@ -1,3 +1,9 @@
+## 1.4.44
+
+- Settings: version chip shows live backendVersion (no more hard-coded 1.4.9)
+- Hosts menu: open Agent / Terminal / Files for selected host
+- Terminal & Files: empty-host CTA with 去选主机
+
 ## 1.4.43
 
 - Agent: quick-start chips on empty chat; jump-to-bottom when scrolled up
