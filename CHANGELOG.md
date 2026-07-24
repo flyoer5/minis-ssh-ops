@@ -1,3 +1,8 @@
+## 1.4.40
+
+- Hosts: empty state with add CTA
+- Terminal: reconnect on app resume; disconnected banner with one-tap 重连
+
 ## 1.4.39
 
 - Files multi-select: 全选 / 反选

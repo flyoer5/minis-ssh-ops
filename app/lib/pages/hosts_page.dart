@@ -127,7 +127,34 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
       body: !state.backendOk
           ? Center(child: FilledButton(onPressed: () => state.bootstrap(), child: const Text('连接后端')))
           : state.hosts.isEmpty
-              ? const Center(child: Text('无主机'))
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.dns_outlined, size: 44, color: AppColors.textFaint),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '还没有主机',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '添加 SSH 主机后可在此查看探针状态，并供 Agent / 终端 / 文件使用。',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 13, color: AppColors.textFaint, height: 1.4),
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: state.backendOk ? () => _showAdd(context, state) : null,
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('添加主机'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               : Column(
                   children: [
                     Padding(

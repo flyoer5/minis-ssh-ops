@@ -79,11 +79,26 @@ class _TerminalPageState extends State<TerminalPage>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final state = context.watch<AppState>();
-    final fontSize = state.termFontSize;
     final id = state.selectedHostId;
     if (id != null && id != _hostId && state.backendOk) {
       _hostId = id;
       _connect(state);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // After backgrounding, WS often dies silently — auto-reconnect on resume.
+    if (state == AppLifecycleState.resumed &&
+        _hostId != null &&
+        !_connected &&
+        !_connecting &&
+        mounted) {
+      final app = context.read<AppState>();
+      if (app.backendOk && app.selectedHostId == _hostId) {
+        _append('\r\n\x1B[90m[app] resumed — reconnecting…\x1B[0m\r\n');
+        _connect(app);
+      }
     }
   }
 
@@ -609,6 +624,35 @@ class _TerminalPageState extends State<TerminalPage>
                           _searchIdx = 0;
                         }),
                         icon: const Icon(Icons.close, size: 18),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (!_connected && !_connecting && _hostId != null)
+              Material(
+                color: const Color(0x33D29922),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.link_off, size: 16, color: Color(0xFFD29922)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _status.isEmpty ? '未连接' : _status,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, color: Color(0xFFD29922)),
+                        ),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          foregroundColor: const Color(0xFFD29922),
+                        ),
+                        onPressed: () => _connect(state),
+                        child: const Text('重连', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
