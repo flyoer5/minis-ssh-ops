@@ -44,9 +44,7 @@ class _TerminalPageState extends State<TerminalPage>
   List<int> _searchHits = [];
 
   static const _bg = AppColors.terminalBlack;
-  static const _fg = AppColors.text;
   static const _green = AppColors.success;
-  static const _muted = AppColors.textMuted;
   static const _keyBg = AppColors.surface2;
   static const _bar = AppColors.bg;
 
@@ -303,13 +301,13 @@ class _TerminalPageState extends State<TerminalPage>
   TextSpan _buildScrollbackSpan(double fontSize) {
     final raw = _buf.isEmpty ? '' : _buf.toString();
     if (!_showSearch || _searchCtrl.text.trim().isEmpty || _searchHits.isEmpty) {
-      return AnsiPainter(fontSize: fontSize, defaultFg: _fg).build(raw);
+      return AnsiPainter(fontSize: fontSize, defaultFg: AppColors.text).build(raw);
     }
     final plain = _plainScrollback;
     final q = _searchCtrl.text.trim();
     final spans = <TextSpan>[];
     var cursor = 0;
-    final base = TextStyle(fontFamily: 'monospace', fontSize: fontSize, height: 1.25, color: _fg);
+    final base = TextStyle(fontFamily: 'monospace', fontSize: fontSize, height: 1.25, color: AppColors.text);
     final hit = base.copyWith(backgroundColor: const Color(0x66D29922), color: Colors.white);
     final active = base.copyWith(backgroundColor: const Color(0xAAD29922), color: Colors.white, fontWeight: FontWeight.w700);
     for (var i = 0; i < _searchHits.length; i++) {
@@ -442,7 +440,7 @@ class _TerminalPageState extends State<TerminalPage>
               child: Center(
                 child: Text(
                   label,
-                  style: TextStyle(color: on ? _green : _fg, fontSize: 12, fontWeight: FontWeight.w600),
+                  style: TextStyle(color: on ? _green : AppColors.text, fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -509,8 +507,8 @@ class _TerminalPageState extends State<TerminalPage>
                 ),
                 child: Row(
                   children: [
-                    const NavMenuButton(color: _fg),
-                    Icon(Icons.circle, size: 8, color: _connected ? _green : Colors.redAccent),
+                    const NavMenuButton(color: AppColors.text),
+                    Icon(Icons.circle, size: 8, color: _connected ? AppColors.success : AppColors.danger),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text.rich(
@@ -518,12 +516,12 @@ class _TerminalPageState extends State<TerminalPage>
                           children: [
                             TextSpan(
                               text: state.hostLabel,
-                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _fg),
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.text),
                             ),
                             if (_status.isNotEmpty)
                               TextSpan(
                                 text: '  ${_status}',
-                                style: const TextStyle(fontSize: 11, color: _muted, fontWeight: FontWeight.w400),
+                                style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w400),
                               ),
                           ],
                         ),
@@ -536,7 +534,7 @@ class _TerminalPageState extends State<TerminalPage>
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       tooltip: '减小字体',
-                      icon: const Icon(Icons.text_decrease, size: 16, color: _muted),
+                      icon: const Icon(Icons.text_decrease, size: 16, color: AppColors.textMuted),
                       onPressed: () => context.read<AppState>().setTermFontSize(state.termFontSize - 1),
                     ),
                     IconButton(
@@ -544,7 +542,7 @@ class _TerminalPageState extends State<TerminalPage>
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       tooltip: '增大字体',
-                      icon: const Icon(Icons.text_increase, size: 16, color: _muted),
+                      icon: const Icon(Icons.text_increase, size: 16, color: AppColors.textMuted),
                       onPressed: () => context.read<AppState>().setTermFontSize(state.termFontSize + 1),
                     ),
                     IconButton(
@@ -555,14 +553,14 @@ class _TerminalPageState extends State<TerminalPage>
                       icon: Icon(
                         _focus.hasFocus ? Icons.keyboard_hide : Icons.keyboard,
                         size: 18,
-                        color: _focus.hasFocus ? _green : _muted,
+                        color: _focus.hasFocus ? _green : AppColors.textMuted,
                       ),
                       onPressed: _toggleKb,
                     ),
                     PopupMenuButton<String>(
                       tooltip: '更多',
                       padding: EdgeInsets.zero,
-                      icon: const Icon(Icons.more_vert, size: 18, color: _muted),
+                      icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textMuted),
                       color: AppColors.surface,
                       onSelected: (v) async {
                         switch (v) {
@@ -648,7 +646,7 @@ class _TerminalPageState extends State<TerminalPage>
                       ),
                       Text(
                         _searchHits.isEmpty ? '0' : '${_searchIdx + 1}/${_searchHits.length}',
-                        style: const TextStyle(fontSize: 11, color: _muted, fontFamily: 'monospace'),
+                        style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace'),
                       ),
                       IconButton(
                         tooltip: '上一个',

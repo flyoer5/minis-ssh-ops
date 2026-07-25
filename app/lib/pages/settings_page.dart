@@ -492,7 +492,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.50',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.51',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
@@ -999,10 +999,10 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 ],
               ),
               Slider(
-                value: state.agentMaxRounds.toDouble().clamp(3, 32),
-                min: 3,
-                max: 32,
-                divisions: 29,
+                value: state.agentMaxRounds.toDouble().clamp(1, 99),
+                min: 1,
+                max: 99,
+                divisions: 98,
                 label: '${state.agentMaxRounds}',
                 onChanged: (v) => state.setAgentMaxRounds(v.round()),
               ),
@@ -1010,7 +1010,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  for (final n in const [8, 12, 16, 24, 32])
+                  for (final n in const [4, 8, 12, 24, 40, 64])
                     ActionChip(
                       label: Text('$n', style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
                       visualDensity: VisualDensity.compact,

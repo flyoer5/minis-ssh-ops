@@ -111,19 +111,13 @@ type chatBody struct {
 	Message        string `json:"message"`
 	SessionID      string `json:"sessionId"`
 	ConfirmWrites  bool   `json:"confirmWrites"`
-	// MaxRounds: tool-loop rounds per turn (3–32). 0 → default 12.
+	// MaxRounds: tool-loop rounds per turn (1–99). 0/超出 → default 12.
 	MaxRounds int `json:"maxRounds"`
 }
 
 func clampMaxRounds(n int) int {
-	if n <= 0 {
+	if n <= 0 || n > 99 {
 		return 12
-	}
-	if n < 3 {
-		return 3
-	}
-	if n > 32 {
-		return 32
 	}
 	return n
 }

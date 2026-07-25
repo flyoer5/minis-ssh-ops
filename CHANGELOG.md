@@ -1,3 +1,13 @@
+## 1.4.51
+
+### MaxRounds
+- Fully open: 1–99 freely set (no hard clamp); default 12
+- Preset chips: 4/8/12/24/40/64
+
+### Polish
+- Terminal: _muted/_fg aliases → AppColors
+- Minor text alignment
+
 ## 1.4.50
 
 ### Polish

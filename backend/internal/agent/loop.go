@@ -99,7 +99,7 @@ func (c *Client) RunLoopStream(userText string, history []LoopMsg, run ToolRunne
 	if maxRounds <= 0 {
 		maxRounds = 12
 	}
-	if maxRounds > 32 {
+	if maxRounds > 99 {
 		maxRounds = 32
 	}
 	emit := func(ev LoopEvent) {
