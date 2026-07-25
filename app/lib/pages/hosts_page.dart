@@ -538,15 +538,23 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
       if (!context.mounted) return;
       final s = _summary[id];
       if (s != null && !s.ok) {
+        // SnackBars with actions stay forever unless duration is set — auto-dismiss.
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
             content: Text('已添加，但暂时连不上：${s.oneLine}'),
             action: SnackBarAction(
               label: '详情',
               onPressed: () {
                 final h = state.hosts.cast<dynamic>().whereType<Map>().cast<Map<String, dynamic>>().firstWhere(
                       (e) => e['id'] == id,
-                      orElse: () => <String, dynamic>{'id': id, 'host': result.body['host'], 'username': result.body['username'], 'port': result.body['port']},
+                      orElse: () => <String, dynamic>{
+                        'id': id,
+                        'host': result.body['host'],
+                        'username': result.body['username'],
+                        'port': result.body['port'],
+                      },
                     );
                 final name = (h['name'] as String?)?.isNotEmpty == true ? h['name'] as String : '${h['host']}';
                 final addr = '${h['username']}@${h['host']}:${h['port']}';
@@ -563,9 +571,13 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
           ),
         );
       } else if (s != null && s.ok) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已添加并探测成功')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已添加并探测成功'), duration: Duration(seconds: 2)),
+        );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已添加主机')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已添加主机'), duration: Duration(seconds: 2)),
+        );
       }
     } catch (e) {
       if (context.mounted) {

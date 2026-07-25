@@ -1,3 +1,10 @@
+## 1.5.10
+
+### UX
+- Offline host snackbar after add: auto-dismiss in 5s (was sticky until detail)
+- Agent busy: history / new session / session menu stay usable; only composer send locked
+- New session or open history while generating auto-stops current turn
+
 ## 1.5.9
 
 ### Hosts

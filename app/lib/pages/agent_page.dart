@@ -176,6 +176,9 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
 
   Future<void> _openSession(AppState state, String id, {String? title}) async {
     try {
+      if (_busy || state.agentBusy) {
+        _stopGeneration(state);
+      }
       final meta = await state.api.getAgentSession(id);
       final sess = AgentSession.fromJson(meta);
       final raw = await state.api.getAgentSessionMessages(id);
@@ -762,7 +765,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
         leadingWidth: NavMenuButton.leadingWidthOf(context),
         titleSpacing: 4,
         title: InkWell(
-          onTap: (_busy || state.agentBusy || state.agentSessionId == null)
+          // Rename allowed even while generating — only send/input is locked.
+          onTap: state.agentSessionId == null
               ? null
               : () async {
                   final ctrl = TextEditingController(text: state.agentSessionTitle);
@@ -835,13 +839,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
           PopupMenuButton<String>(
             tooltip: '会话',
             icon: const Icon(Icons.tune, size: 20),
-            enabled: !(_busy || state.agentBusy),
             color: AppColors.surface,
             onSelected: (v) {
               if (v == 'settings') _showSessionSettings(state);
               if (v == 'memory') _showSessionMemory(state);
               if (v == 'rename' && state.agentSessionId != null) {
-                // reuse title tap dialog via synthetic
                 final ctrl = TextEditingController(text: state.agentSessionTitle);
                 showDialog<String>(
                   context: context,
@@ -875,34 +877,35 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
           IconButton(
             visualDensity: VisualDensity.compact,
             tooltip: '历史会话',
-            onPressed: (_busy || state.agentBusy) ? null : () => _showSessions(state),
+            onPressed: () => _showSessions(state),
             icon: const Icon(Icons.history, size: 20),
           ),
           IconButton(
             visualDensity: VisualDensity.compact,
             tooltip: '新会话',
-            onPressed: (_busy || state.agentBusy)
-                ? null
-                : () async {
-                    state.clearAgentChat();
-                    // Create a server session row for the new blank conversation.
-                    try {
-                      final r = await state.api.createAgentSession(
-                        hostId: state.selectedHostId,
-                      );
-                      final sid = r['sessionId'] ?? r['id'] ?? '';
-                      if (sid is String && sid.isNotEmpty) {
-                        state.agentSessionId = sid;
-                        state.agentSessionTitle = '新会话';
-                        state.notifyListeners();
-                      }
-                    } catch (_) {}
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已开新会话'), duration: Duration(seconds: 1)),
-                      );
-                    }
-                  },
+            onPressed: () async {
+              // Opening a new chat while generating: stop first so stream doesn't leak.
+              if (_busy || state.agentBusy) {
+                _stopGeneration(state);
+              }
+              state.clearAgentChat();
+              try {
+                final r = await state.api.createAgentSession(
+                  hostId: state.selectedHostId,
+                );
+                final sid = r['sessionId'] ?? r['id'] ?? '';
+                if (sid is String && sid.isNotEmpty) {
+                  state.agentSessionId = sid;
+                  state.agentSessionTitle = '新会话';
+                  state.notifyListeners();
+                }
+              } catch (_) {}
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('已开新会话'), duration: Duration(seconds: 1)),
+                );
+              }
+            },
             icon: const Icon(Icons.add_comment_outlined, size: 20),
           ),
         ],
@@ -976,7 +979,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                     if (state.sessionOvPrompt != null && state.sessionOvPrompt!.trim().isNotEmpty)
                       const _OvChip(label: '附加提示词'),
                     GestureDetector(
-                      onTap: (_busy || state.agentBusy) ? null : () => _showSessionSettings(state),
+                      onTap: () => _showSessionSettings(state),
                       child: const Text(
                         '编辑',
                         style: TextStyle(fontSize: 11, color: AppColors.accentSoft, fontWeight: FontWeight.w600),
