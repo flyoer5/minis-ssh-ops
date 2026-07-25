@@ -271,7 +271,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                             Text(
                               query.trim().isNotEmpty || filter != 'all' || hostFilter != 'all'
                                   ? '没有匹配的记录'
-                                  : '暂无审计记录',
+                                  : '暂无执行记录',
                               style: TextStyle(fontSize: fs, color: AppColors.textMuted, fontWeight: FontWeight.w600),
                             ),
                             if (query.trim().isNotEmpty || filter != 'all' || hostFilter != 'all') ...[

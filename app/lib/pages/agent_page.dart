@@ -133,7 +133,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     }
     setState(() {
       _busy = true;
-      _busyHint = '思考 / 调用工具中…（可点停止）';
+      _busyHint = '思考 / 调工具… 可点停止';
     });
     try {
       await state.agentChat(text);
@@ -692,7 +692,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                         hintText: state.selectedHostId == null
                             ? '先选主机'
                             : ((_busy || state.agentBusy)
-                                ? '生成中…点停止可中断'
+                                ? '生成中… 可点停止'
                                 : (state.agentEnterToSend ? '消息 · 回车发送' : '消息 · 回车换行')),
                         hintStyle: const TextStyle(color: AppColors.textFaint),
                         filled: true,

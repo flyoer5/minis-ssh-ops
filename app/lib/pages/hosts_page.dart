@@ -170,7 +170,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          '添加 SSH 主机后可在此查看探针状态，并供 Agent / 终端 / 文件使用。',
+                          '添加主机后即可在 Agent / 终端 / 文件中使用',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 13, color: AppColors.textFaint, height: 1.4),
                         ),
@@ -300,7 +300,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     VoidCallback? onRetry,
   }) {
     if (s == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('尚无探针数据')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('尚未探测，点「刷新」获取')));
       return;
     }
     showModalBottomSheet<void>(

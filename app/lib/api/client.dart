@@ -150,7 +150,7 @@ class ApiClient {
     required String message,
     String? sessionId,
     bool confirmWrites = false,
-    int maxRounds = 5,
+    int maxRounds = 12,
   }) async {
     final r = await _c
         .post(
@@ -182,7 +182,7 @@ class ApiClient {
     required String message,
     String? sessionId,
     bool confirmWrites = false,
-    int maxRounds = 5,
+    int maxRounds = 12,
     required void Function(Map<String, dynamic> event) onEvent,
   }) async {
     cancelAgentStream();

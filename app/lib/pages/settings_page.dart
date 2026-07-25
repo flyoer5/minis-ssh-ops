@@ -492,7 +492,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.49',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.50',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
@@ -500,8 +500,8 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               ),
               const SizedBox(height: 6),
               const Text(
-                '主机探针 · Agent · 终端 · SFTP · 审计',
-                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                'SSH 运维 Agent · 主机枢纽',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600),
               ),
               if (state.backendFeatures.isNotEmpty) ...[
                 const SizedBox(height: 8),
@@ -799,7 +799,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 dense: true,
                 title: const Text('流式 Markdown', style: TextStyle(fontSize: 13.5)),
                 subtitle: const Text(
-                  '边生成边渲 MD（可能抖动）；关闭则结束后再渲染',
+                  '关闭则流式过程以纯文本暂示，完成后再渲染 Markdown（更稳）',
                   style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
                 ),
                 value: state.streamMarkdown,
@@ -855,7 +855,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 },
               ),
               const Text(
-                '后台定时刷新主机探针（0=关闭）。费电/费 SSH，仅在需要看板时打开。',
+                '后台自动刷新探针（0=关闭）。频繁探针会增加 SSH 连接和电量开销。',
                 style: TextStyle(fontSize: 11, color: AppColors.textFaint),
               ),
               const SizedBox(height: 8),
@@ -984,22 +984,44 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                   const Expanded(
                     child: Text('工具循环轮数', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
                   ),
-                  Text(
-                    '${state.agentMaxRounds}',
-                    style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.bg,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(
+                      '${state.agentMaxRounds}',
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: AppColors.chipBlue, fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ],
               ),
               Slider(
-                value: state.agentMaxRounds.toDouble().clamp(3, 12),
+                value: state.agentMaxRounds.toDouble().clamp(3, 32),
                 min: 3,
-                max: 12,
-                divisions: 9,
+                max: 32,
+                divisions: 29,
                 label: '${state.agentMaxRounds}',
                 onChanged: (v) => state.setAgentMaxRounds(v.round()),
               ),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final n in const [8, 12, 16, 24, 32])
+                    ActionChip(
+                      label: Text('$n', style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: state.agentMaxRounds == n ? AppColors.accentDeep.withAlpha(0x33) : null,
+                      onPressed: () => state.setAgentMaxRounds(n),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
               const Text(
-                '单次对话最多调用工具几轮（3–12，默认 5）。复杂排障可调高。',
+                '每次提问最多调几轮工具（3–32，默认 12）。长排障/安装建议 16–24。',
                 style: TextStyle(fontSize: 11, color: AppColors.textFaint),
               ),
               const SizedBox(height: 6),
@@ -1007,7 +1029,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 contentPadding: EdgeInsets.zero,
                 dense: true,
                 title: const Text('显示思考过程', style: TextStyle(fontSize: 13.5)),
-                subtitle: const Text('关闭后隐藏模型 reasoning 块', style: TextStyle(fontSize: 11.5)),
+                subtitle: const Text('关闭后不显示推理过程气泡，视觉更紧凑', style: TextStyle(fontSize: 11.5)),
                 value: state.agentShowReasoning,
                 onChanged: (v) => state.setAgentShowReasoning(v),
               ),
@@ -1015,7 +1037,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 contentPadding: EdgeInsets.zero,
                 dense: true,
                 title: const Text('折叠成功工具卡', style: TextStyle(fontSize: 13.5)),
-                subtitle: const Text('失败仍展开；关闭则成功结果也默认展开', style: TextStyle(fontSize: 11.5)),
+                subtitle: const Text('成功工具卡折叠只保留标题；失败仍自动展开', style: TextStyle(fontSize: 11.5)),
                 value: state.agentCollapseTools,
                 onChanged: (v) => state.setAgentCollapseTools(v),
               ),
@@ -1023,7 +1045,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 contentPadding: EdgeInsets.zero,
                 dense: true,
                 title: const Text('流式跟随底部', style: TextStyle(fontSize: 13.5)),
-                subtitle: const Text('生成时自动滚到最新（上滑阅读时仍可停跟）', style: TextStyle(fontSize: 11.5)),
+                subtitle: const Text('流式输出时底部自动跟随，手动上滑暂停跟随', style: TextStyle(fontSize: 11.5)),
                 value: state.agentAutoScroll,
                 onChanged: (v) => state.setAgentAutoScroll(v),
               ),
@@ -1039,7 +1061,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 contentPadding: EdgeInsets.zero,
                 dense: true,
                 title: const Text('发送后保持键盘', style: TextStyle(fontSize: 13.5)),
-                subtitle: const Text('方便连续追问', style: TextStyle(fontSize: 11.5)),
+                subtitle: const Text('发送后不收起键盘，一条接一条问', style: TextStyle(fontSize: 11.5)),
                 value: state.agentKeepKeyboard,
                 onChanged: (v) => state.setAgentKeepKeyboard(v),
               ),

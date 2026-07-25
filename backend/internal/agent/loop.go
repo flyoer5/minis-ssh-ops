@@ -97,7 +97,10 @@ func (c *Client) RunLoop(userText string, history []LoopMsg, run ToolRunner, max
 
 func (c *Client) RunLoopStream(userText string, history []LoopMsg, run ToolRunner, maxRounds int, sink EventSink) ([]LoopEvent, []LoopMsg, error) {
 	if maxRounds <= 0 {
-		maxRounds = 6
+		maxRounds = 12
+	}
+	if maxRounds > 32 {
+		maxRounds = 32
 	}
 	emit := func(ev LoopEvent) {
 		if sink != nil {

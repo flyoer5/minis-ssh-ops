@@ -420,7 +420,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
         final raw = e.toString();
         String msg = raw.replaceFirst(RegExp(r'^Exception:\s*'), '');
         if (msg.toLowerCase().contains('too large') || msg.contains('file too large')) {
-          msg = '文件过大，当前单次下载上限约 8MB。可在服务器上压缩/拆分后再下，或用 scp。';
+          msg = '文件过大，文件过大？回到主机上用 scp/rsync 或压缩再下';
         }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
@@ -1166,22 +1166,44 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                 child: Container(
                   width: double.infinity,
                   color: AppColors.surface,
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  padding: const EdgeInsets.fromLTRB(12, 4, 8, 6),
+                  child: Row(
                     children: [
-                      Text(
-                        _transferLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _transferLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                            ),
+                            const SizedBox(height: 4),
+                            LinearProgressIndicator(
+                              value: _transferProgress,
+                              minHeight: 3,
+                              backgroundColor: AppColors.surface2,
+                              color: AppColors.accentSoft,
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      LinearProgressIndicator(
-                        value: _transferProgress,
-                        minHeight: 3,
-                        backgroundColor: AppColors.surface2,
-                        color: AppColors.accentSoft,
+                      const SizedBox(width: 8),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        icon: const Icon(Icons.close, size: 16, color: AppColors.textMuted),
+                        tooltip: '取消传输',
+                        onPressed: () {
+                          setState(() {
+                            _transferring = false;
+                            _transferLabel = '';
+                            _transferProgress = null;
+                          });
+                        },
                       ),
                     ],
                   ),

@@ -1,3 +1,14 @@
+## 1.4.50
+
+### Polish
+- Settings/Agent/UI: concise Chinese captions and explanations
+- Files: transfer bar cancel; download error hint
+- Hosts: probe data detail text
+- Records: 暂无执行记录
+
+### MaxRounds
+- Range 3–32 (was 3–12), default 12; preset chips (8/12/16/24/32)
+
 ## 1.4.49
 
 ### Settings

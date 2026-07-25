@@ -31,8 +31,8 @@ mixin UiPrefs on ChangeNotifier {
   int probeConcurrency = 3;
 
   // —— Agent ——
-  /// Tool-loop rounds per user turn (3–12). Backend clamps.
-  int agentMaxRounds = 5;
+  /// Tool-loop rounds per user turn (3–32). Backend clamps.
+  int agentMaxRounds = 12;
 
   /// Follow the bottom of the chat while streaming.
   bool agentAutoScroll = true;
@@ -71,7 +71,8 @@ mixin UiPrefs on ChangeNotifier {
     final pc = prefs.getInt('probeConcurrency') ?? 3;
     probeConcurrency = pc.clamp(1, 6);
 
-    agentMaxRounds = (prefs.getInt('agentMaxRounds') ?? 5).clamp(3, 12);
+    // Migrate old low defaults: stored 5 → keep; clamp to new ceiling 32.
+    agentMaxRounds = (prefs.getInt('agentMaxRounds') ?? 12).clamp(3, 32);
     agentAutoScroll = prefs.getBool('agentAutoScroll') ?? true;
     agentShowReasoning = prefs.getBool('agentShowReasoning') ?? true;
     agentCollapseTools = prefs.getBool('agentCollapseTools') ?? true;
@@ -140,7 +141,7 @@ mixin UiPrefs on ChangeNotifier {
     await setHostCardCompact(false);
     await setStreamMarkdown(false);
     await setProbeConcurrency(3);
-    await setAgentMaxRounds(5);
+    await setAgentMaxRounds(12);
     await setAgentAutoScroll(true);
     await setAgentShowReasoning(true);
     await setAgentCollapseTools(true);
@@ -253,7 +254,7 @@ mixin UiPrefs on ChangeNotifier {
   }
 
   Future<void> setAgentMaxRounds(int v) async {
-    agentMaxRounds = v.clamp(3, 12);
+    agentMaxRounds = v.clamp(3, 32);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('agentMaxRounds', agentMaxRounds);
     notifyListeners();
