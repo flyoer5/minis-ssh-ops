@@ -1,3 +1,9 @@
+## 1.5.5
+
+### Bugfix
+- Host editor: dispose TextEditingControllers only after sheet unmount (fixes  crash on 保存/添加)
+- Agent: create server session before first message so history always has a durable id
+
 ## 1.5.4
 
 ### Session overrides + memory (Minis P1)

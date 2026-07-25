@@ -772,6 +772,16 @@ mixin AgentChatController on ChangeNotifier {
     agentBusy = true;
     _agentCancelRequested = false;
     final turn = ++_agentTurnGen;
+    // Always have a durable server session before the turn (Minis-style).
+    if (agentSessionId == null || agentSessionId!.isEmpty) {
+      try {
+        final r = await api.createAgentSession(hostId: id, title: userText.trim());
+        final sid = (r['sessionId'] ?? r['id'] ?? '').toString();
+        if (sid.isNotEmpty) agentSessionId = sid;
+      } catch (_) {
+        // Backend will still mint a UUID if sessionId is omitted.
+      }
+    }
     _pushMsg(ChatMessage(role: 'user', content: userText));
     if (agentSessionTitle == '新会话' || agentSessionTitle.isEmpty) {
       final t = userText.trim().replaceAll(RegExp(r'\s+'), ' ');

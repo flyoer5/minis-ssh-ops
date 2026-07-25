@@ -128,7 +128,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"service":   "ssh-ai-agent-backend",
-		"version":   "1.5.4",
+		"version":   "1.5.5",
 		"startedAt": s.StartedAt.Format(time.RFC3339),
 		"listenHint": "127.0.0.1 only",
 		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu","stream","tokstream","models","longmem","fscopy","fsmove","sessions"},
