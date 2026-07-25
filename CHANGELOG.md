@@ -1,3 +1,9 @@
+## 1.5.9
+
+### Hosts
+- Reorder only after long-press (ReorderableDelayedDragStartListener)
+- Card long-press no longer opens menu while reorderable; use ⋮ for menu
+
 ## 1.5.8
 
 ### Keyboard / IME smoothness

@@ -195,7 +195,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                         style: const TextStyle(fontSize: 14),
                         decoration: InputDecoration(
                           isDense: true,
-                          hintText: '搜索 · 无搜索时长按卡片拖动排序',
+                          hintText: '搜索 · 无搜索时：长按卡片拖动排序',
                           prefixIcon: const Icon(Icons.search, size: 20),
                           suffixIcon: _query.isEmpty
                               ? null
@@ -264,9 +264,11 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                               fontSize: state.uiFontSize,
                               compact: state.hostCardCompact,
                               authKind: auth,
+                              // When reorderable, long-press is reserved for drag; menu via ⋮ only.
                               onSelect: () => state.selectHost(id),
                               onRefresh: () => _refreshProbe(state, id, force: true),
                               onMenu: () => _hostMenu(context, state, h),
+                              longPressOpensMenu: !canReorder,
                               onShowDetail: () => _showProbeDetail(
                                 context,
                                 name,
@@ -277,7 +279,8 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                               ),
                             );
                             if (!canReorder) return card;
-                            return ReorderableDragStartListener(
+                            // Delayed listener = long-press then drag (not immediate press-drag).
+                            return ReorderableDelayedDragStartListener(
                               key: ValueKey(id),
                               index: i,
                               child: Padding(
@@ -591,6 +594,8 @@ class _StatusCard extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onMenu;
   final VoidCallback? onShowDetail;
+  /// When false, long-press is free for reorder drag (menu only via ⋮).
+  final bool longPressOpensMenu;
 
   const _StatusCard({
     required this.name,
@@ -606,6 +611,7 @@ class _StatusCard extends StatelessWidget {
     required this.onRefresh,
     required this.onMenu,
     this.onShowDetail,
+    this.longPressOpensMenu = true,
   });
 
   String get _ageText {
@@ -709,7 +715,7 @@ class _StatusCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onSelect,
-        onLongPress: onMenu,
+        onLongPress: longPressOpensMenu ? onMenu : null,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
           child: Column(
