@@ -1,3 +1,13 @@
+## 1.4.48
+
+### Bugfix
+- Agent: stop no longer falls back to batch chat (was re-running the whole turn)
+- Agent: turn generation guard drops stale SSE after stop/new chat
+- Agent: pendingConfirm tool cards not paired with later tool_results
+- Agent: runAgentStep double-tap debounce; seal pending toolUse after confirm
+- Agent: open tools marked interrupted on stop; clearer model error strings
+- Terminal: connection generation guard (stale WS events after reconnect)
+
 ## 1.4.47
 
 ### Agent

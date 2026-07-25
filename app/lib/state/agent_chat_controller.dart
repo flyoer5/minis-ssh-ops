@@ -59,6 +59,9 @@ mixin AgentChatController on ChangeNotifier {
     stepOutputs.clear();
     agentSessionId = null;
     _lastPlanMsgIndex = null;
+    _agentCancelRequested = false;
+    _runningStepIds.clear();
+    agentBusy = false;
     notifyListeners();
     _saveSessionsToPrefs();
   }
@@ -103,6 +106,9 @@ mixin AgentChatController on ChangeNotifier {
     lastPlan = null;
     stepOutputs.clear();
     _lastPlanMsgIndex = null;
+    _agentCancelRequested = false;
+    _runningStepIds.clear();
+    agentBusy = false;
     notifyListeners();
     _saveSessionsToPrefs();
   }
@@ -132,7 +138,18 @@ mixin AgentChatController on ChangeNotifier {
     _saveSessionsToPrefs();
   }
 
+  /// Set when user hits stop — stream close must NOT fall back to batch chat.
+  bool _agentCancelRequested = false;
+
+  /// Bumped on each agentChat / cancel so stale SSE events are ignored.
+  int _agentTurnGen = 0;
+
+  /// In-flight manual exec-step ids (prevent double-tap).
+  final Set<int> _runningStepIds = {};
+
   void cancelAgentChat() {
+    _agentCancelRequested = true;
+    _agentTurnGen++; // invalidate in-flight stream callbacks
     api.cancelAgentStream();
     agentBusy = false;
     _flushStreamNotify();
@@ -140,6 +157,22 @@ mixin AgentChatController on ChangeNotifier {
     for (var i = agentMessages.length - 1; i >= 0; i--) {
       final m = agentMessages[i];
       if (m.role == 'user') break;
+      if (m.kind == ChatKind.toolUse && m.meta?['success'] == null && m.meta?['pendingConfirm'] != true) {
+        final meta = <String, dynamic>{
+          if (m.meta != null) ...m.meta!,
+          'success': false,
+          'interrupted': true,
+          'output': '已中断',
+        };
+        agentMessages[i] = ChatMessage(
+          role: m.role,
+          content: '已中断',
+          kind: m.kind,
+          meta: meta,
+          at: m.at,
+        );
+        continue;
+      }
       if (m.kind == ChatKind.text || m.kind == ChatKind.reasoning) {
         final meta = <String, dynamic>{
           if (m.meta != null) ...m.meta!,
@@ -257,11 +290,28 @@ mixin AgentChatController on ChangeNotifier {
     if (low.contains('timeout') || low.contains('timed out')) {
       return '模型请求超时，请重试';
     }
-    if (low.contains('401') || low.contains('403')) {
-      return '模型鉴权失败，请检查设置';
+    if (low.contains('401') || low.contains('unauthorized')) {
+      return '模型鉴权失败，请检查 API Key';
+    }
+    if (low.contains('403') || low.contains('forbidden')) {
+      return '模型拒绝访问（403），请检查密钥权限或额度';
+    }
+    if (low.contains('429') || low.contains('rate limit')) {
+      return '模型请求过于频繁，请稍后再试';
+    }
+    if (low.contains('llm not configured') || low.contains('not configured')) {
+      return '未配置模型，请到设置里填写';
+    }
+    if (low.contains('failed host lookup') || low.contains('network is unreachable')) {
+      return '网络不可用，请检查连接后重试';
     }
     final m = RegExp(r'ApiException\(\d+\):\s*(.*)').firstMatch(s);
-    if (m != null) return m.group(1)!;
+    if (m != null) {
+      final body = m.group(1)!.trim();
+      if (body.length > 280) return '${body.substring(0, 280)}…';
+      return body.isEmpty ? '请求失败' : body;
+    }
+    if (s.length > 280) return '${s.substring(0, 280)}…';
     return s;
   }
 
@@ -479,6 +529,8 @@ mixin AgentChatController on ChangeNotifier {
   }
 
   bool _isOpenToolUse(ChatMessage m) {
+    // Waiting for user confirm is not "running" — don't pair later tool_results onto it.
+    if (m.meta?['pendingConfirm'] == true) return false;
     if (m.kind == ChatKind.toolUse) return m.meta?['success'] == null;
     // legacy: meta.part toolUse with status kind
     return m.meta?['part']?.toString() == 'toolUse' && m.meta?['success'] == null;
@@ -597,10 +649,12 @@ mixin AgentChatController on ChangeNotifier {
       return;
     }
     agentBusy = true;
+    _agentCancelRequested = false;
+    final turn = ++_agentTurnGen;
     _pushMsg(ChatMessage(role: 'user', content: userText));
     notifyListeners();
     try {
-      // Prefer SSE progressive events; fall back to batch chat.
+      // Prefer SSE progressive events; fall back to batch chat only on real errors.
       try {
         await api.agentChatStream(
           hostId: id,
@@ -608,6 +662,7 @@ mixin AgentChatController on ChangeNotifier {
           sessionId: agentSessionId,
           confirmWrites: confirmWrites,
           onEvent: (raw) {
+            if (turn != _agentTurnGen) return;
             final type = raw['type']?.toString() ?? '';
             if (type == 'session') {
               agentSessionId = raw['sessionId'] as String? ?? agentSessionId;
@@ -624,27 +679,53 @@ mixin AgentChatController on ChangeNotifier {
             }
           },
         );
-      } catch (_) {
-        final res = await api.agentChat(hostId: id, message: userText, sessionId: agentSessionId, confirmWrites: confirmWrites);
-        agentSessionId = res['sessionId'] as String? ?? agentSessionId;
-        for (final raw in (res['events'] as List?) ?? []) {
-          if (raw is Map) _ingestAgentEvent(Map<String, dynamic>.from(raw));
+      } catch (e) {
+        // User stop closes the HTTP client — never re-run the whole turn via batch.
+        if (turn != _agentTurnGen || _agentCancelRequested || _isCancelError(e)) {
+          // already tagged by cancelAgentChat / superseded
+        } else {
+          final res = await api.agentChat(
+            hostId: id,
+            message: userText,
+            sessionId: agentSessionId,
+            confirmWrites: confirmWrites,
+          );
+          if (turn != _agentTurnGen) return;
+          agentSessionId = res['sessionId'] as String? ?? agentSessionId;
+          for (final raw in (res['events'] as List?) ?? []) {
+            if (raw is Map) _ingestAgentEvent(Map<String, dynamic>.from(raw));
+          }
         }
       }
-      _flushStreamNotify();
-      notifyListeners();
+      if (turn == _agentTurnGen) {
+        _flushStreamNotify();
+        notifyListeners();
+      }
     } catch (e) {
-      final msg = e.toString();
-      if (msg.contains('ClientException') || msg.contains('Connection closed') || msg.contains('Cancel')) {
-        // cancelled stream
+      if (turn != _agentTurnGen || _agentCancelRequested || _isCancelError(e)) {
+        // cancelled / superseded
       } else {
         _pushMsg(ChatMessage(role: 'assistant', content: _friendlyErr(e), kind: ChatKind.error));
       }
     } finally {
-      agentBusy = false;
-      _flushStreamNotify();
-      notifyListeners();
+      if (turn == _agentTurnGen) {
+        agentBusy = false;
+        _agentCancelRequested = false;
+        _flushStreamNotify();
+        notifyListeners();
+      }
     }
+  }
+
+  bool _isCancelError(Object e) {
+    final msg = e.toString().toLowerCase();
+    return msg.contains('clientexception') ||
+        msg.contains('connection closed') ||
+        msg.contains('cancel') ||
+        msg.contains('broken pipe') ||
+        msg.contains('connection reset') ||
+        msg.contains('stream closed') ||
+        msg.contains('socketexception');
   }
 
 
@@ -833,6 +914,11 @@ mixin AgentChatController on ChangeNotifier {
   }) async {
     final id = selectedHostId;
     if (id == null) return;
+    if (_runningStepIds.contains(stepId)) return;
+    // Already have output for this step (e.g. double-tap after success).
+    if ((stepOutputs['step_$stepId'] ?? '').isNotEmpty) return;
+    _runningStepIds.add(stepId);
+    notifyListeners();
     try {
       final res = await api.agentExecStep(
         hostId: id,
@@ -844,6 +930,7 @@ mixin AgentChatController on ChangeNotifier {
       final out = '${res['stdout'] ?? ''}${res['stderr'] ?? ''}'.trim();
       final block = out.isEmpty ? '(exit ${res['exitCode']})' : out;
       stepOutputs['step_$stepId'] = block;
+      _sealPendingToolUse(command, success: true, output: block);
       // attach to last plan message outputs map for rssh-style cards
       final idx = _lastPlanMsgIndex;
       if (idx != null && idx >= 0 && idx < agentMessages.length) {
@@ -864,8 +951,9 @@ mixin AgentChatController on ChangeNotifier {
       }
       notifyListeners();
     } on ApiException catch (e) {
-      final msg = e.status == 403 ? 'blocked' : e.message;
+      final msg = e.status == 403 ? '已拦截' : e.message;
       stepOutputs['step_$stepId'] = msg;
+      _sealPendingToolUse(command, success: false, output: msg);
       final idx = _lastPlanMsgIndex;
       if (idx != null && idx >= 0 && idx < agentMessages.length) {
         final m = agentMessages[idx];
@@ -885,6 +973,35 @@ mixin AgentChatController on ChangeNotifier {
       }
       notifyListeners();
       rethrow;
+    } finally {
+      _runningStepIds.remove(stepId);
+      notifyListeners();
+    }
+  }
+
+  /// After user confirms exec, close matching pending toolUse cards.
+  void _sealPendingToolUse(String command, {required bool success, required String output}) {
+    final cmd = command.trim();
+    for (var i = agentMessages.length - 1; i >= 0; i--) {
+      final m = agentMessages[i];
+      if (m.kind != ChatKind.toolUse) continue;
+      if (m.meta?['pendingConfirm'] != true && m.meta?['success'] != null) continue;
+      final c = (m.meta?['command'] ?? '').toString().trim();
+      if (cmd.isNotEmpty && c.isNotEmpty && c != cmd) continue;
+      agentMessages[i] = ChatMessage(
+        role: m.role,
+        content: success ? (output.isEmpty ? '完成' : output) : output,
+        kind: ChatKind.toolUse,
+        meta: {
+          ...?m.meta,
+          'pendingConfirm': false,
+          'success': success,
+          'output': output,
+          'interrupted': false,
+        },
+        at: m.at,
+      );
+      if (cmd.isNotEmpty) break;
     }
   }
 

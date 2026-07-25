@@ -734,10 +734,12 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
 
   void _stopGeneration(AppState state) {
     state.cancelAgentChat();
-    if (mounted) setState(() {
-      _busy = false;
-      _busyHint = '已停止';
-    });
+    if (mounted) {
+      setState(() {
+        _busy = false;
+        _busyHint = '已停止';
+      });
+    }
   }
 
 

@@ -35,6 +35,7 @@ class _TerminalPageState extends State<TerminalPage>
   String? _hostId;
   bool _connected = false;
   bool _connecting = false;
+  int _connGen = 0;
   bool _ctrl = false;
   bool _showSearch = false;
   String _status = '';
@@ -121,14 +122,28 @@ class _TerminalPageState extends State<TerminalPage>
   }
 
   void _connect(AppState state) {
+    final gen = ++_connGen;
     _sub?.cancel();
-    _ch?.sink.close();
+    _sub = null;
+    try {
+      _ch?.sink.close();
+    } catch (_) {}
+    _ch = null;
+    if (!mounted) return;
     setState(() {
       _connecting = true;
       _connected = false;
       _status = '连接中…';
       _buf.clear();
     });
+    final hostId = state.selectedHostId;
+    if (hostId == null) {
+      setState(() {
+        _connecting = false;
+        _status = '未选主机';
+      });
+      return;
+    }
     final base = Uri.parse(state.api.baseUrl);
     final ws = Uri(
       scheme: base.scheme == 'https' ? 'wss' : 'ws',
@@ -137,16 +152,21 @@ class _TerminalPageState extends State<TerminalPage>
       path: '/v1/pty',
       queryParameters: {
         'token': state.api.localToken,
-        'hostId': state.selectedHostId!,
+        'hostId': hostId,
         'cols': '80',
         'rows': '28',
       },
     );
     try {
       final ch = IOWebSocketChannel.connect(ws);
+      if (gen != _connGen) {
+        ch.sink.close();
+        return;
+      }
       _ch = ch;
       _sub = ch.stream.listen(
         (data) {
+          if (gen != _connGen || !mounted) return;
           if (data is String) {
             try {
               final m = jsonDecode(data) as Map<String, dynamic>;
@@ -176,6 +196,7 @@ class _TerminalPageState extends State<TerminalPage>
           }
         },
         onError: (e) {
+          if (gen != _connGen || !mounted) return;
           setState(() {
             _connected = false;
             _connecting = false;
@@ -184,6 +205,7 @@ class _TerminalPageState extends State<TerminalPage>
           _append('\n$e\n');
         },
         onDone: () {
+          if (gen != _connGen || !mounted) return;
           setState(() {
             _connected = false;
             _connecting = false;
@@ -192,6 +214,7 @@ class _TerminalPageState extends State<TerminalPage>
         },
       );
     } catch (e) {
+      if (gen != _connGen || !mounted) return;
       setState(() {
         _connecting = false;
         _status = '连接失败';

@@ -49,12 +49,19 @@ class _ConfirmPlanCardState extends State<_ConfirmPlanCard> {
     required bool continueAfter,
   }) async {
     if (_running.contains(stepId) || _batchRunning) return;
+    // Already finished this step.
+    if ((state.stepOutputs['step_$stepId'] ?? '').isNotEmpty) return;
     setState(() => _running.add(stepId));
     try {
       await state.runAgentStep(stepId: stepId, command: cmd, confirmed: true);
       if (continueAfter && context.mounted) {
-        // Resume agent with the confirmed command result so the loop doesn't die at the wall.
         final out = state.stepOutputs['step_$stepId'] ?? '';
+        final blocked = out == 'blocked' || out == '已拦截' || out.startsWith('blocked');
+        if (blocked) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(out)));
+          return;
+        }
+        // Resume agent with the confirmed command result so the loop doesn't die at the wall.
         final follow = StringBuffer()
           ..writeln('用户已确认并执行了以下命令：')
           ..writeln('```')
