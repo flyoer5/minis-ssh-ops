@@ -50,6 +50,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/agent/chat", s.handleAgentChat)
 	s.mux.HandleFunc("POST /v1/agent/chat/stream", s.handleAgentChatStream)
 	s.mux.HandleFunc("POST /v1/agent/exec-step", s.handleAgentExecStep)
+	// Minis-style durable sessions
+	s.mux.HandleFunc("GET /v1/agent/sessions", s.handleListAgentSessions)
+	s.mux.HandleFunc("POST /v1/agent/sessions", s.handleCreateAgentSession)
+	s.mux.HandleFunc("GET /v1/agent/sessions/{id}", s.handleGetAgentSession)
+	s.mux.HandleFunc("GET /v1/agent/sessions/{id}/messages", s.handleGetAgentSessionMessages)
+	s.mux.HandleFunc("PATCH /v1/agent/sessions/{id}", s.handlePatchAgentSession)
+	s.mux.HandleFunc("DELETE /v1/agent/sessions/{id}", s.handleDeleteAgentSession)
 	s.mux.HandleFunc("GET /v1/audit", s.handleAudit)
 	s.mux.HandleFunc("GET /v1/known-hosts", s.handleListKnownHosts)
 	s.mux.HandleFunc("DELETE /v1/known-hosts", s.handleDeleteKnownHost)
@@ -119,10 +126,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"service":   "ssh-ai-agent-backend",
-		"version":   "1.5.1",
+		"version":   "1.5.2",
 		"startedAt": s.StartedAt.Format(time.RFC3339),
 		"listenHint": "127.0.0.1 only",
-		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu","stream","tokstream","models","longmem","fscopy","fsmove"},
+		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu","stream","tokstream","models","longmem","fscopy","fsmove","sessions"},
 	})
 }
 

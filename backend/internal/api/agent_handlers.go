@@ -155,6 +155,7 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	}
 	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
 	cli.ThinkingLevel = llmCfg.ThinkingLevel
+	_ = s.Store.EnsureAgentSession(body.SessionID, body.HostID, body.Message)
 	_ = s.Store.AddChat(body.SessionID, "user", body.Message)
 
 	// Durable memory + recent window (does not hard-forget older turns).
@@ -302,6 +303,7 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 	cli.ThinkingLevel = llmCfg.ThinkingLevel
 	// Cancel LLM + SSH when the mobile client closes the SSE (user hit 停止).
 	cli.Ctx = r.Context()
+	_ = s.Store.EnsureAgentSession(body.SessionID, body.HostID, body.Message)
 	_ = s.Store.AddChat(body.SessionID, "user", body.Message)
 	history, _ := agent.BuildMemoryMessages(s.Store, body.SessionID, body.Message, 16)
 

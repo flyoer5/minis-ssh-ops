@@ -1,3 +1,12 @@
+## 1.5.2
+
+### Agent sessions (Minis-style)
+- Backend: agent_sessions table + list/search/create/get/messages/rename/delete APIs
+- Chat auto-creates/updates session header + preview from first user message
+- Frontend history sheet loads from server (search, host filter, pull-to-refresh)
+- Open session pulls messages from server; new session creates server row
+- Health feature flag: sessions
+
 ## 1.5.1
 
 ### Hosts

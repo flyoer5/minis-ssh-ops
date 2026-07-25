@@ -69,6 +69,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     _input.dispose();
     _scroll.dispose();
     _focus.dispose();
+    _sessionsSearch.dispose();
     super.dispose();
   }
 
@@ -160,7 +161,50 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     }
   }
 
+  List<AgentSession> _cachedSessions = [];
+  bool _sessionsLoading = false;
+  String _sessionsQuery = '';
+  final _sessionsSearch = TextEditingController();
+
+  void _loadSessions(AppState state) {
+    setState(() => _sessionsLoading = true);
+    _doLoad(state);
+  }
+
+  Future<void> _doLoad(AppState state) async {
+    try {
+      final raw = await state.api.listAgentSessions(
+        hostId: _onlyCurrentHost ? state.selectedHostId : null,
+        q: _sessionsQuery.isNotEmpty ? _sessionsQuery : null,
+      );
+      if (mounted) {
+        final sessions = [for (final j in raw) AgentSession.fromJson(j)];
+        setState(() {
+          _cachedSessions = sessions;
+          _sessionsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _sessionsLoading = false);
+    }
+  }
+
+  Future<void> _openSession(AppState state, String id) async {
+    try {
+      final raw = await state.api.getAgentSessionMessages(id);
+      final msgs = [for (final j in raw) ChatMessage.fromJson(j)];
+      state.openAgentSessionRaw(id, msgs);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('加载会话失败: $e')));
+      }
+    }
+  }
+
   Future<void> _showSessions(AppState state) async {
+    setState(() => _sessionsLoading = true);
+    await _doLoad(state);
+    final sc = ScrollController();
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
@@ -168,8 +212,9 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       backgroundColor: AppColors.surface,
       builder: (c) {
         return StatefulBuilder(
-          builder: (context, setModal) {
-            final list = state.sessionsForHost(state.selectedHostId, onlyCurrent: _onlyCurrentHost);
+          builder: (ctx, setModal) {
+            final list = _cachedSessions;
+            final loading = _sessionsLoading;
             return DraggableScrollableSheet(
               expand: false,
               initialChildSize: 0.58,
@@ -177,179 +222,215 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
               minChildSize: 0.35,
               builder: (_, sc) => Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('历史会话', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                              SizedBox(height: 4),
-                              Text(
-                                '点「新会话」会归档当前对话；点条目恢复；可重命名或删除。',
-                                style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.35),
-                              ),
-                            ],
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('历史会话', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                                SizedBox(height: 4),
+                                Text(
+                                  '服务端持久化。可搜索、重命名、删除或打开续聊。',
+                                  style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.35),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        IconButton(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.close)),
-                      ],
-                    ),
-                  ),
-                  SwitchListTile(
-                    dense: true,
-                    title: const Text('仅当前主机', style: TextStyle(fontSize: 14)),
-                    value: _onlyCurrentHost,
-                    onChanged: (v) {
-                      setState(() => _onlyCurrentHost = v);
-                      setModal(() {});
-                    },
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        list.isEmpty ? '暂无归档会话' : '共 ${list.length} 个',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                          IconButton(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.close)),
+                        ],
                       ),
                     ),
-                  ),
-                  const Divider(height: 1, color: AppColors.border),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                      child: SizedBox(
+                        height: 30,
+                        child: TextField(
+                          controller: _sessionsSearch,
+                          style: const TextStyle(fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: '搜索会话…',
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            suffixIcon: _sessionsQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 16),
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () async {
+                                      _sessionsSearch.clear();
+                                      setState(() {
+                                        _sessionsQuery = '';
+                                        _sessionsLoading = true;
+                                      });
+                                      setModal(() {});
+                                      await _doLoad(state);
+                                      setModal(() {});
+                                    },
+                                  )
+                                : null,
+                          ),
+                          onChanged: (v) async {
+                            setState(() {
+                              _sessionsQuery = v.trim();
+                              _sessionsLoading = true;
+                            });
+                            setModal(() {});
+                            await _doLoad(state);
+                            setModal(() {});
+                          },
+                          onSubmitted: (v) async {
+                            setState(() {
+                              _sessionsQuery = v.trim();
+                              _sessionsLoading = true;
+                            });
+                            setModal(() {});
+                            await _doLoad(state);
+                            setModal(() {});
+                          },
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SwitchListTile(
+                            dense: true,
+                            title: const Text('仅当前主机', style: TextStyle(fontSize: 14)),
+                            value: _onlyCurrentHost,
+                            onChanged: (v) async {
+                              setState(() {
+                                _onlyCurrentHost = v;
+                                _sessionsLoading = true;
+                              });
+                              setModal(() {});
+                              await _doLoad(state);
+                              setModal(() {});
+                            },
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: Text(
+                            loading ? '加载中…' : '${list.length} 个',
+                            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                          ),
+                        ),
+                      ],
+                    ),
+                  Divider(height: 1, color: AppColors.border, indent: 16, endIndent: 16),
                   Expanded(
-                    child: list.isEmpty
-                        ? const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 28),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.history, size: 40, color: AppColors.textFaint),
-                                  SizedBox(height: 12),
-                                  Text(
-                                    '还没有历史会话',
-                                    style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textMuted),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    '发几条消息后点右上角「新会话」即可归档到这里。',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(fontSize: 12.5, color: AppColors.textFaint, height: 1.4),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : Builder(
-                            builder: (_) {
-                              // Group by host: [(label, [sessions...]), ...]
-                              final groups = <String, List<AgentSession>>{};
-                              final order = <String>[];
-                              for (final s in list) {
-                                final key = s.hostId ?? '';
-                                final label = key.isEmpty
-                                    ? '未绑定主机'
-                                    : (state.hostLabelFor(key).isEmpty ? key : state.hostLabelFor(key));
-                                if (!groups.containsKey(label)) {
-                                  groups[label] = [];
-                                  order.add(label);
-                                }
-                                groups[label]!.add(s);
-                              }
-                              // flat rows: header | tiles
-                              final rows = <Object>[];
-                              for (final label in order) {
-                                rows.add(label);
-                                rows.addAll(groups[label]!);
-                              }
-                              return ListView.builder(
-                                controller: sc,
-                                itemCount: rows.length,
-                                itemBuilder: (_, i) {
-                                  final row = rows[i];
-                                  if (row is String) {
-                                    return Container(
-                                      width: double.infinity,
-                                      color: AppColors.bg,
-                                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                                      child: Text(
-                                        row,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.chipBlue,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  final s = row as AgentSession;
-                                  final hostHint = s.hostId == null ? '' : state.hostLabelFor(s.hostId);
-                                  final open = state.agentSessionId == s.id;
-                                  final when = s.updatedAt;
-                                  final ts = _relTime(when);
-                                  return Column(
+                    child: loading
+                        ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                        : list.isEmpty
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      ListTile(
-                                        dense: true,
-                                        selected: open,
-                                        selectedTileColor: AppColors.accentDeep.withAlpha(0x18),
-                                        title: Text(
-                                          s.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontWeight: open ? FontWeight.w700 : FontWeight.w500,
-                                            color: open ? AppColors.accentSoft : null,
+                                      Icon(
+                                        _sessionsQuery.isNotEmpty ? Icons.search_off : Icons.history,
+                                        size: 40,
+                                        color: AppColors.textFaint,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        _sessionsQuery.isNotEmpty ? '没有匹配的会话' : '还没有历史会话',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _sessionsQuery.isNotEmpty
+                                            ? '换个关键词试试'
+                                            : '发消息后自动写入服务端；点「新会话」开始空白对话。',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(fontSize: 12.5, color: AppColors.textFaint, height: 1.4),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : RefreshIndicator(
+                                onRefresh: () async {
+                                  await _doLoad(state);
+                                  setModal(() {});
+                                },
+                                child: ListView.builder(
+                                  controller: sc,
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  itemCount: list.length,
+                                  itemBuilder: (_, i) {
+                                    final s = list[i];
+                                    final hostHint = s.hostId == null ? '' : state.hostLabelFor(s.hostId);
+                                    final open = state.agentSessionId == s.id;
+                                    final ts = _relTime(s.updatedAt);
+                                    return Column(
+                                      children: [
+                                        ListTile(
+                                          dense: true,
+                                          selected: open,
+                                          selectedTileColor: AppColors.accentDeep.withAlpha(0x18),
+                                          title: Text(
+                                            s.title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontWeight: open ? FontWeight.w700 : FontWeight.w500,
+                                              color: open ? AppColors.accentSoft : null,
+                                            ),
                                           ),
-                                        ),
-                                        subtitle: Text(
-                                          [
-                                            '${s.messages.length} 条',
-                                            if (hostHint.isNotEmpty && _onlyCurrentHost) hostHint,
-                                            ts,
-                                            if (open) '当前',
-                                          ].join(' · '),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
-                                        ),
-                                        onTap: () {
-                                          state.openAgentSession(s);
-                                          Navigator.pop(c);
-                                        },
-                                        trailing: PopupMenuButton<String>(
-                                          tooltip: '更多',
-                                          icon: const Icon(Icons.more_vert, size: 20),
-                                          color: AppColors.surface,
-                                          onSelected: (v) async {
-                                            if (v == 'rename') {
-                                              final ctrl = TextEditingController(text: s.title);
-                                              final name = await showDialog<String>(
-                                                context: context,
-                                                builder: (d) => AlertDialog(
-                                                  title: const Text('重命名会话'),
-                                                  content: TextField(
-                                                    controller: ctrl,
-                                                    autofocus: true,
-                                                    maxLength: 48,
-                                                    decoration: const InputDecoration(labelText: '标题'),
-                                                    onSubmitted: (x) => Navigator.pop(d, x),
-                                                  ),
-                                                  actions: [
-                                                    TextButton(onPressed: () => Navigator.pop(d), child: const Text('取消')),
-                                                    FilledButton(
-                                                      onPressed: () => Navigator.pop(d, ctrl.text),
-                                                      child: const Text('保存'),
+                                          subtitle: Text(
+                                            [
+                                              '${s.msgCount} 条',
+                                              if (hostHint.isNotEmpty) hostHint,
+                                              ts,
+                                              if (open) '当前',
+                                            ].join(' · '),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                                          ),
+                                          onTap: () {
+                                            _openSession(state, s.id);
+                                            Navigator.pop(c);
+                                          },
+                                          trailing: PopupMenuButton<String>(
+                                            tooltip: '更多',
+                                            icon: const Icon(Icons.more_vert, size: 20),
+                                            color: AppColors.surface,
+                                            onSelected: (v) async {
+                                              if (v == 'rename') {
+                                                final ctrl = TextEditingController(text: s.title);
+                                                final name = await showDialog<String>(
+                                                  context: context,
+                                                  builder: (d) => AlertDialog(
+                                                    title: const Text('重命名会话'),
+                                                    content: TextField(
+                                                      controller: ctrl,
+                                                      autofocus: true,
+                                                      maxLength: 48,
+                                                      decoration: const InputDecoration(labelText: '标题'),
+                                                      onSubmitted: (x) => Navigator.pop(d, x),
                                                     ),
-                                                  ],
-                                                ),
-                                              );
-                                              if (name != null && name.trim().isNotEmpty) {
-                                                state.renameAgentSession(s.id, name);
-                                                setModal(() {});
-                                              }
+                                                    actions: [
+                                                      TextButton(onPressed: () => Navigator.pop(d), child: const Text('取消')),
+                                                      FilledButton(
+                                                        onPressed: () => Navigator.pop(d, ctrl.text),
+                                                        child: const Text('保存'),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                                if (name != null && name.trim().isNotEmpty) {
+                                                  try {
+                                                    await state.api.renameAgentSession(s.id, name.trim());
+                                                  } catch (_) {}
+                                                  await _doLoad(state);
+                                                  setModal(() {});
+                                                }
                                             } else if (v == 'delete') {
                                               final ok = await showDialog<bool>(
                                                 context: context,
@@ -366,7 +447,10 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                                                 ),
                                               );
                                               if (ok == true) {
-                                                state.deleteAgentSession(s.id);
+                                                try {
+                                                  await state.api.deleteAgentSessionRemote(s.id);
+                                                } catch (_) {}
+                                                _loadSessions(state);
                                                 setModal(() {});
                                               }
                                             }
@@ -384,9 +468,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                                     ],
                                   );
                                 },
-                              );
-                            },
-                          ),
+                              ),
+                            ),
                   ),
                 ],
               ),
@@ -438,11 +521,23 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
             tooltip: '新会话',
             onPressed: (_busy || state.agentBusy)
                 ? null
-                : () {
+                : () async {
                     state.clearAgentChat();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('已开新会话'), duration: Duration(seconds: 1)),
-                    );
+                    // Create a server session row for the new blank conversation.
+                    try {
+                      final r = await state.api.createAgentSession(
+                        hostId: state.selectedHostId,
+                      );
+                      final sid = r['sessionId'] ?? r['id'] ?? '';
+                      if (sid is String && sid.isNotEmpty) {
+                        state.agentSessionId = sid;
+                      }
+                    } catch (_) {}
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已开新会话'), duration: Duration(seconds: 1)),
+                      );
+                    }
                   },
             icon: const Icon(Icons.add_comment_outlined, size: 20),
           ),

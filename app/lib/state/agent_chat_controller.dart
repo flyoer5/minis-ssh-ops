@@ -116,6 +116,39 @@ mixin AgentChatController on ChangeNotifier {
     _saveSessionsToPrefs();
   }
 
+  void openAgentSessionRaw(String id, List<ChatMessage> msgs) {
+    // Save current transcript into sessions if needed (as before)
+    if (agentMessages.isNotEmpty) {
+      final curId = agentSessionId ?? '';
+      if (curId != id) {
+        final existing = agentSessions.indexWhere((e) => e.id == curId);
+        final snap = AgentSession(
+          id: curId.isEmpty ? DateTime.now().millisecondsSinceEpoch.toString() : curId,
+          title: _sessionTitleFromMessages(agentMessages),
+          hostId: selectedHostId,
+          messages: List<ChatMessage>.from(agentMessages),
+        );
+        if (existing >= 0) {
+          agentSessions[existing] = snap;
+        } else {
+          agentSessions.insert(0, snap);
+        }
+      }
+    }
+    agentMessages
+      ..clear()
+      ..addAll(msgs);
+    agentSessionId = id;
+    lastPlan = null;
+    stepOutputs.clear();
+    _lastPlanMsgIndex = null;
+    _agentCancelRequested = false;
+    _runningStepIds.clear();
+    agentBusy = false;
+    notifyListeners();
+    _saveSessionsToPrefs();
+  }
+
   void deleteAgentSession(String id) {
     agentSessions.removeWhere((e) => e.id == id);
     // If deleting the open session, clear the live transcript

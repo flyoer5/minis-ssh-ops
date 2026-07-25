@@ -246,6 +246,68 @@ class ApiClient {
     }
   }
 
+  Future<List<Map<String, dynamic>>> listAgentSessions({
+    String? hostId,
+    String? q,
+    int limit = 50,
+  }) async {
+    final qp = <String, String>{'limit': '$limit'};
+    if (hostId != null && hostId.isNotEmpty) qp['hostId'] = hostId;
+    if (q != null && q.trim().isNotEmpty) qp['q'] = q.trim();
+    final uri = Uri.parse('$baseUrl/v1/agent/sessions').replace(queryParameters: qp);
+    final r = await _c.get(uri, headers: _headers).timeout(const Duration(seconds: 20));
+    _ensureOk(r);
+    final m = jsonDecode(r.body) as Map<String, dynamic>;
+    final list = m['sessions'];
+    if (list is! List) return [];
+    return [for (final e in list) if (e is Map) Map<String, dynamic>.from(e)];
+  }
+
+  Future<Map<String, dynamic>> createAgentSession({String? hostId, String? title}) async {
+    final r = await _c
+        .post(
+          _u('/v1/agent/sessions'),
+          headers: _headers,
+          body: jsonEncode({
+            if (hostId != null && hostId.isNotEmpty) 'hostId': hostId,
+            if (title != null && title.isNotEmpty) 'title': title,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> getAgentSessionMessages(String id, {int limit = 200}) async {
+    final uri = Uri.parse('$baseUrl/v1/agent/sessions/$id/messages')
+        .replace(queryParameters: {'limit': '$limit'});
+    final r = await _c.get(uri, headers: _headers).timeout(const Duration(seconds: 30));
+    _ensureOk(r);
+    final m = jsonDecode(r.body) as Map<String, dynamic>;
+    final list = m['messages'];
+    if (list is! List) return [];
+    return [for (final e in list) if (e is Map) Map<String, dynamic>.from(e)];
+  }
+
+  Future<Map<String, dynamic>> renameAgentSession(String id, String title) async {
+    final r = await _c
+        .patch(
+          _u('/v1/agent/sessions/$id'),
+          headers: _headers,
+          body: jsonEncode({'title': title}),
+        )
+        .timeout(const Duration(seconds: 15));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<void> deleteAgentSessionRemote(String id) async {
+    final r = await _c
+        .delete(_u('/v1/agent/sessions/$id'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+    _ensureOk(r);
+  }
+
   Future<Map<String, dynamic>> agentExecStep({
     required String hostId,
     required String command,
