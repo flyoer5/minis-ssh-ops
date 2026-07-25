@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/widgets/ime_inset.dart';
 
 /// Result of [showHostEditor].
 class HostEditorResult {
@@ -103,16 +104,12 @@ class _HostEditorSheetState extends State<_HostEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final ime = MediaQuery.viewInsetsOf(context).bottom;
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 120),
-      curve: Curves.easeOutCubic,
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 4,
-        bottom: ime + 16,
-      ),
+    // Sheet is small; ImeInset still avoids fighting the system IME curve.
+    return ImeInset(
+      left: 16,
+      right: 16,
+      top: 4,
+      extraBottom: 16,
       child: Form(
         key: form,
         child: SingleChildScrollView(

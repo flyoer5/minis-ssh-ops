@@ -1,3 +1,10 @@
+## 1.5.13
+
+### Keyboard smoothness
+- Isolate IME inset to leaf widget (ImeInset) so keyboard frames do not rebuild message list / terminal scrollback
+- Remove AnimatedPadding fighting system IME interpolation
+- Agent composer + terminal keybar + host/session sheets use ImeInset
+
 ## 1.5.12
 
 ### Self-check

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:ssh_ai_agent/widgets/nav_menu.dart';
+import 'package:ssh_ai_agent/widgets/ime_inset.dart';
 
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/pages/ansi_text.dart';
@@ -233,7 +234,9 @@ class _TerminalPageState extends State<TerminalPage>
     // approximate cols from width / char width ~ fontSize*0.6
     final mq = MediaQuery.of(context);
     final w = mq.size.width - 16;
-    final h = mq.size.height - mq.viewInsets.bottom - 160;
+    // Use size only — reading viewInsets here is fine (not in build), but don't
+    // shrink rows by full IME every keyframe; keybar ImeInset already accounts for it.
+    final h = mq.size.height - 200;
     final fs = context.read<AppState>().termFontSize;
     final cols = (w / (fs * 0.6)).floor().clamp(40, 200);
     final rows = (h / (fs * 1.3)).floor().clamp(10, 80);
@@ -491,7 +494,7 @@ class _TerminalPageState extends State<TerminalPage>
       );
     }
 
-    final imeBottom = MediaQuery.viewInsetsOf(context).bottom;
+    // Do NOT read viewInsets here — rebuilds whole scrollback every IME frame.
     return Scaffold(
       backgroundColor: _bg,
       // Shell already freezes outer resize; keep terminal body stable while IME animates.
@@ -781,10 +784,7 @@ class _TerminalPageState extends State<TerminalPage>
                 ],
               ),
             ),
-            AnimatedPadding(
-              duration: const Duration(milliseconds: 120),
-              curve: Curves.easeOutCubic,
-              padding: EdgeInsets.only(bottom: imeBottom),
+            ImeInset(
               child: Container(
                 color: _bar,
                 padding: const EdgeInsets.only(left: 4, right: 4, top: 4, bottom: 6),

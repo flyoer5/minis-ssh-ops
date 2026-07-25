@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/models/agent_session.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
+import 'package:ssh_ai_agent/widgets/ime_inset.dart';
 import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 part 'agent_widgets.dart';
@@ -216,15 +217,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       builder: (c) {
         return StatefulBuilder(
           builder: (ctx, setM) {
-            return AnimatedPadding(
-              duration: const Duration(milliseconds: 120),
-              curve: Curves.easeOutCubic,
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 12,
-                bottom: MediaQuery.viewInsetsOf(c).bottom + 16,
-              ),
+            return ImeInset(
+              left: 16,
+              right: 16,
+              top: 12,
+              extraBottom: 16,
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -754,7 +751,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     super.build(context);
     final state = context.watch<AppState>();
     _autoFollow(state);
-    final imeBottom = MediaQuery.viewInsetsOf(context).bottom;
+    // Do NOT read viewInsets here — it rebuilds the whole transcript every IME frame.
     return Scaffold(
       backgroundColor: AppColors.bg,
       // Avoid full-body reflow; only the composer pads for IME (smoother keyboard).
@@ -1160,13 +1157,10 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                 ),
               ),
             ),
-          // Minis-like composer — pad only here for IME (scaffold does not resize).
+          // Minis-like composer — ImeInset isolates keyboard rebuilds from the list.
           SafeArea(
             top: false,
-            child: AnimatedPadding(
-              duration: const Duration(milliseconds: 120),
-              curve: Curves.easeOutCubic,
-              padding: EdgeInsets.only(bottom: imeBottom),
+            child: ImeInset(
               child: Container(
               decoration: const BoxDecoration(
                 color: AppColors.bg,
