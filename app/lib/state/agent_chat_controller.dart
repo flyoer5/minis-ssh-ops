@@ -754,7 +754,9 @@ mixin AgentChatController on ChangeNotifier {
   void _scheduleStreamNotify() {
     _streamNotifyPending = true;
     if (_streamNotifyTimer?.isActive == true) return;
-    _streamNotifyTimer = Timer(const Duration(milliseconds: 33), () {
+    // ~20fps is enough for token paint; lower = less jank on mid-range phones when
+    // other tabs still listen to AppState (IndexedStack keepAlive).
+    _streamNotifyTimer = Timer(const Duration(milliseconds: 50), () {
       if (!_streamNotifyPending) return;
       _streamNotifyPending = false;
       notifyListeners();

@@ -74,8 +74,10 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final state = context.watch<AppState>();
-    final fs = state.recordsFontSize;
+    context.select((AppState s) => s.audit.length);
+    context.select((AppState s) => s.hosts.length);
+    final fs = context.select((AppState s) => s.recordsFontSize);
+    final state = context.read<AppState>();
     final all = state.audit.whereType<Map>().toList();
 
     final hostIds = <String>{};

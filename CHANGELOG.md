@@ -1,3 +1,12 @@
+## 1.5.14
+
+### Performance (global jank)
+- HomeShell / RootGate / Terminal / Files / Hosts / Records / Settings: context.select instead of full AppState watch
+- Agent stream notify throttle 33ms → 50ms
+- probeGen for host list selective rebuild
+- RepaintBoundary on agent bubbles and host cards
+- IndexedStack keepAlive pages no longer rebuild on every stream token
+
 ## 1.5.13
 
 ### Keyboard smoothness

@@ -115,8 +115,8 @@ class RootGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    if (!state.bootstrapped || state.startingBackend) {
+    final ready = context.select((AppState s) => s.bootstrapped && !s.startingBackend);
+    if (!ready) {
       return const Scaffold(
         body: Center(
           child: Column(
@@ -155,8 +155,12 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    final menu = state.navIsMenu;
+    // Select only shell fields — full watch() rebuilds every Agent stream tick.
+    final menu = context.select((AppState s) => s.navIsMenu);
+    final backendOk = context.select((AppState s) => s.backendOk);
+    final starting = context.select((AppState s) => s.startingBackend);
+    final backendNote = context.select((AppState s) => s.backendNote);
+    final backendError = context.select((AppState s) => s.backendError);
     return NavScope(
       index: index,
       go: (i) => setState(() => index = i),
@@ -167,9 +171,9 @@ class _HomeShellState extends State<HomeShell> {
         resizeToAvoidBottomInset: false,
         body: Column(
           children: [
-            if (!state.backendOk || state.startingBackend)
+            if (!backendOk || starting)
               Material(
-                color: state.startingBackend ? AppColors.surface2 : AppColors.errorPanel,
+                color: starting ? AppColors.surface2 : AppColors.errorPanel,
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
@@ -177,31 +181,31 @@ class _HomeShellState extends State<HomeShell> {
                     child: Row(
                       children: [
                         Icon(
-                          state.startingBackend ? Icons.hourglass_top : Icons.warning_amber,
+                          starting ? Icons.hourglass_top : Icons.warning_amber,
                           size: 16,
-                          color: state.startingBackend ? AppColors.textMuted : AppColors.dangerSoft,
+                          color: starting ? AppColors.textMuted : AppColors.dangerSoft,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            state.startingBackend
-                                ? (state.backendNote ?? '启动后端…')
-                                : (state.backendError ?? '后端未连接'),
+                            starting
+                                ? (backendNote ?? '启动后端…')
+                                : (backendError ?? '后端未连接'),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
-                              color: state.startingBackend ? AppColors.textMuted : AppColors.dangerSoft,
+                              color: starting ? AppColors.textMuted : AppColors.dangerSoft,
                             ),
                           ),
                         ),
-                        if (!state.startingBackend)
+                        if (!starting)
                           TextButton(
                             style: TextButton.styleFrom(
                               visualDensity: VisualDensity.compact,
                               padding: const EdgeInsets.symmetric(horizontal: 8),
                             ),
-                            onPressed: () => state.bootstrap(),
+                            onPressed: () => context.read<AppState>().bootstrap(),
                             child: const Text('重试', style: TextStyle(fontSize: 12)),
                           ),
                       ],

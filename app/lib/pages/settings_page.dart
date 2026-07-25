@@ -468,7 +468,32 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
 
   Widget build(BuildContext context) {
     super.build(context);
-    final state = context.watch<AppState>();
+    // Avoid full rebuild on Agent stream: select fields that settings UI shows.
+    context.select((AppState s) => s.backendOk);
+    context.select((AppState s) => s.backendVersion);
+    context.select((AppState s) => s.backendFeatures.length);
+    context.select((AppState s) => s.llm);
+    context.select((AppState s) => s.agentMaxRounds);
+    context.select((AppState s) => s.agentTemperature);
+    context.select((AppState s) => s.agentCustomPrompt);
+    context.select((AppState s) => s.confirmWrites);
+    context.select((AppState s) => s.agentShowReasoning);
+    context.select((AppState s) => s.agentCollapseTools);
+    context.select((AppState s) => s.agentAutoScroll);
+    context.select((AppState s) => s.agentEnterToSend);
+    context.select((AppState s) => s.agentKeepKeyboard);
+    context.select((AppState s) => s.hapticFeedback);
+    context.select((AppState s) => s.streamMarkdown);
+    context.select((AppState s) => s.probeConcurrency);
+    context.select((AppState s) => s.hostAutoProbeSec);
+    context.select((AppState s) => s.termFontSize);
+    context.select((AppState s) => s.agentFontSize);
+    context.select((AppState s) => s.recordsFontSize);
+    context.select((AppState s) => s.uiFontSize);
+    context.select((AppState s) => s.editorFontSize);
+    context.select((AppState s) => s.hostCardCompact);
+    context.select((AppState s) => s.navIsMenu);
+    final state = context.read<AppState>();
     return Scaffold(
       resizeToAvoidBottomInset: true,
       backgroundColor: AppColors.bg,
@@ -509,7 +534,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.13',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.14',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),

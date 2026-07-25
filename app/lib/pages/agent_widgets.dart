@@ -115,7 +115,7 @@ class _ConfirmPlanCardState extends State<_ConfirmPlanCard> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<AppState>(); // needs busy/stepOutputs during confirm
     final plan = widget.msg.meta?['plan'];
     final steps = plan is Map ? (plan['steps'] as List?) ?? [] : <dynamic>[];
     final outputs = (widget.msg.meta?['outputs'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {};
@@ -430,7 +430,7 @@ class _Bubble extends StatelessWidget {
 
     // —— toolUse / toolResult (Minis) ——
     if (part == 'toolUse' || part == 'toolResult') {
-      final collapse = context.watch<AppState>().agentCollapseTools;
+      final collapse = context.select((AppState s) => s.agentCollapseTools);
       return _MinisToolBlock(
         msg: msg,
         part: part,
@@ -468,7 +468,7 @@ class _Bubble extends StatelessWidget {
 
     // —— reasoning (Minis messages.reasoning_content) ——
     if (msg.kind == ChatKind.reasoning || part == 'reasoning') {
-      if (!context.watch<AppState>().agentShowReasoning) {
+      if (!context.select((AppState s) => s.agentShowReasoning)) {
         return const SizedBox.shrink();
       }
       return _ReasoningBlock(

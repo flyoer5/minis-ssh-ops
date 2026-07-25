@@ -48,9 +48,10 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final s = context.watch<AppState>();
-    if (s.selectedHostId != null && s.selectedHostId != hostId && s.backendOk) {
-      hostId = s.selectedHostId;
+    final id = context.select((AppState s) => s.selectedHostId);
+    final backendOk = context.select((AppState s) => s.backendOk);
+    if (id != null && id != hostId && backendOk) {
+      hostId = id;
       _load(_left);
       _load(_right);
     }
@@ -716,11 +717,11 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                             constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                             tooltip: '收藏路径',
                             icon: Icon(
-                              context.watch<AppState>().pathFavorites.contains(pane.path.isEmpty ? '/' : pane.path)
+                              context.read<AppState>().pathFavorites.contains(pane.path.isEmpty ? '/' : pane.path)
                                   ? Icons.star
                                   : Icons.star_border,
                               size: 18,
-                              color: context.watch<AppState>().pathFavorites.contains(pane.path.isEmpty ? '/' : pane.path)
+                              color: context.read<AppState>().pathFavorites.contains(pane.path.isEmpty ? '/' : pane.path)
                                   ? AppColors.warnBright
                                   : null,
                             ),
@@ -763,7 +764,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                     // Path favorites shortcuts
                     Builder(
                       builder: (context) {
-                        final favs = context.watch<AppState>().pathFavorites;
+                        final favs = context.read<AppState>().pathFavorites;
                         if (favs.isEmpty) return const SizedBox.shrink();
                         return SizedBox(
                           height: 32,
@@ -946,8 +947,11 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final state = context.watch<AppState>();
-    if (state.selectedHostId == null) {
+    final hostId = context.select((AppState s) => s.selectedHostId);
+    final backendOk = context.select((AppState s) => s.backendOk);
+    context.select((AppState s) => s.pathFavorites.length);
+    final state = context.read<AppState>();
+    if (hostId == null) {
       return Scaffold(
         appBar: AppBar(
           toolbarHeight: 44,

@@ -66,6 +66,9 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
 
   // --- Probe cache (hostId -> summary json + epoch ms) ---
   final Map<String, Map<String, dynamic>> probeCache = {};
+  /// Bumped only when host probe cache changes — lets host list select without
+  /// rebuilding on every Agent stream token notifyListeners().
+  int probeGen = 0;
   // UI prefs (fonts/nav/host card) live in UiPrefs mixin
   bool batteryIgnored = true;
   bool onboarded = true;
@@ -294,6 +297,7 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
   Future<String> exportBackendLog() => NativeBackend.exportBackendLog();
 
   void putProbeCache(String hostId, ProbeSummary s) {
+    probeGen++;
     probeCache[hostId] = {
       'ok': s.ok,
       'oneLine': s.oneLine,

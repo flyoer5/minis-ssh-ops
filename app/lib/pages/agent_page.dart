@@ -1100,11 +1100,13 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                           final streaming = _busy &&
                               i == state.agentMessages.length - 1 &&
                               (part == 'text_delta' || part == 'text' || part == 'reasoning');
-                          return _Bubble(
-                            key: ValueKey('$id|$part|${m.role}'),
-                            msg: m,
-                            fontSize: state.agentFontSize,
-                            streaming: streaming,
+                          return RepaintBoundary(
+                            child: _Bubble(
+                              key: ValueKey('$id|$part|${m.role}'),
+                              msg: m,
+                              fontSize: state.agentFontSize,
+                              streaming: streaming,
+                            ),
                           );
                         },
                       ),

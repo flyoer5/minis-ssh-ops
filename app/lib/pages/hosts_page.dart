@@ -53,12 +53,18 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final state = context.watch<AppState>();
-    if (!_autoStarted && state.backendOk && state.hosts.isNotEmpty) {
+    // Only react to host-list / probe prefs — not Agent stream ticks.
+    final backendOk = context.select((AppState s) => s.backendOk);
+    final hostCount = context.select((AppState s) => s.hosts.length);
+    final autoSec = context.select((AppState s) => s.hostAutoProbeSec);
+    final state = context.read<AppState>();
+    if (!_autoStarted && backendOk && hostCount > 0) {
       _autoStarted = true;
       unawaited(_probeMany(state, force: false));
     }
+    // autoSec in select so timer resyncs when pref changes without full watch.
     _syncAutoProbeTimer(state);
+    assert(autoSec == state.hostAutoProbeSec);
   }
 
   Future<void> _probeMany(AppState state, {required bool force}) async {
@@ -122,7 +128,15 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final state = context.watch<AppState>();
+    // Rebuild host list only when hosts / selection / probe data / layout prefs change.
+    context.select((AppState s) => s.hosts.length);
+    context.select((AppState s) => s.selectedHostId);
+    context.select((AppState s) => s.probeGen);
+    context.select((AppState s) => s.uiFontSize);
+    context.select((AppState s) => s.hostCardCompact);
+    context.select((AppState s) => s.backendOk);
+    context.select((AppState s) => s.probeConcurrency);
+    final state = context.read<AppState>();
     final total = state.hosts.length;
     final online = state.hosts.where((h) {
       final id = h['id']?.toString();
@@ -254,7 +268,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                             final auth = h['hasPrivateKey'] == true
                                 ? 'key'
                                 : (h['hasPassword'] == true ? 'password' : '');
-                            final card = _StatusCard(
+                            final card = RepaintBoundary(child: _StatusCard(
                               name: name,
                               addr: addr,
                               selected: state.selectedHostId == id,
@@ -277,7 +291,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                 hostId: id,
                                 onRetry: () => _refreshProbe(state, id, force: true),
                               ),
-                            );
+                            ));
                             if (!canReorder) return card;
                             // Delayed listener = long-press then drag (not immediate press-drag).
                             return ReorderableDelayedDragStartListener(

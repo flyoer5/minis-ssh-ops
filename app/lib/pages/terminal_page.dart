@@ -78,11 +78,12 @@ class _TerminalPageState extends State<TerminalPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final state = context.watch<AppState>();
-    final id = state.selectedHostId;
-    if (id != null && id != _hostId && state.backendOk) {
+    // select avoids rebuild on every Agent stream notifyListeners.
+    final id = context.select((AppState s) => s.selectedHostId);
+    final backendOk = context.select((AppState s) => s.backendOk);
+    if (id != null && id != _hostId && backendOk) {
       _hostId = id;
-      _connect(state);
+      _connect(context.read<AppState>());
     }
   }
 
@@ -456,9 +457,11 @@ class _TerminalPageState extends State<TerminalPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final state = context.watch<AppState>();
-    final fontSize = state.termFontSize;
-    if (state.selectedHostId == null) {
+    final hostId = context.select((AppState s) => s.selectedHostId);
+    final fontSize = context.select((AppState s) => s.termFontSize);
+    final hostLabel = context.select((AppState s) => s.hostLabel);
+    final state = context.read<AppState>();
+    if (hostId == null) {
       return Scaffold(
         appBar: AppBar(
           toolbarHeight: 44,
@@ -521,7 +524,7 @@ class _TerminalPageState extends State<TerminalPage>
                         TextSpan(
                           children: [
                             TextSpan(
-                              text: state.hostLabel,
+                              text: hostLabel,
                               style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.text),
                             ),
                             if (_status.isNotEmpty)
@@ -541,7 +544,7 @@ class _TerminalPageState extends State<TerminalPage>
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       tooltip: '减小字体',
                       icon: const Icon(Icons.text_decrease, size: 16, color: AppColors.textMuted),
-                      onPressed: () => context.read<AppState>().setTermFontSize(state.termFontSize - 1),
+                      onPressed: () => context.read<AppState>().setTermFontSize(fontSize - 1),
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
@@ -549,7 +552,7 @@ class _TerminalPageState extends State<TerminalPage>
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       tooltip: '增大字体',
                       icon: const Icon(Icons.text_increase, size: 16, color: AppColors.textMuted),
-                      onPressed: () => context.read<AppState>().setTermFontSize(state.termFontSize + 1),
+                      onPressed: () => context.read<AppState>().setTermFontSize(fontSize + 1),
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
