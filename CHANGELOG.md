@@ -1,3 +1,12 @@
+## 1.5.7
+
+### Hosts
+- Drag-to-reorder host cards (long-press); persisted via PUT /v1/hosts/reorder + sort_order
+
+### Time
+- Display times in fixed China UTC+8 (avoids broken device TZ=LCL-8)
+- Records + Agent session relative times use China clock
+
 ## 1.5.6
 
 ### Agent tool reliability

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/util/time_fmt.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
@@ -45,24 +46,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     }
   }
 
-  String _relTime(DateTime when) {
-    final now = DateTime.now();
-    final diff = now.difference(when);
-    String two(int n) => n.toString().padLeft(2, '0');
-    if (diff.isNegative || diff.inSeconds < 45) return '刚刚';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
-    if (diff.inHours < 24 && now.day == when.day) {
-      return '今天 ${two(when.hour)}:${two(when.minute)}';
-    }
-    final yday = now.subtract(const Duration(days: 1));
-    if (yday.year == when.year && yday.month == when.month && yday.day == when.day) {
-      return '昨天 ${two(when.hour)}:${two(when.minute)}';
-    }
-    if (now.year == when.year) {
-      return '${two(when.month)}-${two(when.day)} ${two(when.hour)}:${two(when.minute)}';
-    }
-    return '${when.year}-${two(when.month)}-${two(when.day)} ${two(when.hour)}:${two(when.minute)}';
-  }
+  String _relTime(DateTime when) => formatChinaRelativeDt(when);
 
   @override
   void dispose() {

@@ -188,6 +188,32 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
     notifyListeners();
   }
 
+  /// Persist user drag order (ids in display order).
+  Future<void> reorderHosts(int oldIndex, int newIndex) async {
+    if (oldIndex < 0 || oldIndex >= hosts.length) return;
+    var ni = newIndex;
+    if (ni > oldIndex) ni -= 1;
+    if (ni < 0 || ni >= hosts.length) return;
+    final list = List<dynamic>.from(hosts);
+    final item = list.removeAt(oldIndex);
+    list.insert(ni, item);
+    hosts = list;
+    notifyListeners();
+    final ids = <String>[
+      for (final h in hosts)
+        if (h is Map && h['id'] != null) h['id'].toString(),
+    ];
+    try {
+      final updated = await api.reorderHosts(ids);
+      if (updated.isNotEmpty) {
+        hosts = updated;
+        notifyListeners();
+      }
+    } catch (_) {
+      // Keep optimistic order; next refresh reconciles.
+    }
+  }
+
   Future<void> refreshLlm() async {
     llm = await api.getLlm();
     notifyListeners();

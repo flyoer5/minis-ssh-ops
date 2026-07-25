@@ -29,6 +29,7 @@ type Host struct {
 	Password       string `json:"password,omitempty"`
 	PrivateKeyPEM  string `json:"privateKeyPem,omitempty"`
 	Passphrase     string `json:"passphrase,omitempty"`
+	SortOrder      int    `json:"sortOrder,omitempty"`
 	CreatedAt      string `json:"createdAt,omitempty"`
 	UpdatedAt      string `json:"updatedAt,omitempty"`
 }
@@ -132,6 +133,8 @@ CREATE INDEX IF NOT EXISTS idx_agent_sessions_updated ON agent_sessions(updated_
 		`ALTER TABLE agent_sessions ADD COLUMN ov_temperature REAL`,
 		`ALTER TABLE agent_sessions ADD COLUMN ov_confirm INTEGER`,
 		`ALTER TABLE agent_sessions ADD COLUMN ov_prompt TEXT`,
+		// User-defined host list order (lower = higher).
+		`ALTER TABLE hosts ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`,
 	} {
 		if _, e := s.db.Exec(ddl); e != nil {
 			msg := strings.ToLower(e.Error())
@@ -709,7 +712,10 @@ func (s *Store) ListChat(sessionID string, limit int) ([]map[string]any, error) 
 }
 
 func (s *Store) ListHosts() ([]Host, error) {
-	rows, err := s.db.Query(`SELECT id,name,host,port,username,password_enc,private_key_enc,created_at,updated_at FROM hosts ORDER BY name, host`)
+	rows, err := s.db.Query(
+		`SELECT id,name,host,port,username,password_enc,private_key_enc,created_at,updated_at,
+		        COALESCE(sort_order, 0)
+		 FROM hosts ORDER BY sort_order ASC, name COLLATE NOCASE, host COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}
@@ -718,11 +724,13 @@ func (s *Store) ListHosts() ([]Host, error) {
 	for rows.Next() {
 		var h Host
 		var pw, pk sql.NullString
-		if err := rows.Scan(&h.ID, &h.Name, &h.Host, &h.Port, &h.Username, &pw, &pk, &h.CreatedAt, &h.UpdatedAt); err != nil {
+		var sortOrder int
+		if err := rows.Scan(&h.ID, &h.Name, &h.Host, &h.Port, &h.Username, &pw, &pk, &h.CreatedAt, &h.UpdatedAt, &sortOrder); err != nil {
 			return nil, err
 		}
 		h.HasPassword = pw.Valid && pw.String != ""
 		h.HasPrivateKey = pk.Valid && pk.String != ""
+		h.SortOrder = sortOrder
 		out = append(out, h)
 	}
 	if out == nil {
@@ -787,19 +795,42 @@ func (s *Store) CreateHost(h Host) (Host, error) {
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	h.CreatedAt, h.UpdatedAt = now, now
+	// Append to end of user order.
+	var maxOrd int
+	_ = s.db.QueryRow(`SELECT COALESCE(MAX(sort_order), 0) FROM hosts`).Scan(&maxOrd)
+	h.SortOrder = maxOrd + 1
 	pw, pk, pp, err := s.sealSecrets(h.Password, h.PrivateKeyPEM, h.Passphrase)
 	if err != nil {
 		return h, err
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO hosts(id,name,host,port,username,password_enc,private_key_enc,passphrase_enc,created_at,updated_at)
-		 VALUES(?,?,?,?,?,?,?,?,?,?)`,
-		h.ID, h.Name, h.Host, h.Port, h.Username, pw, pk, pp, h.CreatedAt, h.UpdatedAt,
+		`INSERT INTO hosts(id,name,host,port,username,password_enc,private_key_enc,passphrase_enc,created_at,updated_at,sort_order)
+		 VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+		h.ID, h.Name, h.Host, h.Port, h.Username, pw, pk, pp, h.CreatedAt, h.UpdatedAt, h.SortOrder,
 	)
 	if err != nil {
 		return h, err
 	}
 	return s.publicHost(h), nil
+}
+
+// ReorderHosts sets sort_order = index for each id (0-based list order).
+func (s *Store) ReorderHosts(ids []string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	now := time.Now().UTC().Format(time.RFC3339)
+	for i, id := range ids {
+		if id == "" {
+			continue
+		}
+		if _, err := tx.Exec(`UPDATE hosts SET sort_order=?, updated_at=? WHERE id=?`, i, now, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *Store) UpdateHost(id string, h Host) (Host, error) {

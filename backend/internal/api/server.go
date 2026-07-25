@@ -40,6 +40,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/settings/llm/models", s.handleListLLMModels)
 	s.mux.HandleFunc("GET /v1/hosts", s.handleListHosts)
 	s.mux.HandleFunc("POST /v1/hosts", s.handleCreateHost)
+	s.mux.HandleFunc("PUT /v1/hosts/reorder", s.handleReorderHosts)
 	s.mux.HandleFunc("GET /v1/hosts/{id}", s.handleGetHost)
 	s.mux.HandleFunc("PUT /v1/hosts/{id}", s.handleUpdateHost)
 	s.mux.HandleFunc("DELETE /v1/hosts/{id}", s.handleDeleteHost)
@@ -128,7 +129,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"service":   "ssh-ai-agent-backend",
-		"version":   "1.5.6",
+		"version":   "1.5.7",
 		"startedAt": s.StartedAt.Format(time.RFC3339),
 		"listenHint": "127.0.0.1 only",
 		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu","stream","tokstream","models","longmem","fscopy","fsmove","sessions"},
@@ -175,6 +176,31 @@ func (s *Server) handlePutLLM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// PUT /v1/hosts/reorder  { "ids": ["id1","id2",...] }
+func (s *Server) handleReorderHosts(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if len(body.IDs) == 0 {
+		writeErr(w, http.StatusBadRequest, "ids required")
+		return
+	}
+	if err := s.Store.ReorderHosts(body.IDs); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	list, err := s.Store.ListHosts()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"hosts": list})
 }
 
 func (s *Server) handleListHosts(w http.ResponseWriter, r *http.Request) {

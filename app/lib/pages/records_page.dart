@@ -4,6 +4,7 @@ import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/util/time_fmt.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
@@ -31,32 +32,8 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
   }
 
   String _fmtLocal(String raw, {bool relative = false}) {
-    final s = raw.trim();
-    if (s.isEmpty) return '';
-    final dt0 = DateTime.tryParse(s);
-    if (dt0 == null) return s;
-    final dt = dt0.toLocal();
-    String two(int n) => n.toString().padLeft(2, '0');
-    final abs = '${dt.year}-${two(dt.month)}-${two(dt.day)} '
-        '${two(dt.hour)}:${two(dt.minute)}:${two(dt.second)}';
-    if (!relative) return abs;
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.isNegative || diff.inSeconds < 45) return '刚刚';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
-    if (diff.inHours < 24 && now.day == dt.day) {
-      return '今天 ${two(dt.hour)}:${two(dt.minute)}';
-    }
-    if (diff.inHours < 48) {
-      final yday = now.subtract(const Duration(days: 1));
-      if (yday.year == dt.year && yday.month == dt.month && yday.day == dt.day) {
-        return '昨天 ${two(dt.hour)}:${two(dt.minute)}';
-      }
-    }
-    if (now.year == dt.year) {
-      return '${two(dt.month)}-${two(dt.day)} ${two(dt.hour)}:${two(dt.minute)}';
-    }
-    return abs;
+    if (relative) return formatChinaRelative(raw);
+    return formatChinaAbsolute(raw);
   }
 
   Color _riskColor(String risk) {

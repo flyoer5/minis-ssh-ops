@@ -194,7 +194,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                         style: const TextStyle(fontSize: 14),
                         decoration: InputDecoration(
                           isDense: true,
-                          hintText: '搜索名称 / 地址 / 用户',
+                          hintText: '搜索 · 无搜索时长按卡片拖动排序',
                           prefixIcon: const Icon(Icons.search, size: 20),
                           suffixIcon: _query.isEmpty
                               ? null
@@ -241,46 +241,77 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                           if (list.isEmpty) {
                             return const Center(child: Text('无匹配主机', style: TextStyle(color: AppColors.slate)));
                           }
+                          // Search results: plain list. Full list: long-press drag to reorder.
+                          final canReorder = q.isEmpty && list.length > 1;
+                          Widget cardAt(int i) {
+                            final h = list[i] as Map<String, dynamic>;
+                            final id = h['id'] as String;
+                            final name = (h['name'] as String?)?.isNotEmpty == true
+                                ? h['name'] as String
+                                : '${h['host']}';
+                            final addr = '${h['username']}@${h['host']}:${h['port']}';
+                            final auth = h['hasPrivateKey'] == true
+                                ? 'key'
+                                : (h['hasPassword'] == true ? 'password' : '');
+                            final card = _StatusCard(
+                              name: name,
+                              addr: addr,
+                              selected: state.selectedHostId == id,
+                              loading: _loading.contains(id),
+                              summary: _summary[id],
+                              probedAt: state.probeCacheTime(id),
+                              fontSize: state.uiFontSize,
+                              compact: state.hostCardCompact,
+                              authKind: auth,
+                              onSelect: () => state.selectHost(id),
+                              onRefresh: () => _refreshProbe(state, id, force: true),
+                              onMenu: () => _hostMenu(context, state, h),
+                              onShowDetail: () => _showProbeDetail(
+                                context,
+                                name,
+                                addr,
+                                _summary[id],
+                                hostId: id,
+                                onRetry: () => _refreshProbe(state, id, force: true),
+                              ),
+                            );
+                            if (!canReorder) return card;
+                            return ReorderableDragStartListener(
+                              key: ValueKey(id),
+                              index: i,
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: card,
+                              ),
+                            );
+                          }
+
                           return RefreshIndicator(
                             onRefresh: () => _refreshAll(state),
-                            child: ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(10, 4, 10, 16),
-                              itemCount: list.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 8),
-                              itemBuilder: (_, i) {
-                                final h = list[i] as Map<String, dynamic>;
-                                final id = h['id'] as String;
-                                final name = (h['name'] as String?)?.isNotEmpty == true
-                                    ? h['name'] as String
-                                    : '${h['host']}';
-                                final addr = '${h['username']}@${h['host']}:${h['port']}';
-                                final auth = h['hasPrivateKey'] == true
-                                    ? 'key'
-                                    : (h['hasPassword'] == true ? 'password' : '');
-                                return _StatusCard(
-                                  name: name,
-                                  addr: addr,
-                                  selected: state.selectedHostId == id,
-                                  loading: _loading.contains(id),
-                                  summary: _summary[id],
-                                  probedAt: state.probeCacheTime(id),
-                                  fontSize: state.uiFontSize,
-                                  compact: state.hostCardCompact,
-                                  authKind: auth,
-                                  onSelect: () => state.selectHost(id),
-                                  onRefresh: () => _refreshProbe(state, id, force: true),
-                                  onMenu: () => _hostMenu(context, state, h),
-                                  onShowDetail: () => _showProbeDetail(
-                                    context,
-                                    name,
-                                    addr,
-                                    _summary[id],
-                                    hostId: id,
-                                    onRetry: () => _refreshProbe(state, id, force: true),
+                            child: canReorder
+                                ? ReorderableListView.builder(
+                                    padding: const EdgeInsets.fromLTRB(10, 4, 10, 16),
+                                    itemCount: list.length,
+                                    buildDefaultDragHandles: false,
+                                    proxyDecorator: (child, index, animation) {
+                                      return Material(
+                                        elevation: 4,
+                                        color: Colors.transparent,
+                                        child: child,
+                                      );
+                                    },
+                                    onReorder: (oldIndex, newIndex) {
+                                      // When filtering is off, list mirrors state.hosts order.
+                                      state.reorderHosts(oldIndex, newIndex);
+                                    },
+                                    itemBuilder: (_, i) => cardAt(i),
+                                  )
+                                : ListView.separated(
+                                    padding: const EdgeInsets.fromLTRB(10, 4, 10, 16),
+                                    itemCount: list.length,
+                                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                    itemBuilder: (_, i) => cardAt(i),
                                   ),
-                                );
-                              },
-                            ),
                           );
                         },
                       ),

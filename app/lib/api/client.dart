@@ -246,6 +246,21 @@ class ApiClient {
     }
   }
 
+  Future<List<Map<String, dynamic>>> reorderHosts(List<String> ids) async {
+    final r = await _c
+        .put(
+          _u('/v1/hosts/reorder'),
+          headers: _headers,
+          body: jsonEncode({'ids': ids}),
+        )
+        .timeout(const Duration(seconds: 20));
+    _ensureOk(r);
+    final m = jsonDecode(r.body) as Map<String, dynamic>;
+    final list = m['hosts'];
+    if (list is! List) return [];
+    return [for (final e in list) if (e is Map) Map<String, dynamic>.from(e)];
+  }
+
   Future<List<Map<String, dynamic>>> listAgentSessions({
     String? hostId,
     String? q,
