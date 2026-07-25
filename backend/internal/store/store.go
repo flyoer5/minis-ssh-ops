@@ -123,19 +123,20 @@ CREATE INDEX IF NOT EXISTS idx_agent_sessions_updated ON agent_sessions(updated_
 	if err != nil {
 		return err
 	}
-	// Additive columns for Minis-style message parts (ignore if already present).
+	// Additive columns (ignore if already present).
 	for _, ddl := range []string{
 		`ALTER TABLE chat_messages ADD COLUMN kind TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE chat_messages ADD COLUMN meta TEXT NOT NULL DEFAULT ''`,
+		// Session-level overrides (NULL = inherit global app settings)
+		`ALTER TABLE agent_sessions ADD COLUMN ov_max_rounds INTEGER`,
+		`ALTER TABLE agent_sessions ADD COLUMN ov_temperature REAL`,
+		`ALTER TABLE agent_sessions ADD COLUMN ov_confirm INTEGER`,
+		`ALTER TABLE agent_sessions ADD COLUMN ov_prompt TEXT`,
 	} {
 		if _, e := s.db.Exec(ddl); e != nil {
-			// duplicate column name → already migrated
-			if !strings.Contains(strings.ToLower(e.Error()), "duplicate column") {
-				// SQLite may say "duplicate column name: kind"
-				msg := strings.ToLower(e.Error())
-				if !strings.Contains(msg, "duplicate") {
-					return e
-				}
+			msg := strings.ToLower(e.Error())
+			if !strings.Contains(msg, "duplicate") {
+				return e
 			}
 		}
 	}
@@ -151,6 +152,12 @@ type AgentSession struct {
 	MsgCount  int    `json:"msgCount"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
+	// Overrides: nil pointer / omitted = inherit global client settings.
+	OvMaxRounds   *int     `json:"ovMaxRounds,omitempty"`
+	OvTemperature *float64 `json:"ovTemperature,omitempty"`
+	// OvConfirm: nil inherit; 0 force off; 1 force on.
+	OvConfirm *int    `json:"ovConfirm,omitempty"`
+	OvPrompt  *string `json:"ovPrompt,omitempty"`
 }
 
 // EnsureAgentSession creates the session row if missing and refreshes host/title/preview.
@@ -263,6 +270,42 @@ func (s *Store) DeleteAgentSession(id string) error {
 	return tx.Commit()
 }
 
+const agentSessionSelect = `SELECT s.id, COALESCE(s.host_id,''), s.title, s.preview, s.created_at, s.updated_at,
+			        (SELECT COUNT(1) FROM chat_messages m WHERE m.session_id=s.id) AS msg_count,
+			        s.ov_max_rounds, s.ov_temperature, s.ov_confirm, s.ov_prompt
+			 FROM agent_sessions s`
+
+func scanAgentSession(sc interface {
+	Scan(dest ...any) error
+}) (AgentSession, error) {
+	var a AgentSession
+	var ovRounds, ovConfirm sql.NullInt64
+	var ovTemp sql.NullFloat64
+	var ovPrompt sql.NullString
+	err := sc.Scan(&a.ID, &a.HostID, &a.Title, &a.Preview, &a.CreatedAt, &a.UpdatedAt, &a.MsgCount,
+		&ovRounds, &ovTemp, &ovConfirm, &ovPrompt)
+	if err != nil {
+		return a, err
+	}
+	if ovRounds.Valid {
+		v := int(ovRounds.Int64)
+		a.OvMaxRounds = &v
+	}
+	if ovTemp.Valid {
+		v := ovTemp.Float64
+		a.OvTemperature = &v
+	}
+	if ovConfirm.Valid {
+		v := int(ovConfirm.Int64)
+		a.OvConfirm = &v
+	}
+	if ovPrompt.Valid {
+		v := ovPrompt.String
+		a.OvPrompt = &v
+	}
+	return a, nil
+}
+
 // ListAgentSessions returns newest sessions first. hostID empty = all.
 func (s *Store) ListAgentSessions(hostID string, limit int) ([]AgentSession, error) {
 	if limit <= 0 {
@@ -276,20 +319,11 @@ func (s *Store) ListAgentSessions(hostID string, limit int) ([]AgentSession, err
 		err  error
 	)
 	if hostID == "" {
-		rows, err = s.db.Query(
-			`SELECT s.id, COALESCE(s.host_id,''), s.title, s.preview, s.created_at, s.updated_at,
-			        (SELECT COUNT(1) FROM chat_messages m WHERE m.session_id=s.id) AS msg_count
-			 FROM agent_sessions s
-			 ORDER BY s.updated_at DESC
-			 LIMIT ?`, limit)
+		rows, err = s.db.Query(agentSessionSelect+` ORDER BY s.updated_at DESC LIMIT ?`, limit)
 	} else {
 		rows, err = s.db.Query(
-			`SELECT s.id, COALESCE(s.host_id,''), s.title, s.preview, s.created_at, s.updated_at,
-			        (SELECT COUNT(1) FROM chat_messages m WHERE m.session_id=s.id) AS msg_count
-			 FROM agent_sessions s
-			 WHERE s.host_id=? OR s.host_id='' OR s.host_id IS NULL
-			 ORDER BY s.updated_at DESC
-			 LIMIT ?`, hostID, limit)
+			agentSessionSelect+` WHERE s.host_id=? OR s.host_id='' OR s.host_id IS NULL
+			 ORDER BY s.updated_at DESC LIMIT ?`, hostID, limit)
 	}
 	if err != nil {
 		return nil, err
@@ -297,8 +331,8 @@ func (s *Store) ListAgentSessions(hostID string, limit int) ([]AgentSession, err
 	defer rows.Close()
 	out := make([]AgentSession, 0)
 	for rows.Next() {
-		var a AgentSession
-		if err := rows.Scan(&a.ID, &a.HostID, &a.Title, &a.Preview, &a.CreatedAt, &a.UpdatedAt, &a.MsgCount); err != nil {
+		a, err := scanAgentSession(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -325,18 +359,14 @@ func (s *Store) SearchAgentSessions(q, hostID string, limit int) ([]AgentSession
 	)
 	if hostID == "" {
 		rows, err = s.db.Query(
-			`SELECT s.id, COALESCE(s.host_id,''), s.title, s.preview, s.created_at, s.updated_at,
-			        (SELECT COUNT(1) FROM chat_messages m WHERE m.session_id=s.id) AS msg_count
-			 FROM agent_sessions s
+			agentSessionSelect+`
 			 WHERE s.title LIKE ? OR s.preview LIKE ?
 			    OR EXISTS (SELECT 1 FROM chat_messages m WHERE m.session_id=s.id AND m.content LIKE ?)
 			 ORDER BY s.updated_at DESC
 			 LIMIT ?`, like, like, like, limit)
 	} else {
 		rows, err = s.db.Query(
-			`SELECT s.id, COALESCE(s.host_id,''), s.title, s.preview, s.created_at, s.updated_at,
-			        (SELECT COUNT(1) FROM chat_messages m WHERE m.session_id=s.id) AS msg_count
-			 FROM agent_sessions s
+			agentSessionSelect+`
 			 WHERE (s.host_id=? OR s.host_id='' OR s.host_id IS NULL)
 			   AND (s.title LIKE ? OR s.preview LIKE ?
 			        OR EXISTS (SELECT 1 FROM chat_messages m WHERE m.session_id=s.id AND m.content LIKE ?))
@@ -349,8 +379,8 @@ func (s *Store) SearchAgentSessions(q, hostID string, limit int) ([]AgentSession
 	defer rows.Close()
 	out := make([]AgentSession, 0)
 	for rows.Next() {
-		var a AgentSession
-		if err := rows.Scan(&a.ID, &a.HostID, &a.Title, &a.Preview, &a.CreatedAt, &a.UpdatedAt, &a.MsgCount); err != nil {
+		a, err := scanAgentSession(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -359,13 +389,62 @@ func (s *Store) SearchAgentSessions(q, hostID string, limit int) ([]AgentSession
 }
 
 func (s *Store) GetAgentSession(id string) (AgentSession, error) {
-	var a AgentSession
-	err := s.db.QueryRow(
-		`SELECT s.id, COALESCE(s.host_id,''), s.title, s.preview, s.created_at, s.updated_at,
-		        (SELECT COUNT(1) FROM chat_messages m WHERE m.session_id=s.id)
-		 FROM agent_sessions s WHERE s.id=?`, id,
-	).Scan(&a.ID, &a.HostID, &a.Title, &a.Preview, &a.CreatedAt, &a.UpdatedAt, &a.MsgCount)
-	return a, err
+	row := s.db.QueryRow(agentSessionSelect+` WHERE s.id=?`, id)
+	return scanAgentSession(row)
+}
+
+// UpdateAgentSessionOverrides sets session-level knobs. Pass nil to clear (inherit).
+func (s *Store) UpdateAgentSessionOverrides(id string, maxRounds *int, temp *float64, confirm *int, prompt *string) error {
+	if id == "" {
+		return fmt.Errorf("empty session id")
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	var rounds any
+	var temperature any
+	var conf any
+	var pr any
+	if maxRounds != nil {
+		v := *maxRounds
+		if v < 1 {
+			v = 1
+		}
+		if v > 99 {
+			v = 99
+		}
+		rounds = v
+	}
+	if temp != nil {
+		v := *temp
+		if v < 0 {
+			v = 0
+		}
+		if v > 2 {
+			v = 2
+		}
+		temperature = v
+	}
+	if confirm != nil {
+		if *confirm != 0 {
+			conf = 1
+		} else {
+			conf = 0
+		}
+	}
+	if prompt != nil {
+		pr = *prompt
+	}
+	res, err := s.db.Exec(
+		`UPDATE agent_sessions SET ov_max_rounds=?, ov_temperature=?, ov_confirm=?, ov_prompt=?, updated_at=? WHERE id=?`,
+		rounds, temperature, conf, pr, now, id,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 // SessionMemory is durable long-term memory for one agent chat session.

@@ -1,3 +1,11 @@
+## 1.5.4
+
+### Session overrides + memory (Minis P1)
+- Session-level: max rounds / temperature / confirm / extra prompt (null = global)
+- PATCH session API + DB columns; chips under Agent strip when active
+- App bar ⚙: 本会话设置 / 本会话记忆 / 重命名
+- GET/DELETE /v1/agent/sessions/{id}/memory
+
 ## 1.5.3
 
 ### Agent sessions P1

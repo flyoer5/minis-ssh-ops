@@ -3,6 +3,7 @@ import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
+import 'package:ssh_ai_agent/models/agent_session.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:ssh_ai_agent/widgets/nav_menu.dart';
@@ -191,14 +192,293 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
 
   Future<void> _openSession(AppState state, String id, {String? title}) async {
     try {
+      final meta = await state.api.getAgentSession(id);
+      final sess = AgentSession.fromJson(meta);
       final raw = await state.api.getAgentSessionMessages(id);
       final msgs = [for (final j in raw) ChatMessage.fromJson(j)];
-      state.openAgentSessionRaw(id, msgs, title: title);
+      state.openAgentSessionRaw(
+        id,
+        msgs,
+        title: title ?? sess.title,
+        ovMaxRounds: sess.ovMaxRounds,
+        ovTemperature: sess.ovTemperature,
+        ovConfirm: sess.ovConfirm,
+        ovPrompt: sess.ovPrompt,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('加载会话失败: $e')));
       }
     }
+  }
+
+  Future<void> _showSessionSettings(AppState state) async {
+    final id = state.agentSessionId;
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先开启或打开一个会话')));
+      return;
+    }
+    var rounds = state.sessionOvMaxRounds?.toDouble();
+    var temp = state.sessionOvTemperature;
+    var confirm = state.sessionOvConfirm; // null / 0 / 1
+    final promptCtrl = TextEditingController(text: state.sessionOvPrompt ?? '');
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (c) {
+        return StatefulBuilder(
+          builder: (ctx, setM) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 12,
+                bottom: MediaQuery.of(c).viewInsets.bottom + 16,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('本会话设置', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setM(() {
+                              rounds = null;
+                              temp = null;
+                              confirm = null;
+                              promptCtrl.clear();
+                            });
+                          },
+                          child: const Text('恢复全局'),
+                        ),
+                        IconButton(onPressed: () => Navigator.pop(c, false), icon: const Icon(Icons.close)),
+                      ],
+                    ),
+                    Text(
+                      '仅影响当前会话「${state.agentSessionTitle}」。留空/恢复 = 跟随设置页全局值。',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.35),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Expanded(child: Text('工具轮数', style: TextStyle(fontWeight: FontWeight.w600))),
+                        Text(
+                          rounds == null ? '全局 ${state.agentMaxRounds}' : '${rounds!.round()}',
+                          style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: (rounds ?? state.agentMaxRounds.toDouble()).clamp(1, 99),
+                      min: 1,
+                      max: 99,
+                      divisions: 98,
+                      label: rounds == null ? '全局' : '${rounds!.round()}',
+                      onChanged: (v) => setM(() => rounds = v),
+                    ),
+                    Row(
+                      children: [
+                        const Expanded(child: Text('温度', style: TextStyle(fontWeight: FontWeight.w600))),
+                        Text(
+                          temp == null
+                              ? (state.agentTemperature == 0 ? '全局 默认' : '全局 ${state.agentTemperature.toStringAsFixed(1)}')
+                              : (temp == 0 ? '默认' : temp!.toStringAsFixed(1)),
+                          style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: (temp ?? state.agentTemperature).clamp(0, 2),
+                      min: 0,
+                      max: 2,
+                      divisions: 20,
+                      onChanged: (v) => setM(() => temp = v),
+                    ),
+                    const Text('写操作确认', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('跟随全局'),
+                          selected: confirm == null,
+                          onSelected: (_) => setM(() => confirm = null),
+                        ),
+                        ChoiceChip(
+                          label: const Text('强制确认'),
+                          selected: confirm == 1,
+                          onSelected: (_) => setM(() => confirm = 1),
+                        ),
+                        ChoiceChip(
+                          label: const Text('强制关闭'),
+                          selected: confirm == 0,
+                          onSelected: (_) => setM(() => confirm = 0),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('本会话附加提示词', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: promptCtrl,
+                      maxLines: 3,
+                      minLines: 1,
+                      decoration: const InputDecoration(
+                        hintText: '追加在全局自定义提示词之后',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      style: const TextStyle(fontSize: 12.5, fontFamily: 'monospace'),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(c, true),
+                      child: const Text('保存本会话设置'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (ok != true || !mounted) {
+      promptCtrl.dispose();
+      return;
+    }
+    final clearAll = rounds == null && temp == null && confirm == null && promptCtrl.text.trim().isEmpty;
+    try {
+      final body = await state.api.patchAgentSession(
+        id,
+        clearOverrides: clearAll,
+        ovMaxRounds: clearAll ? null : rounds?.round(),
+        clearMaxRounds: !clearAll && rounds == null,
+        ovTemperature: clearAll ? null : temp,
+        clearTemperature: !clearAll && temp == null,
+        ovConfirm: clearAll ? null : confirm,
+        clearConfirm: !clearAll && confirm == null,
+        ovPrompt: clearAll ? null : promptCtrl.text,
+        clearPrompt: !clearAll && promptCtrl.text.trim().isEmpty,
+      );
+      final sess = AgentSession.fromJson(body);
+      state.applySessionOverrides(
+        maxRounds: sess.ovMaxRounds,
+        temperature: sess.ovTemperature,
+        confirm: sess.ovConfirm,
+        prompt: sess.ovPrompt,
+        clearAll: clearAll,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(clearAll ? '已恢复全局设置' : '本会话设置已保存'), duration: const Duration(seconds: 1)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+      }
+    }
+    promptCtrl.dispose();
+  }
+
+  Future<void> _showSessionMemory(AppState state) async {
+    final id = state.agentSessionId;
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先开启或打开一个会话')));
+      return;
+    }
+    Map<String, dynamic>? mem;
+    try {
+      mem = await state.api.getAgentSessionMemory(id);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('读取记忆失败: $e')));
+      }
+      return;
+    }
+    if (!mounted) return;
+    final summary = (mem['summary'] ?? '').toString().trim();
+    final facts = (mem['facts'] ?? '').toString().trim();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (c) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('本会话记忆', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  ),
+                  TextButton(
+                    onPressed: summary.isEmpty && facts.isEmpty
+                        ? null
+                        : () async {
+                            final ok = await showDialog<bool>(
+                              context: context,
+                              builder: (d) => AlertDialog(
+                                title: const Text('清除本会话记忆？'),
+                                content: const Text('摘要与事实会被删除，聊天记录仍保留。'),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('取消')),
+                                  FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('清除')),
+                                ],
+                              ),
+                            );
+                            if (ok == true) {
+                              try {
+                                await state.api.deleteAgentSessionMemory(id);
+                              } catch (_) {}
+                              if (c.mounted) Navigator.pop(c);
+                            }
+                          },
+                    child: const Text('清除'),
+                  ),
+                  IconButton(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.close)),
+                ],
+              ),
+              Text(
+                '会话：${state.agentSessionTitle}',
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 12),
+              if (summary.isEmpty && facts.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text('暂无摘要/事实\n对话足够长后会自动沉淀', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textFaint, height: 1.4)),
+                  ),
+                )
+              else ...[
+                if (summary.isNotEmpty) ...[
+                  const Text('摘要', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  SelectableText(summary, style: const TextStyle(fontSize: 13, height: 1.4)),
+                  const SizedBox(height: 14),
+                ],
+                if (facts.isNotEmpty) ...[
+                  const Text('事实', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  SelectableText(facts, style: const TextStyle(fontSize: 13, height: 1.4, fontFamily: 'monospace')),
+                ],
+              ],
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _showSessions(AppState state) async {
@@ -563,6 +843,46 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                 label: const Text('停止', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               ),
             ),
+          PopupMenuButton<String>(
+            tooltip: '会话',
+            icon: const Icon(Icons.tune, size: 20),
+            enabled: !(_busy || state.agentBusy),
+            color: AppColors.surface,
+            onSelected: (v) {
+              if (v == 'settings') _showSessionSettings(state);
+              if (v == 'memory') _showSessionMemory(state);
+              if (v == 'rename' && state.agentSessionId != null) {
+                // reuse title tap dialog via synthetic
+                final ctrl = TextEditingController(text: state.agentSessionTitle);
+                showDialog<String>(
+                  context: context,
+                  builder: (d) => AlertDialog(
+                    title: const Text('会话标题'),
+                    content: TextField(
+                      controller: ctrl,
+                      autofocus: true,
+                      maxLength: 48,
+                      decoration: const InputDecoration(labelText: '标题'),
+                      onSubmitted: (x) => Navigator.pop(d, x),
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(d), child: const Text('取消')),
+                      FilledButton(onPressed: () => Navigator.pop(d, ctrl.text), child: const Text('保存')),
+                    ],
+                  ),
+                ).then((name) {
+                  if (name != null && name.trim().isNotEmpty) {
+                    state.renameOpenSessionTitle(name);
+                  }
+                });
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'settings', child: Text('本会话设置')),
+              const PopupMenuItem(value: 'memory', child: Text('本会话记忆')),
+              const PopupMenuItem(value: 'rename', child: Text('重命名')),
+            ],
+          ),
           IconButton(
             visualDensity: VisualDensity.compact,
             tooltip: '历史会话',
@@ -641,6 +961,42 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
               ),
             ),
           ),
+          if (state.sessionOvMaxRounds != null ||
+              state.sessionOvTemperature != null ||
+              state.sessionOvConfirm != null ||
+              (state.sessionOvPrompt != null && state.sessionOvPrompt!.trim().isNotEmpty))
+            Material(
+              color: AppColors.bg,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (state.sessionOvMaxRounds != null)
+                      _OvChip(label: '轮数 ${state.sessionOvMaxRounds}'),
+                    if (state.sessionOvTemperature != null)
+                      _OvChip(
+                        label: state.sessionOvTemperature == 0
+                            ? '温度 默认'
+                            : '温度 ${state.sessionOvTemperature!.toStringAsFixed(1)}',
+                      ),
+                    if (state.sessionOvConfirm != null)
+                      _OvChip(label: state.sessionOvConfirm == 1 ? '强制确认' : '确认关'),
+                    if (state.sessionOvPrompt != null && state.sessionOvPrompt!.trim().isNotEmpty)
+                      const _OvChip(label: '附加提示词'),
+                    GestureDetector(
+                      onTap: (_busy || state.agentBusy) ? null : () => _showSessionSettings(state),
+                      child: const Text(
+                        '编辑',
+                        style: TextStyle(fontSize: 11, color: AppColors.accentSoft, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Expanded(
             child: state.agentMessages.isEmpty
                 ? Center(

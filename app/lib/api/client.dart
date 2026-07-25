@@ -308,6 +308,77 @@ class ApiClient {
     _ensureOk(r);
   }
 
+  /// Patch session title and/or overrides. Pass explicit null via clear* flags.
+  Future<Map<String, dynamic>> patchAgentSession(
+    String id, {
+    String? title,
+    bool clearOverrides = false,
+    int? ovMaxRounds,
+    bool clearMaxRounds = false,
+    double? ovTemperature,
+    bool clearTemperature = false,
+    int? ovConfirm,
+    bool clearConfirm = false,
+    String? ovPrompt,
+    bool clearPrompt = false,
+  }) async {
+    final body = <String, dynamic>{};
+    if (title != null) body['title'] = title;
+    if (clearOverrides) body['clearOverrides'] = true;
+    if (clearMaxRounds) {
+      body['ovMaxRounds'] = null;
+    } else if (ovMaxRounds != null) {
+      body['ovMaxRounds'] = ovMaxRounds;
+    }
+    if (clearTemperature) {
+      body['ovTemperature'] = null;
+    } else if (ovTemperature != null) {
+      body['ovTemperature'] = ovTemperature;
+    }
+    if (clearConfirm) {
+      body['ovConfirm'] = null;
+    } else if (ovConfirm != null) {
+      body['ovConfirm'] = ovConfirm;
+    }
+    if (clearPrompt) {
+      body['ovPrompt'] = null;
+    } else if (ovPrompt != null) {
+      body['ovPrompt'] = ovPrompt;
+    }
+    final r = await _c
+        .patch(
+          _u('/v1/agent/sessions/$id'),
+          headers: _headers,
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 15));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getAgentSessionMemory(String id) async {
+    final r = await _c
+        .get(_u('/v1/agent/sessions/$id/memory'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  Future<void> deleteAgentSessionMemory(String id) async {
+    final r = await _c
+        .delete(_u('/v1/agent/sessions/$id/memory'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+    _ensureOk(r);
+  }
+
+  Future<Map<String, dynamic>> getAgentSession(String id) async {
+    final r = await _c
+        .get(_u('/v1/agent/sessions/$id'), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+    _ensureOk(r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> agentExecStep({
     required String hostId,
     required String command,

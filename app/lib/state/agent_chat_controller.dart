@@ -27,6 +27,12 @@ mixin AgentChatController on ChangeNotifier {
   String? agentSessionId;
   /// Display title for the open session (Minis-style app bar).
   String agentSessionTitle = '新会话';
+  /// Session-level overrides (null = inherit global UiPrefs).
+  int? sessionOvMaxRounds;
+  double? sessionOvTemperature;
+  /// null inherit; 0 off; 1 on
+  int? sessionOvConfirm;
+  String? sessionOvPrompt;
   final Map<String, String> stepOutputs = {};
   final List<ChatMessage> agentMessages = [];
   /// Index of last plan message in agentMessages (for attaching step outputs).
@@ -64,6 +70,10 @@ mixin AgentChatController on ChangeNotifier {
     stepOutputs.clear();
     agentSessionId = null;
     agentSessionTitle = '新会话';
+    sessionOvMaxRounds = null;
+    sessionOvTemperature = null;
+    sessionOvConfirm = null;
+    sessionOvPrompt = null;
     _lastPlanMsgIndex = null;
     _agentCancelRequested = false;
     _runningStepIds.clear();
@@ -120,7 +130,15 @@ mixin AgentChatController on ChangeNotifier {
     _saveSessionsToPrefs();
   }
 
-  void openAgentSessionRaw(String id, List<ChatMessage> msgs, {String? title}) {
+  void openAgentSessionRaw(
+    String id,
+    List<ChatMessage> msgs, {
+    String? title,
+    int? ovMaxRounds,
+    double? ovTemperature,
+    int? ovConfirm,
+    String? ovPrompt,
+  }) {
     // Save current transcript into sessions if needed (as before)
     if (agentMessages.isNotEmpty) {
       final curId = agentSessionId ?? '';
@@ -150,6 +168,12 @@ mixin AgentChatController on ChangeNotifier {
     } else {
       agentSessionTitle = '会话';
     }
+    applySessionOverrides(
+      maxRounds: ovMaxRounds,
+      temperature: ovTemperature,
+      confirm: ovConfirm,
+      prompt: ovPrompt,
+    );
     lastPlan = null;
     stepOutputs.clear();
     _lastPlanMsgIndex = null;
@@ -158,6 +182,39 @@ mixin AgentChatController on ChangeNotifier {
     agentBusy = false;
     notifyListeners();
     _saveSessionsToPrefs();
+  }
+
+  void applySessionOverrides({
+    int? maxRounds,
+    double? temperature,
+    int? confirm,
+    String? prompt,
+    bool clearAll = false,
+  }) {
+    if (clearAll) {
+      sessionOvMaxRounds = null;
+      sessionOvTemperature = null;
+      sessionOvConfirm = null;
+      sessionOvPrompt = null;
+    } else {
+      sessionOvMaxRounds = maxRounds;
+      sessionOvTemperature = temperature;
+      sessionOvConfirm = confirm;
+      sessionOvPrompt = prompt;
+    }
+    notifyListeners();
+  }
+
+  int get effectiveMaxRounds => sessionOvMaxRounds ?? agentMaxRounds;
+  double get effectiveTemperature => sessionOvTemperature ?? agentTemperature;
+  bool get effectiveConfirmWrites =>
+      sessionOvConfirm == null ? confirmWrites : sessionOvConfirm == 1;
+  String get effectiveCustomPrompt {
+    final g = agentCustomPrompt;
+    final o = sessionOvPrompt;
+    if (o == null || o.trim().isEmpty) return g;
+    if (g.trim().isEmpty) return o;
+    return '$g\n\n## 本会话附加\n$o';
   }
 
   Future<void> renameOpenSessionTitle(String title) async {
@@ -179,6 +236,10 @@ mixin AgentChatController on ChangeNotifier {
       agentMessages.clear();
       agentSessionId = null;
       agentSessionTitle = '新会话';
+      sessionOvMaxRounds = null;
+      sessionOvTemperature = null;
+      sessionOvConfirm = null;
+      sessionOvPrompt = null;
       lastPlan = null;
       stepOutputs.clear();
       _lastPlanMsgIndex = null;
@@ -724,10 +785,10 @@ mixin AgentChatController on ChangeNotifier {
           hostId: id,
           message: userText,
           sessionId: agentSessionId,
-          confirmWrites: confirmWrites,
-          maxRounds: agentMaxRounds,
-          temperature: agentTemperature,
-          customPrompt: agentCustomPrompt,
+          confirmWrites: effectiveConfirmWrites,
+          maxRounds: effectiveMaxRounds,
+          temperature: effectiveTemperature,
+          customPrompt: effectiveCustomPrompt,
           onEvent: (raw) {
             if (turn != _agentTurnGen) return;
             final type = raw['type']?.toString() ?? '';
@@ -755,10 +816,10 @@ mixin AgentChatController on ChangeNotifier {
             hostId: id,
             message: userText,
             sessionId: agentSessionId,
-            confirmWrites: confirmWrites,
-            maxRounds: agentMaxRounds,
-            temperature: agentTemperature,
-            customPrompt: agentCustomPrompt,
+            confirmWrites: effectiveConfirmWrites,
+            maxRounds: effectiveMaxRounds,
+            temperature: effectiveTemperature,
+            customPrompt: effectiveCustomPrompt,
           );
           if (turn != _agentTurnGen) return;
           agentSessionId = res['sessionId'] as String? ?? agentSessionId;

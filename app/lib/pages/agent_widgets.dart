@@ -965,3 +965,24 @@ class _BlinkCursorState extends State<_BlinkCursor> with SingleTickerProviderSta
     );
   }
 }
+
+class _OvChip extends StatelessWidget {
+  final String label;
+  const _OvChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.accentDeep.withAlpha(0x28),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 11, color: AppColors.accentSoft, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
