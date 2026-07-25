@@ -445,6 +445,8 @@ class _FileEditorPageState extends State<FileEditorPage> {
             autofocus: false,
             child: Scaffold(
         backgroundColor: AppColors.bg,
+        // Editor is full-screen route; keep body from jumping with every IME frame.
+        resizeToAvoidBottomInset: true,
         appBar: AppBar(
           backgroundColor: AppColors.surface,
           toolbarHeight: 48,

@@ -1,3 +1,11 @@
+## 1.5.8
+
+### Keyboard / IME smoothness
+- HomeShell: resizeToAvoidBottomInset false (stop double layout with tab Scaffolds)
+- Agent / Terminal: pad only composer/keybar with AnimatedPadding(viewInsets)
+- Hosts / Files / Records: no full-page IME resize
+- Host editor + session settings sheets: AnimatedPadding
+
 ## 1.5.7
 
 ### Hosts

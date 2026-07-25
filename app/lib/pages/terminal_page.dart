@@ -491,8 +491,11 @@ class _TerminalPageState extends State<TerminalPage>
       );
     }
 
+    final imeBottom = MediaQuery.viewInsetsOf(context).bottom;
     return Scaffold(
       backgroundColor: _bg,
+      // Shell already freezes outer resize; keep terminal body stable while IME animates.
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: Column(
           children: [
@@ -778,37 +781,37 @@ class _TerminalPageState extends State<TerminalPage>
                 ],
               ),
             ),
-            Container(
-              color: _bar,
-              padding: EdgeInsets.only(
-                left: 4,
-                right: 4,
-                top: 4,
-                bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 4 : 6,
-              ),
-              child: Column(
-                children: [
-                  Row(children: [
-                    _k('ESC'),
-                    _k('TAB'),
-                    _k('CTRL', on: _ctrl),
-                    _k('C'),
-                    _k('D'),
-                    _k('L'),
-                    _k('—'),
-                    _k('/'),
-                    _k('|'),
-                  ]),
-                  Row(children: [
-                    _k('↑'),
-                    _k('↓'),
-                    _k('←'),
-                    _k('→'),
-                    _k('~'),
-                    _k('BS'),
-                    _k('ENT'),
-                  ]),
-                ],
+            AnimatedPadding(
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.only(bottom: imeBottom),
+              child: Container(
+                color: _bar,
+                padding: const EdgeInsets.only(left: 4, right: 4, top: 4, bottom: 6),
+                child: Column(
+                  children: [
+                    Row(children: [
+                      _k('ESC'),
+                      _k('TAB'),
+                      _k('CTRL', on: _ctrl),
+                      _k('C'),
+                      _k('D'),
+                      _k('L'),
+                      _k('—'),
+                      _k('/'),
+                      _k('|'),
+                    ]),
+                    Row(children: [
+                      _k('↑'),
+                      _k('↓'),
+                      _k('←'),
+                      _k('→'),
+                      _k('~'),
+                      _k('BS'),
+                      _k('ENT'),
+                    ]),
+                  ],
+                ),
               ),
             ),
           ],

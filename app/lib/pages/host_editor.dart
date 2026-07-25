@@ -103,12 +103,15 @@ class _HostEditorSheetState extends State<_HostEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final ime = MediaQuery.viewInsetsOf(context).bottom;
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(
         left: 16,
         right: 16,
         top: 4,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
+        bottom: ime + 16,
       ),
       child: Form(
         key: form,

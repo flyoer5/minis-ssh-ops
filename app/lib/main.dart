@@ -161,7 +161,10 @@ class _HomeShellState extends State<HomeShell> {
       index: index,
       go: (i) => setState(() => index = i),
       menuMode: menu,
+      // Outer shell must NOT resize with IME — each tab's own Scaffold / padding
+      // handles the keyboard. Double-resize (shell + page) janks the IME animation.
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         body: Column(
           children: [
             if (!state.backendOk || state.startingBackend)

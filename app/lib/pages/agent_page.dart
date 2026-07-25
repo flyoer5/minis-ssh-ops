@@ -213,12 +213,14 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       builder: (c) {
         return StatefulBuilder(
           builder: (ctx, setM) {
-            return Padding(
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOutCubic,
               padding: EdgeInsets.only(
                 left: 16,
                 right: 16,
                 top: 12,
-                bottom: MediaQuery.of(c).viewInsets.bottom + 16,
+                bottom: MediaQuery.viewInsetsOf(c).bottom + 16,
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -749,8 +751,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     super.build(context);
     final state = context.watch<AppState>();
     _autoFollow(state);
+    final imeBottom = MediaQuery.viewInsetsOf(context).bottom;
     return Scaffold(
       backgroundColor: AppColors.bg,
+      // Avoid full-body reflow; only the composer pads for IME (smoother keyboard).
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         toolbarHeight: 44,
         leading: NavMenuButton.leadingOf(context),
@@ -1152,10 +1157,14 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                 ),
               ),
             ),
-          // Minis-like composer
+          // Minis-like composer — pad only here for IME (scaffold does not resize).
           SafeArea(
             top: false,
-            child: Container(
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.only(bottom: imeBottom),
+              child: Container(
               decoration: const BoxDecoration(
                 color: AppColors.bg,
                 border: Border(top: BorderSide(color: AppColors.surface2)),
@@ -1233,6 +1242,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                   ),
                 ],
               ),
+            ),
             ),
           ),
         ],

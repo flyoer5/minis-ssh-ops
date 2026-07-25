@@ -1154,6 +1154,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     final fs = state.uiFontSize;
     return Scaffold(
       backgroundColor: AppColors.pureBlack,
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         backgroundColor: AppColors.darkBar,
         toolbarHeight: 44,

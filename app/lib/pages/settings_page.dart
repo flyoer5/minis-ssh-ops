@@ -468,6 +468,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     super.build(context);
     final state = context.watch<AppState>();
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         leading: NavMenuButton.leadingOf(context),
@@ -506,7 +507,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.7',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.8',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
