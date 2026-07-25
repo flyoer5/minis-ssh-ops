@@ -231,7 +231,7 @@ func (c *Client) chatTools(messages []LoopMsg) (LoopMsg, error) {
 		"messages":    apiMsgs,
 		"tools":       defaultTools,
 		"tool_choice": "auto",
-		"temperature": 0.2,
+		"temperature": c.Temperature,
 	}
 	applyThinkingParams(payload, c.ThinkingLevel)
 	body, _ := json.Marshal(payload)

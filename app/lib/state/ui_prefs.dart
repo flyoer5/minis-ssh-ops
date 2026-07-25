@@ -52,6 +52,12 @@ mixin UiPrefs on ChangeNotifier {
   /// Light haptic on send / confirm run.
   bool hapticFeedback = true;
 
+  /// LLM temperature (0.0–2.0). 0 → use backend default.
+  double agentTemperature = 0;
+
+  /// Custom system prompt suffix appended to every agent request.
+  String agentCustomPrompt = '';
+
   /// Auto-refresh host probes in background (seconds; 0 = off).
   int hostAutoProbeSec = 0;
 
@@ -79,6 +85,8 @@ mixin UiPrefs on ChangeNotifier {
     agentEnterToSend = prefs.getBool('agentEnterToSend') ?? true;
     agentKeepKeyboard = prefs.getBool('agentKeepKeyboard') ?? false;
     hapticFeedback = prefs.getBool('hapticFeedback') ?? true;
+    agentTemperature = prefs.getDouble('agentTemperature') ?? 0;
+    agentCustomPrompt = prefs.getString('agentCustomPrompt') ?? '';
     hostAutoProbeSec = (prefs.getInt('hostAutoProbeSec') ?? 0).clamp(0, 600);
   }
 
@@ -101,6 +109,8 @@ mixin UiPrefs on ChangeNotifier {
         'agentEnterToSend': agentEnterToSend,
         'agentKeepKeyboard': agentKeepKeyboard,
         'hapticFeedback': hapticFeedback,
+        'agentTemperature': agentTemperature,
+        'agentCustomPrompt': agentCustomPrompt,
         'hostAutoProbeSec': hostAutoProbeSec,
       };
 
@@ -128,6 +138,8 @@ mixin UiPrefs on ChangeNotifier {
     if (pr['agentEnterToSend'] is bool) await setAgentEnterToSend(pr['agentEnterToSend'] as bool);
     if (pr['agentKeepKeyboard'] is bool) await setAgentKeepKeyboard(pr['agentKeepKeyboard'] as bool);
     if (pr['hapticFeedback'] is bool) await setHapticFeedback(pr['hapticFeedback'] as bool);
+    if (pr['agentTemperature'] is num) await setAgentTemperature((pr['agentTemperature'] as num).toDouble());
+    if (pr['agentCustomPrompt'] is String) await setAgentCustomPrompt(pr['agentCustomPrompt'] as String);
     if (pr['hostAutoProbeSec'] is num) await setHostAutoProbeSec((pr['hostAutoProbeSec'] as num).toInt());
   }
 
@@ -148,6 +160,8 @@ mixin UiPrefs on ChangeNotifier {
     await setAgentEnterToSend(true);
     await setAgentKeepKeyboard(false);
     await setHapticFeedback(true);
+    await setAgentTemperature(0);
+    await setAgentCustomPrompt('');
     await setHostAutoProbeSec(0);
     // leave confirmWrites and pathFavorites as-is (user safety / data)
   }
@@ -299,6 +313,20 @@ mixin UiPrefs on ChangeNotifier {
     hapticFeedback = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hapticFeedback', v);
+    notifyListeners();
+  }
+
+  Future<void> setAgentTemperature(double v) async {
+    agentTemperature = v.clamp(0, 2);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('agentTemperature', agentTemperature);
+    notifyListeners();
+  }
+
+  Future<void> setAgentCustomPrompt(String v) async {
+    agentCustomPrompt = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('agentCustomPrompt', agentCustomPrompt);
     notifyListeners();
   }
 

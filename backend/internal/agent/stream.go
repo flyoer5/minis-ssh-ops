@@ -46,7 +46,7 @@ func (c *Client) chatToolsStream(messages []LoopMsg, onDelta func(kind, text str
 		"messages":    apiMsgs,
 		"tools":       defaultTools,
 		"tool_choice": "auto",
-		"temperature": 0.2,
+		"temperature": c.Temperature,
 		"stream":      true,
 	}
 	applyThinkingParams(payload, c.ThinkingLevel)

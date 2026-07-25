@@ -16,6 +16,7 @@ type Client struct {
 	BaseURL       string
 	APIKey        string
 	Model         string
+	Temperature   float64 // 0.0–2.0; 0 → use default
 	ThinkingLevel string // none|low|medium|high|xhigh|auto
 	HTTP          *http.Client
 	// Req is cancelled when the SSE client disconnects (user stop).

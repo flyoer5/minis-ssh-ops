@@ -151,6 +151,8 @@ class ApiClient {
     String? sessionId,
     bool confirmWrites = false,
     int maxRounds = 12,
+    double temperature = 0,
+    String customPrompt = '',
   }) async {
     final r = await _c
         .post(
@@ -162,6 +164,8 @@ class ApiClient {
             if (sessionId != null) 'sessionId': sessionId,
             'confirmWrites': confirmWrites,
             'maxRounds': maxRounds,
+            if (temperature > 0) 'temperature': temperature,
+            if (customPrompt.isNotEmpty) 'customPrompt': customPrompt,
           }),
         )
         .timeout(const Duration(seconds: 180));
@@ -183,6 +187,8 @@ class ApiClient {
     String? sessionId,
     bool confirmWrites = false,
     int maxRounds = 12,
+    double temperature = 0,
+    String customPrompt = '',
     required void Function(Map<String, dynamic> event) onEvent,
   }) async {
     cancelAgentStream();
@@ -197,6 +203,8 @@ class ApiClient {
         if (sessionId != null) 'sessionId': sessionId,
         'confirmWrites': confirmWrites,
         'maxRounds': maxRounds,
+        if (temperature > 0) 'temperature': temperature,
+        if (customPrompt.isNotEmpty) 'customPrompt': customPrompt,
       });
       final res = await client.send(req).timeout(const Duration(seconds: 180));
       if (res.statusCode >= 400) {

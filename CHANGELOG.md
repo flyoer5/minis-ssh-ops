@@ -1,3 +1,11 @@
+## 1.5.0
+
+### 高度自定义
+- Agent: 模型温度 (0–2, 直接传backend)、自定义提示词 (suffix)、工具轮数 1–99
+- Settings: 温度滑块 + 预设、自定义提示词编辑框
+- Prefs: 导出/导入/重置含新字段
+- Backend: wire temperature + customPrompt to LLM calls
+
 ## 1.4.51
 
 ### MaxRounds

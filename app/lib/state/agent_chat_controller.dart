@@ -16,6 +16,8 @@ mixin AgentChatController on ChangeNotifier {
   set selectedHostId(String? value);
   bool get confirmWrites;
   int get agentMaxRounds;
+  double get agentTemperature;
+  String get agentCustomPrompt;
 
   /// Coalesce high-frequency stream token notifies (~30fps max).
   Timer? _streamNotifyTimer;
@@ -663,6 +665,8 @@ mixin AgentChatController on ChangeNotifier {
           sessionId: agentSessionId,
           confirmWrites: confirmWrites,
           maxRounds: agentMaxRounds,
+          temperature: agentTemperature,
+          customPrompt: agentCustomPrompt,
           onEvent: (raw) {
             if (turn != _agentTurnGen) return;
             final type = raw['type']?.toString() ?? '';
@@ -692,6 +696,8 @@ mixin AgentChatController on ChangeNotifier {
             sessionId: agentSessionId,
             confirmWrites: confirmWrites,
             maxRounds: agentMaxRounds,
+            temperature: agentTemperature,
+            customPrompt: agentCustomPrompt,
           );
           if (turn != _agentTurnGen) return;
           agentSessionId = res['sessionId'] as String? ?? agentSessionId;

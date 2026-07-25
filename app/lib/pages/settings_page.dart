@@ -492,7 +492,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.51',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.0',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
@@ -1023,6 +1023,45 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               const Text(
                 '每次提问最多调几轮工具（3–32，默认 12）。长排障/安装建议 16–24。',
                 style: TextStyle(fontSize: 11, color: AppColors.textFaint),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('模型温度', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                  ),
+                  Text(
+                    state.agentTemperature == 0 ? '默认' : '${state.agentTemperature.toStringAsFixed(1)}',
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: AppColors.chipBlue, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+              Slider(
+                value: state.agentTemperature.clamp(0, 2),
+                min: 0,
+                max: 2,
+                divisions: 20,
+                label: state.agentTemperature == 0 ? '默认' : '${state.agentTemperature.toStringAsFixed(1)}',
+                onChanged: (v) => state.setAgentTemperature(v),
+              ),
+              const Text('0=默认 0.2，越高越随机。适合创意任务调高。', style: TextStyle(fontSize: 11, color: AppColors.textFaint)),
+              const SizedBox(height: 8),
+              const Text('自定义提示词', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              TextField(
+                controller: TextEditingController(text: state.agentCustomPrompt)
+                  ..selection = TextSelection.collapsed(offset: state.agentCustomPrompt.length),
+                decoration: const InputDecoration(
+                  hintText: '追加到系统提示词末尾（如：优先使用 Docker）',
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                minLines: 1,
+                style: const TextStyle(fontSize: 12.5, fontFamily: 'monospace'),
+                onChanged: (v) => state.setAgentCustomPrompt(v),
+                onSubmitted: (v) => state.setAgentCustomPrompt(v),
               ),
               const SizedBox(height: 6),
               SwitchListTile(

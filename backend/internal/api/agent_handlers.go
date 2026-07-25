@@ -107,12 +107,13 @@ type planBody struct {
 }
 
 type chatBody struct {
-	HostID         string `json:"hostId"`
-	Message        string `json:"message"`
-	SessionID      string `json:"sessionId"`
-	ConfirmWrites  bool   `json:"confirmWrites"`
-	// MaxRounds: tool-loop rounds per turn (1–99). 0/超出 → default 12.
-	MaxRounds int `json:"maxRounds"`
+	HostID         string  `json:"hostId"`
+	Message        string  `json:"message"`
+	SessionID      string  `json:"sessionId"`
+	ConfirmWrites  bool    `json:"confirmWrites"`
+	MaxRounds      int     `json:"maxRounds"`
+	Temperature    float64 `json:"temperature"`
+	CustomPrompt   string  `json:"customPrompt"`
 }
 
 func clampMaxRounds(n int) int {
@@ -214,7 +215,8 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	events, _, err := cli.RunLoop(body.Message, history, run, clampMaxRounds(body.MaxRounds))
+	if body.Temperature > 0 { cli.Temperature = body.Temperature }
+events, _, err := cli.RunLoop(body.Message, history, run, clampMaxRounds(body.MaxRounds))
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
@@ -356,7 +358,8 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	events, _, err := cli.RunLoopStream(body.Message, history, run, clampMaxRounds(body.MaxRounds), func(ev agent.LoopEvent) {
+	if body.Temperature > 0 { cli.Temperature = body.Temperature }
+events, _, err := cli.RunLoopStream(body.Message, history, run, clampMaxRounds(body.MaxRounds), func(ev agent.LoopEvent) {
 		if !writeEv(ev) {
 			// Client closed SSE mid-event — request context should already be cancelled.
 			log.Printf("agent stream: write failed session=%s (client stop?)", body.SessionID)
