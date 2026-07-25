@@ -408,8 +408,11 @@ mixin AgentChatController on ChangeNotifier {
     if (low.contains('connection abort') || low.contains('connection reset') || low.contains('broken pipe')) {
       return '模型网关连接中断，请重试';
     }
-    if (low.contains('timeout') || low.contains('timed out')) {
-      return '模型请求超时，请重试';
+    if (low.contains('timeout') || low.contains('timed out') || low.contains('deadline exceeded')) {
+      if (low.contains('context deadline') || low.contains('ssh') || low.contains('exec')) {
+        return '远程命令执行超时（主机负载高或命令过慢）。可重试，或让 Agent 拆成更短的命令。';
+      }
+      return '请求超时，请重试';
     }
     if (low.contains('401') || low.contains('unauthorized')) {
       return '模型鉴权失败，请检查 API Key';
@@ -719,9 +722,16 @@ mixin AgentChatController on ChangeNotifier {
             (command.isNotEmpty ? command.trim().split('\n').first : name));
     final cmd = command.isNotEmpty ? command : (prev?.meta?['command']?.toString() ?? '');
     final toolName = name.isNotEmpty ? name : (prev?.meta?['name']?.toString() ?? 'tool');
+    var out = output;
+    final low = out.toLowerCase();
+    if (low.contains('context deadline exceeded') ||
+        (low.contains('deadline exceeded') && low.contains('error'))) {
+      out = '远程命令超时（主机忙或命令过慢）。可拆短命令后重试。\n原始错误: $out';
+      success = false;
+    }
     final msg = ChatMessage(
       role: 'tool',
-      content: output,
+      content: out,
       kind: ChatKind.toolResult,
       meta: {
         'part': 'toolResult',
@@ -730,6 +740,7 @@ mixin AgentChatController on ChangeNotifier {
         'command': cmd,
         'description': desc,
         'success': success,
+        'output': out,
       },
       at: prev?.at,
     );

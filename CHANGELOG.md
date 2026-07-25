@@ -1,3 +1,10 @@
+## 1.5.6
+
+### Agent tool reliability
+- SSH timeout for agent tools: 12s → 90s (fixes docker stats / heavy ps deadline exceeded)
+- Friendly Chinese for context deadline exceeded
+- Hide retry bar while turn is busy (no 重试中 + 运行中 stack)
+
 ## 1.5.5
 
 ### Bugfix

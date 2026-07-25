@@ -1138,7 +1138,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                     ],
                   ),
           ),
-          if (_canRetryLast(state))
+          // Don't stack retry while a turn is still running (looks like 重试中 + 运行中 + 停止).
+          if (!_busy && !state.agentBusy && _canRetryLast(state))
             Material(
               color: AppColors.surface,
               child: Padding(

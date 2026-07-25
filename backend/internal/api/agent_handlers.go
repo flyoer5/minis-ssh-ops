@@ -3,12 +3,13 @@ package api
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"log"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/agent"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/risk"
@@ -89,6 +90,8 @@ func (s *Server) runSSHContext(ctx context.Context, hostID, command string) (ssh
 	if err != nil {
 		return sshx.ExecResult{}, err
 	}
+	// Agent tools often chain ps/docker/journalctl; 12s dial default is too tight
+	// on loaded hosts and surfaces as "context deadline exceeded".
 	return sshx.ExecContext(ctx, sshx.ConnectParams{
 		Host:          h.Host,
 		Port:          h.Port,
@@ -97,6 +100,7 @@ func (s *Server) runSSHContext(ctx context.Context, hostID, command string) (ssh
 		PrivateKeyPEM: sec.PrivateKeyPEM,
 		Passphrase:    sec.Passphrase,
 		HostKeys:      s.HostKeys,
+		Timeout:       90 * time.Second,
 	}, command)
 }
 
@@ -669,6 +673,10 @@ func (s *Server) persistAgentEvents(sessionID string, events []agent.LoopEvent) 
 		case "tool_result":
 			success := true
 			out := ev.Content
+			if strings.Contains(strings.ToLower(out), "deadline exceeded") {
+				out = "远程命令超时（主机忙或命令过慢）。可拆短命令后重试。\n原始错误: " + out
+				success = false
+			}
 			if strings.HasPrefix(out, "error:") || strings.HasPrefix(out, "NEEDS_CONFIRM:") || strings.HasPrefix(out, "error: NEEDS_CONFIRM:") {
 				success = false
 			}
