@@ -1,3 +1,11 @@
+## 1.5.11
+
+### Bugfix (nightly self-check)
+- Offline host cards: never put SSH error strings into MEM/CPU/HDD gauges
+- Custom prompt: save on focus loss / editing complete (not every keystroke)
+- createAgentSession response includes sessionId alias
+- Settings dispose no longer uses context.read after deactivate
+
 ## 1.5.10
 
 ### UX

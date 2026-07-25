@@ -154,10 +154,18 @@ class ProbeSummary {
         memHint = '$pct%';
         memSub = '${(used / 1024 / 1024).toStringAsFixed(1)}G/${(total / 1024 / 1024).toStringAsFixed(1)}G';
       } else {
-        memHint = firstLine(memory);
-        // avoid showing free(1) header as value
-        if (memHint.toLowerCase().contains('total') && memHint.toLowerCase().contains('used')) {
+        // Never dump raw "错误: ssh dial…" into MEM — keep gauges clean when offline.
+        final fl = firstLine(memory);
+        final looksErr = fl.startsWith('错误') ||
+            fl.toLowerCase().contains('error') ||
+            fl.toLowerCase().contains('ssh dial') ||
+            fl.toLowerCase().contains('timeout') ||
+            fl.toLowerCase().contains('deadline');
+        if (looksErr || (fl.toLowerCase().contains('total') && fl.toLowerCase().contains('used'))) {
           memHint = '—';
+          memSub = '';
+        } else {
+          memHint = fl;
         }
       }
     }
@@ -226,6 +234,23 @@ class ProbeSummary {
       ..writeln('load:\n$load\n')
       ..writeln('disk:\n$disk\n')
       ..writeln('memory:\n$memory\n');
+
+    // Offline / hard probe failure: never show error blobs in metric columns.
+    if (!ok) {
+      bool metricOk(String s) {
+        final t = s.replaceAll(' ', '');
+        return t == '—' || RegExp(r'^[\d.]+%?$').hasMatch(t);
+      }
+      if (!metricOk(cpuHint)) cpuHint = '—';
+      if (!metricOk(memHint)) {
+        memHint = '—';
+        memSub = '';
+      }
+      if (!metricOk(diskHint)) {
+        diskHint = '—';
+        diskSub = '';
+      }
+    }
 
     return ProbeSummary(
       ok: ok,

@@ -61,7 +61,17 @@ func (s *Server) handleCreateAgentSession(w http.ResponseWriter, r *http.Request
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, sess)
+	// Flatten + sessionId alias (some clients only look for sessionId).
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id":        sess.ID,
+		"sessionId": sess.ID,
+		"hostId":    sess.HostID,
+		"title":     sess.Title,
+		"preview":   sess.Preview,
+		"msgCount":  sess.MsgCount,
+		"createdAt": sess.CreatedAt,
+		"updatedAt": sess.UpdatedAt,
+	})
 }
 
 // GET /v1/agent/sessions/{id}

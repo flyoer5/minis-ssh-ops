@@ -69,6 +69,8 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
 
   @override
   void dispose() {
+    // Note: do not use context.read here (element may be deactivated).
+    // Prompt is flushed on onEditingComplete / onTapOutside.
     baseUrl.dispose();
     token.dispose();
     llmBase.dispose();
@@ -507,7 +509,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.10',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.11',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
@@ -1101,7 +1103,9 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 maxLines: 3,
                 minLines: 1,
                 style: const TextStyle(fontSize: 12.5, fontFamily: 'monospace'),
-                onChanged: (v) => state.setAgentCustomPrompt(v),
+                // Don't write SharedPreferences on every keystroke (IME jank).
+                onEditingComplete: () => state.setAgentCustomPrompt(customPrompt.text),
+                onTapOutside: (_) => state.setAgentCustomPrompt(customPrompt.text),
               ),
               const SizedBox(height: 6),
               SwitchListTile(
