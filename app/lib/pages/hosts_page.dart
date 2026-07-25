@@ -22,14 +22,32 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   bool _autoStarted = false;
   final TextEditingController _search = TextEditingController();
   String _query = '';
+  Timer? _autoProbeTimer;
+  int _autoProbeSecBound = -1;
 
   @override
   bool get wantKeepAlive => true;
 
   @override
   void dispose() {
+    _autoProbeTimer?.cancel();
     _search.dispose();
     super.dispose();
+  }
+
+  void _syncAutoProbeTimer(AppState state) {
+    final sec = state.hostAutoProbeSec;
+    if (sec == _autoProbeSecBound) return;
+    _autoProbeSecBound = sec;
+    _autoProbeTimer?.cancel();
+    _autoProbeTimer = null;
+    if (sec <= 0) return;
+    _autoProbeTimer = Timer.periodic(Duration(seconds: sec), (_) {
+      if (!mounted) return;
+      final s = context.read<AppState>();
+      if (!s.backendOk || s.hosts.isEmpty) return;
+      unawaited(_probeMany(s, force: true));
+    });
   }
 
   @override
@@ -40,6 +58,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
       _autoStarted = true;
       unawaited(_probeMany(state, force: false));
     }
+    _syncAutoProbeTimer(state);
   }
 
   Future<void> _probeMany(AppState state, {required bool force}) async {

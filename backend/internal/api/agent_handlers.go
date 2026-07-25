@@ -111,8 +111,23 @@ type chatBody struct {
 	Message        string `json:"message"`
 	SessionID      string `json:"sessionId"`
 	ConfirmWrites  bool   `json:"confirmWrites"`
+	// MaxRounds: tool-loop rounds per turn (3–12). 0 → default 5.
+	MaxRounds int `json:"maxRounds"`
 }
 
+
+func clampMaxRounds(n int) int {
+	if n <= 0 {
+		return 5
+	}
+	if n < 3 {
+		return 3
+	}
+	if n > 12 {
+		return 12
+	}
+	return n
+}
 
 // handleAgentChat: OpenClaw-style multi-turn tool loop (model decides tools).
 func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
@@ -206,7 +221,7 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	events, _, err := cli.RunLoop(body.Message, history, run, 5)
+	events, _, err := cli.RunLoop(body.Message, history, run, clampMaxRounds(body.MaxRounds))
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
@@ -348,7 +363,7 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	events, _, err := cli.RunLoopStream(body.Message, history, run, 5, func(ev agent.LoopEvent) {
+	events, _, err := cli.RunLoopStream(body.Message, history, run, clampMaxRounds(body.MaxRounds), func(ev agent.LoopEvent) {
 		if !writeEv(ev) {
 			// Client closed SSE mid-event — request context should already be cancelled.
 			log.Printf("agent stream: write failed session=%s (client stop?)", body.SessionID)

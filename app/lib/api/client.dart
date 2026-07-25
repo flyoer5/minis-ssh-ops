@@ -150,6 +150,7 @@ class ApiClient {
     required String message,
     String? sessionId,
     bool confirmWrites = false,
+    int maxRounds = 5,
   }) async {
     final r = await _c
         .post(
@@ -160,6 +161,7 @@ class ApiClient {
             'message': message,
             if (sessionId != null) 'sessionId': sessionId,
             'confirmWrites': confirmWrites,
+            'maxRounds': maxRounds,
           }),
         )
         .timeout(const Duration(seconds: 180));
@@ -180,6 +182,7 @@ class ApiClient {
     required String message,
     String? sessionId,
     bool confirmWrites = false,
+    int maxRounds = 5,
     required void Function(Map<String, dynamic> event) onEvent,
   }) async {
     cancelAgentStream();
@@ -193,6 +196,7 @@ class ApiClient {
         'message': message,
         if (sessionId != null) 'sessionId': sessionId,
         'confirmWrites': confirmWrites,
+        'maxRounds': maxRounds,
       });
       final res = await client.send(req).timeout(const Duration(seconds: 180));
       if (res.statusCode >= 400) {

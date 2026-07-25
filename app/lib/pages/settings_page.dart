@@ -492,7 +492,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.48',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.4.49',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
@@ -829,6 +829,35 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 '刷新主机列表时同时探测的 SSH 数（1–6）',
                 style: TextStyle(fontSize: 11, color: AppColors.textFaint),
               ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('自动探针间隔', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                  ),
+                  Text(
+                    state.hostAutoProbeSec == 0 ? '关' : '${state.hostAutoProbeSec}s',
+                    style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
+                  ),
+                ],
+              ),
+              Slider(
+                value: state.hostAutoProbeSec.toDouble().clamp(0, 300),
+                min: 0,
+                max: 300,
+                divisions: 30,
+                label: state.hostAutoProbeSec == 0 ? '关' : '${state.hostAutoProbeSec}s',
+                onChanged: (v) {
+                  // snap to 0 or 10s steps
+                  final raw = v.round();
+                  final snapped = raw == 0 ? 0 : ((raw / 10).round() * 10).clamp(10, 300);
+                  state.setHostAutoProbeSec(snapped);
+                },
+              ),
+              const Text(
+                '后台定时刷新主机探针（0=关闭）。费电/费 SSH，仅在需要看板时打开。',
+                style: TextStyle(fontSize: 11, color: AppColors.textFaint),
+              ),
               const SizedBox(height: 8),
               _fontSlider(
                 context: context,
@@ -936,7 +965,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             icon: Icons.rule_folder_outlined,
             accent: AppColors.warning,
             title: 'Agent 行为',
-            subtitle: '确认策略与安全',
+            subtitle: '确认 · 循环 · 显示 · 输入',
             children: [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -948,6 +977,79 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 ),
                 value: state.confirmWrites,
                 onChanged: (v) => state.setConfirmWrites(v),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('工具循环轮数', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                  ),
+                  Text(
+                    '${state.agentMaxRounds}',
+                    style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
+                  ),
+                ],
+              ),
+              Slider(
+                value: state.agentMaxRounds.toDouble().clamp(3, 12),
+                min: 3,
+                max: 12,
+                divisions: 9,
+                label: '${state.agentMaxRounds}',
+                onChanged: (v) => state.setAgentMaxRounds(v.round()),
+              ),
+              const Text(
+                '单次对话最多调用工具几轮（3–12，默认 5）。复杂排障可调高。',
+                style: TextStyle(fontSize: 11, color: AppColors.textFaint),
+              ),
+              const SizedBox(height: 6),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('显示思考过程', style: TextStyle(fontSize: 13.5)),
+                subtitle: const Text('关闭后隐藏模型 reasoning 块', style: TextStyle(fontSize: 11.5)),
+                value: state.agentShowReasoning,
+                onChanged: (v) => state.setAgentShowReasoning(v),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('折叠成功工具卡', style: TextStyle(fontSize: 13.5)),
+                subtitle: const Text('失败仍展开；关闭则成功结果也默认展开', style: TextStyle(fontSize: 11.5)),
+                value: state.agentCollapseTools,
+                onChanged: (v) => state.setAgentCollapseTools(v),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('流式跟随底部', style: TextStyle(fontSize: 13.5)),
+                subtitle: const Text('生成时自动滚到最新（上滑阅读时仍可停跟）', style: TextStyle(fontSize: 11.5)),
+                value: state.agentAutoScroll,
+                onChanged: (v) => state.setAgentAutoScroll(v),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('回车发送', style: TextStyle(fontSize: 13.5)),
+                subtitle: const Text('关闭则回车换行，需点发送按钮', style: TextStyle(fontSize: 11.5)),
+                value: state.agentEnterToSend,
+                onChanged: (v) => state.setAgentEnterToSend(v),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('发送后保持键盘', style: TextStyle(fontSize: 13.5)),
+                subtitle: const Text('方便连续追问', style: TextStyle(fontSize: 11.5)),
+                value: state.agentKeepKeyboard,
+                onChanged: (v) => state.setAgentKeepKeyboard(v),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('触感反馈', style: TextStyle(fontSize: 13.5)),
+                subtitle: const Text('发送时轻微震动', style: TextStyle(fontSize: 11.5)),
+                value: state.hapticFeedback,
+                onChanged: (v) => state.setHapticFeedback(v),
               ),
             ],
           ),

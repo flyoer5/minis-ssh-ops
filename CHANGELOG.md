@@ -1,3 +1,15 @@
+## 1.4.49
+
+### Settings
+- Agent: max tool rounds (3–12), show reasoning, collapse tools, auto-scroll, enter-to-send, keep keyboard, haptic
+- Display: host auto-probe interval (0–300s)
+- Prefs export/import/reset include new keys
+
+### Wiring
+- Backend chat/stream accept maxRounds (clamp 3–12)
+- Agent UI respects prefs (scroll, enter, keyboard, reasoning, tool collapse, haptic)
+- Hosts page periodic probe when interval > 0
+
 ## 1.4.48
 
 ### Bugfix

@@ -75,7 +75,9 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   int _lastMsgCount = 0;
   int _lastTailLen = 0;
 
-  void _bottom() {
+  void _bottom({bool force = false}) {
+    final state = context.read<AppState>();
+    if (!force && !state.agentAutoScroll) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
         _scroll.jumpTo(_scroll.position.maxScrollExtent);
@@ -87,6 +89,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   /// Keep view pinned to bottom during streaming, but only when the user is
   /// already near the bottom (so manual scroll-up to read isn't yanked back).
   void _autoFollow(AppState state) {
+    if (!state.agentAutoScroll) return;
     final msgs = state.agentMessages;
     final count = msgs.length;
     final tailLen = msgs.isEmpty ? 0 : msgs.last.content.length;
@@ -122,6 +125,12 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       return;
     }
     _input.clear();
+    if (state.hapticFeedback) {
+      HapticFeedback.lightImpact();
+    }
+    if (!state.agentKeepKeyboard) {
+      _focus.unfocus();
+    }
     setState(() {
       _busy = true;
       _busyHint = '思考 / 调用工具中…（可点停止）';
@@ -143,7 +152,10 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     } finally {
       if (mounted) {
         setState(() => _busy = false);
-        _bottom();
+        _bottom(force: true);
+        if (state.agentKeepKeyboard) {
+          _focus.requestFocus();
+        }
       }
     }
   }
@@ -612,7 +624,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                             child: IconButton(
                               tooltip: '回到底部',
                               visualDensity: VisualDensity.compact,
-                              onPressed: _bottom,
+                              onPressed: () => _bottom(force: true),
                               icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.accentSoft),
                             ),
                           ),
@@ -669,14 +681,19 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                       minLines: 1,
                       maxLines: 6,
                       style: TextStyle(fontSize: state.agentFontSize, color: AppColors.text),
-                      textInputAction: TextInputAction.send,
+                      textInputAction:
+                          state.agentEnterToSend ? TextInputAction.send : TextInputAction.newline,
                       onSubmitted: (_) {
-                        if (!(_busy || state.agentBusy)) _send(state);
+                        if (state.agentEnterToSend && !(_busy || state.agentBusy)) {
+                          _send(state);
+                        }
                       },
                       decoration: InputDecoration(
                         hintText: state.selectedHostId == null
                             ? '先选主机'
-                            : ((_busy || state.agentBusy) ? '生成中…点停止可中断' : '消息'),
+                            : ((_busy || state.agentBusy)
+                                ? '生成中…点停止可中断'
+                                : (state.agentEnterToSend ? '消息 · 回车发送' : '消息 · 回车换行')),
                         hintStyle: const TextStyle(color: AppColors.textFaint),
                         filled: true,
                         fillColor: AppColors.surface,

@@ -53,6 +53,9 @@ class _ConfirmPlanCardState extends State<_ConfirmPlanCard> {
     if ((state.stepOutputs['step_$stepId'] ?? '').isNotEmpty) return;
     setState(() => _running.add(stepId));
     try {
+      if (state.hapticFeedback) {
+        HapticFeedback.lightImpact();
+      }
       await state.runAgentStep(stepId: stepId, command: cmd, confirmed: true);
       if (continueAfter && context.mounted) {
         final out = state.stepOutputs['step_$stepId'] ?? '';
@@ -427,10 +430,12 @@ class _Bubble extends StatelessWidget {
 
     // —— toolUse / toolResult (Minis) ——
     if (part == 'toolUse' || part == 'toolResult') {
+      final collapse = context.watch<AppState>().agentCollapseTools;
       return _MinisToolBlock(
         msg: msg,
         part: part,
         fontSize: fs,
+        collapseSuccess: collapse,
         onCopy: () => _copy(context, _copyText),
       );
     }
@@ -463,6 +468,9 @@ class _Bubble extends StatelessWidget {
 
     // —— reasoning (Minis messages.reasoning_content) ——
     if (msg.kind == ChatKind.reasoning || part == 'reasoning') {
+      if (!context.watch<AppState>().agentShowReasoning) {
+        return const SizedBox.shrink();
+      }
       return _ReasoningBlock(
         content: msg.content,
         fontSize: fs,
@@ -554,7 +562,14 @@ class _MinisToolBlock extends StatefulWidget {
   final String part;
   final double fontSize;
   final VoidCallback onCopy;
-  const _MinisToolBlock({required this.msg, required this.part, required this.onCopy, this.fontSize = 15});
+  final bool collapseSuccess;
+  const _MinisToolBlock({
+    required this.msg,
+    required this.part,
+    required this.onCopy,
+    this.fontSize = 15,
+    this.collapseSuccess = true,
+  });
 
   @override
   State<_MinisToolBlock> createState() => _MinisToolBlockState();
@@ -566,13 +581,15 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
 
   /// Minis-like density:
   /// - toolUse (running): collapsed (header only: name + description)
-  /// - toolResult success: collapsed by default (tap to see output)
+  /// - toolResult success: collapsed by default when agentCollapseTools
   /// - toolResult failure: expanded so errors are visible
   bool _defaultOpen() {
     if (widget.part != 'toolResult') return false;
     final s = widget.msg.meta?['success'];
     final failed = s == false || s?.toString() == 'false';
-    return failed;
+    if (failed) return true;
+    // Prefer watching via context in build; init uses root prefs via widget.
+    return !widget.collapseSuccess;
   }
 
   @override

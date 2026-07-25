@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Font sizes, navigation chrome, host-card density.
+/// Font sizes, navigation chrome, host-card density, agent behavior.
 /// Mixed into [AppState] so prefs stay one notify surface for now.
 mixin UiPrefs on ChangeNotifier {
   double termFontSize = 13;
@@ -30,6 +30,31 @@ mixin UiPrefs on ChangeNotifier {
   /// Concurrent SSH probes when refreshing host list (1–6).
   int probeConcurrency = 3;
 
+  // —— Agent ——
+  /// Tool-loop rounds per user turn (3–12). Backend clamps.
+  int agentMaxRounds = 5;
+
+  /// Follow the bottom of the chat while streaming.
+  bool agentAutoScroll = true;
+
+  /// Show model "thinking / reasoning" blocks.
+  bool agentShowReasoning = true;
+
+  /// Collapse successful tool cards by default (failed still expand).
+  bool agentCollapseTools = true;
+
+  /// Enter sends message; when false, Enter inserts newline (IME action: newline).
+  bool agentEnterToSend = true;
+
+  /// Keep soft keyboard after send.
+  bool agentKeepKeyboard = false;
+
+  /// Light haptic on send / confirm run.
+  bool hapticFeedback = true;
+
+  /// Auto-refresh host probes in background (seconds; 0 = off).
+  int hostAutoProbeSec = 0;
+
   void loadUiPrefs(SharedPreferences prefs) {
     termFontSize = prefs.getDouble('termFontSize') ?? 13;
     agentFontSize = prefs.getDouble('agentFontSize') ?? 15;
@@ -45,6 +70,15 @@ mixin UiPrefs on ChangeNotifier {
     streamMarkdown = prefs.getBool('streamMarkdown') ?? false;
     final pc = prefs.getInt('probeConcurrency') ?? 3;
     probeConcurrency = pc.clamp(1, 6);
+
+    agentMaxRounds = (prefs.getInt('agentMaxRounds') ?? 5).clamp(3, 12);
+    agentAutoScroll = prefs.getBool('agentAutoScroll') ?? true;
+    agentShowReasoning = prefs.getBool('agentShowReasoning') ?? true;
+    agentCollapseTools = prefs.getBool('agentCollapseTools') ?? true;
+    agentEnterToSend = prefs.getBool('agentEnterToSend') ?? true;
+    agentKeepKeyboard = prefs.getBool('agentKeepKeyboard') ?? false;
+    hapticFeedback = prefs.getBool('hapticFeedback') ?? true;
+    hostAutoProbeSec = (prefs.getInt('hostAutoProbeSec') ?? 0).clamp(0, 600);
   }
 
   Map<String, dynamic> uiPrefsExport() => {
@@ -59,6 +93,14 @@ mixin UiPrefs on ChangeNotifier {
         'pathFavorites': pathFavorites,
         'streamMarkdown': streamMarkdown,
         'probeConcurrency': probeConcurrency,
+        'agentMaxRounds': agentMaxRounds,
+        'agentAutoScroll': agentAutoScroll,
+        'agentShowReasoning': agentShowReasoning,
+        'agentCollapseTools': agentCollapseTools,
+        'agentEnterToSend': agentEnterToSend,
+        'agentKeepKeyboard': agentKeepKeyboard,
+        'hapticFeedback': hapticFeedback,
+        'hostAutoProbeSec': hostAutoProbeSec,
       };
 
   Future<void> applyUiPrefsImport(Map pr) async {
@@ -78,6 +120,35 @@ mixin UiPrefs on ChangeNotifier {
     }
     if (pr['streamMarkdown'] is bool) await setStreamMarkdown(pr['streamMarkdown'] as bool);
     if (pr['probeConcurrency'] is num) await setProbeConcurrency((pr['probeConcurrency'] as num).toInt());
+    if (pr['agentMaxRounds'] is num) await setAgentMaxRounds((pr['agentMaxRounds'] as num).toInt());
+    if (pr['agentAutoScroll'] is bool) await setAgentAutoScroll(pr['agentAutoScroll'] as bool);
+    if (pr['agentShowReasoning'] is bool) await setAgentShowReasoning(pr['agentShowReasoning'] as bool);
+    if (pr['agentCollapseTools'] is bool) await setAgentCollapseTools(pr['agentCollapseTools'] as bool);
+    if (pr['agentEnterToSend'] is bool) await setAgentEnterToSend(pr['agentEnterToSend'] as bool);
+    if (pr['agentKeepKeyboard'] is bool) await setAgentKeepKeyboard(pr['agentKeepKeyboard'] as bool);
+    if (pr['hapticFeedback'] is bool) await setHapticFeedback(pr['hapticFeedback'] as bool);
+    if (pr['hostAutoProbeSec'] is num) await setHostAutoProbeSec((pr['hostAutoProbeSec'] as num).toInt());
+  }
+
+  Future<void> resetUiDefaults() async {
+    await setTermFontSize(13);
+    await setAgentFontSize(15);
+    await setRecordsFontSize(13);
+    await setUiFontSize(14);
+    await setEditorFontSize(13);
+    await setNavMode('bottom');
+    await setHostCardCompact(false);
+    await setStreamMarkdown(false);
+    await setProbeConcurrency(3);
+    await setAgentMaxRounds(5);
+    await setAgentAutoScroll(true);
+    await setAgentShowReasoning(true);
+    await setAgentCollapseTools(true);
+    await setAgentEnterToSend(true);
+    await setAgentKeepKeyboard(false);
+    await setHapticFeedback(true);
+    await setHostAutoProbeSec(0);
+    // leave confirmWrites and pathFavorites as-is (user safety / data)
   }
 
   Future<void> setTermFontSize(double v) async {
@@ -178,6 +249,62 @@ mixin UiPrefs on ChangeNotifier {
     probeConcurrency = v.clamp(1, 6);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('probeConcurrency', probeConcurrency);
+    notifyListeners();
+  }
+
+  Future<void> setAgentMaxRounds(int v) async {
+    agentMaxRounds = v.clamp(3, 12);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('agentMaxRounds', agentMaxRounds);
+    notifyListeners();
+  }
+
+  Future<void> setAgentAutoScroll(bool v) async {
+    agentAutoScroll = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('agentAutoScroll', v);
+    notifyListeners();
+  }
+
+  Future<void> setAgentShowReasoning(bool v) async {
+    agentShowReasoning = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('agentShowReasoning', v);
+    notifyListeners();
+  }
+
+  Future<void> setAgentCollapseTools(bool v) async {
+    agentCollapseTools = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('agentCollapseTools', v);
+    notifyListeners();
+  }
+
+  Future<void> setAgentEnterToSend(bool v) async {
+    agentEnterToSend = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('agentEnterToSend', v);
+    notifyListeners();
+  }
+
+  Future<void> setAgentKeepKeyboard(bool v) async {
+    agentKeepKeyboard = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('agentKeepKeyboard', v);
+    notifyListeners();
+  }
+
+  Future<void> setHapticFeedback(bool v) async {
+    hapticFeedback = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hapticFeedback', v);
+    notifyListeners();
+  }
+
+  Future<void> setHostAutoProbeSec(int v) async {
+    hostAutoProbeSec = v.clamp(0, 600);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('hostAutoProbeSec', hostAutoProbeSec);
     notifyListeners();
   }
 }

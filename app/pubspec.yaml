@@ -1,7 +1,7 @@
 name: ssh_ai_agent
 description: 机枢 — SSH 运维 Agent
 publish_to: "none"
-version: 1.4.48+80
+version: 1.4.49+81
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

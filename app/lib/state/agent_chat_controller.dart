@@ -9,12 +9,13 @@ import 'package:ssh_ai_agent/models/agent_session.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 
 /// Agent transcript, sessions, SSE coalescing / tool pairing.
-/// Mixed into [AppState]; requires [api], [selectedHostId], [confirmWrites].
+/// Mixed into [AppState]; requires [api], [selectedHostId], [confirmWrites], [agentMaxRounds].
 mixin AgentChatController on ChangeNotifier {
   ApiClient get api;
   String? get selectedHostId;
   set selectedHostId(String? value);
   bool get confirmWrites;
+  int get agentMaxRounds;
 
   /// Coalesce high-frequency stream token notifies (~30fps max).
   Timer? _streamNotifyTimer;
@@ -661,6 +662,7 @@ mixin AgentChatController on ChangeNotifier {
           message: userText,
           sessionId: agentSessionId,
           confirmWrites: confirmWrites,
+          maxRounds: agentMaxRounds,
           onEvent: (raw) {
             if (turn != _agentTurnGen) return;
             final type = raw['type']?.toString() ?? '';
@@ -689,6 +691,7 @@ mixin AgentChatController on ChangeNotifier {
             message: userText,
             sessionId: agentSessionId,
             confirmWrites: confirmWrites,
+            maxRounds: agentMaxRounds,
           );
           if (turn != _agentTurnGen) return;
           agentSessionId = res['sessionId'] as String? ?? agentSessionId;
