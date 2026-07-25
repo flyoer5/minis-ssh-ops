@@ -25,6 +25,8 @@ mixin AgentChatController on ChangeNotifier {
   // --- Agent chat ---
   Map<String, dynamic>? lastPlan;
   String? agentSessionId;
+  /// Display title for the open session (Minis-style app bar).
+  String agentSessionTitle = '新会话';
   final Map<String, String> stepOutputs = {};
   final List<ChatMessage> agentMessages = [];
   /// Index of last plan message in agentMessages (for attaching step outputs).
@@ -61,6 +63,7 @@ mixin AgentChatController on ChangeNotifier {
     lastPlan = null;
     stepOutputs.clear();
     agentSessionId = null;
+    agentSessionTitle = '新会话';
     _lastPlanMsgIndex = null;
     _agentCancelRequested = false;
     _runningStepIds.clear();
@@ -105,6 +108,7 @@ mixin AgentChatController on ChangeNotifier {
       ..clear()
       ..addAll(s.messages);
     agentSessionId = s.id;
+    agentSessionTitle = s.title.isNotEmpty ? s.title : '会话';
     if (s.hostId != null) selectedHostId = s.hostId;
     lastPlan = null;
     stepOutputs.clear();
@@ -116,7 +120,7 @@ mixin AgentChatController on ChangeNotifier {
     _saveSessionsToPrefs();
   }
 
-  void openAgentSessionRaw(String id, List<ChatMessage> msgs) {
+  void openAgentSessionRaw(String id, List<ChatMessage> msgs, {String? title}) {
     // Save current transcript into sessions if needed (as before)
     if (agentMessages.isNotEmpty) {
       final curId = agentSessionId ?? '';
@@ -139,6 +143,13 @@ mixin AgentChatController on ChangeNotifier {
       ..clear()
       ..addAll(msgs);
     agentSessionId = id;
+    if (title != null && title.trim().isNotEmpty) {
+      agentSessionTitle = title.trim();
+    } else if (msgs.isNotEmpty) {
+      agentSessionTitle = _sessionTitleFromMessages(msgs);
+    } else {
+      agentSessionTitle = '会话';
+    }
     lastPlan = null;
     stepOutputs.clear();
     _lastPlanMsgIndex = null;
@@ -149,12 +160,25 @@ mixin AgentChatController on ChangeNotifier {
     _saveSessionsToPrefs();
   }
 
+  Future<void> renameOpenSessionTitle(String title) async {
+    final t = title.trim();
+    if (t.isEmpty) return;
+    agentSessionTitle = t.length > 48 ? '${t.substring(0, 48)}…' : t;
+    notifyListeners();
+    final id = agentSessionId;
+    if (id == null || id.isEmpty) return;
+    try {
+      await api.renameAgentSession(id, agentSessionTitle);
+    } catch (_) {}
+  }
+
   void deleteAgentSession(String id) {
     agentSessions.removeWhere((e) => e.id == id);
     // If deleting the open session, clear the live transcript
     if (agentSessionId == id) {
       agentMessages.clear();
       agentSessionId = null;
+      agentSessionTitle = '新会话';
       lastPlan = null;
       stepOutputs.clear();
       _lastPlanMsgIndex = null;
@@ -688,6 +712,10 @@ mixin AgentChatController on ChangeNotifier {
     _agentCancelRequested = false;
     final turn = ++_agentTurnGen;
     _pushMsg(ChatMessage(role: 'user', content: userText));
+    if (agentSessionTitle == '新会话' || agentSessionTitle.isEmpty) {
+      final t = userText.trim().replaceAll(RegExp(r'\s+'), ' ');
+      agentSessionTitle = t.length > 32 ? '${t.substring(0, 32)}…' : t;
+    }
     notifyListeners();
     try {
       // Prefer SSE progressive events; fall back to batch chat only on real errors.

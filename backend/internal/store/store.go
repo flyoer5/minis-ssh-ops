@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -119,7 +120,26 @@ CREATE TABLE IF NOT EXISTS session_memory (
 CREATE INDEX IF NOT EXISTS idx_chat_session_id ON chat_messages(session_id);
 CREATE INDEX IF NOT EXISTS idx_agent_sessions_updated ON agent_sessions(updated_at);
 `)
-	return err
+	if err != nil {
+		return err
+	}
+	// Additive columns for Minis-style message parts (ignore if already present).
+	for _, ddl := range []string{
+		`ALTER TABLE chat_messages ADD COLUMN kind TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE chat_messages ADD COLUMN meta TEXT NOT NULL DEFAULT ''`,
+	} {
+		if _, e := s.db.Exec(ddl); e != nil {
+			// duplicate column name → already migrated
+			if !strings.Contains(strings.ToLower(e.Error()), "duplicate column") {
+				// SQLite may say "duplicate column name: kind"
+				msg := strings.ToLower(e.Error())
+				if !strings.Contains(msg, "duplicate") {
+					return e
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // AgentSession is a durable agent conversation header (Minis-style).
@@ -436,8 +456,8 @@ func (s *Store) ListChatRecent(sessionID string, limit int) ([]map[string]any, e
 		limit = 100
 	}
 	rows, err := s.db.Query(
-		`SELECT id,session_id,role,content,created_at FROM (
-		   SELECT id,session_id,role,content,created_at FROM chat_messages
+		`SELECT id,session_id,role,content,created_at,COALESCE(kind,''),COALESCE(meta,'') FROM (
+		   SELECT id,session_id,role,content,created_at,kind,meta FROM chat_messages
 		   WHERE session_id=? ORDER BY id DESC LIMIT ?
 		 ) ORDER BY id ASC`,
 		sessionID, limit)
@@ -448,13 +468,23 @@ func (s *Store) ListChatRecent(sessionID string, limit int) ([]map[string]any, e
 	var out []map[string]any
 	for rows.Next() {
 		var id int64
-		var sid, role, content, ca string
-		if err := rows.Scan(&id, &sid, &role, &content, &ca); err != nil {
+		var sid, role, content, ca, kind, metaStr string
+		if err := rows.Scan(&id, &sid, &role, &content, &ca, &kind, &metaStr); err != nil {
 			return nil, err
 		}
-		out = append(out, map[string]any{
+		row := map[string]any{
 			"id": id, "sessionId": sid, "role": role, "content": content, "createdAt": ca,
-		})
+		}
+		if kind != "" {
+			row["kind"] = kind
+		}
+		if metaStr != "" {
+			var meta map[string]any
+			if json.Unmarshal([]byte(metaStr), &meta) == nil {
+				row["meta"] = meta
+			}
+		}
+		out = append(out, row)
 	}
 	if out == nil {
 		out = []map[string]any{}
@@ -468,7 +498,7 @@ func (s *Store) ListChatAfter(sessionID string, afterID int64, limit int) ([]map
 		limit = 200
 	}
 	rows, err := s.db.Query(
-		`SELECT id,session_id,role,content,created_at FROM chat_messages
+		`SELECT id,session_id,role,content,created_at,COALESCE(kind,''),COALESCE(meta,'') FROM chat_messages
 		 WHERE session_id=? AND id>? ORDER BY id ASC LIMIT ?`,
 		sessionID, afterID, limit)
 	if err != nil {
@@ -478,13 +508,23 @@ func (s *Store) ListChatAfter(sessionID string, afterID int64, limit int) ([]map
 	var out []map[string]any
 	for rows.Next() {
 		var id int64
-		var sid, role, content, ca string
-		if err := rows.Scan(&id, &sid, &role, &content, &ca); err != nil {
+		var sid, role, content, ca, kind, metaStr string
+		if err := rows.Scan(&id, &sid, &role, &content, &ca, &kind, &metaStr); err != nil {
 			return nil, err
 		}
-		out = append(out, map[string]any{
+		row := map[string]any{
 			"id": id, "sessionId": sid, "role": role, "content": content, "createdAt": ca,
-		})
+		}
+		if kind != "" {
+			row["kind"] = kind
+		}
+		if metaStr != "" {
+			var meta map[string]any
+			if json.Unmarshal([]byte(metaStr), &meta) == nil {
+				row["meta"] = meta
+			}
+		}
+		out = append(out, row)
 	}
 	if out == nil {
 		out = []map[string]any{}
@@ -553,12 +593,24 @@ func (s *Store) ListAudit(limit int) ([]AuditEntry, error) {
 }
 
 func (s *Store) AddChat(sessionID, role, content string) error {
+	return s.AddChatPart(sessionID, role, content, "", nil)
+}
+
+// AddChatPart stores a transcript part with optional kind/meta (JSON object).
+func (s *Store) AddChatPart(sessionID, role, content, kind string, meta map[string]any) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	// Best-effort session header (host filled by EnsureAgentSession from handlers).
 	_ = s.EnsureAgentSession(sessionID, "", "")
+	metaStr := ""
+	if meta != nil {
+		b, err := json.Marshal(meta)
+		if err == nil {
+			metaStr = string(b)
+		}
+	}
 	_, err := s.db.Exec(
-		`INSERT INTO chat_messages(session_id,role,content,created_at) VALUES(?,?,?,?)`,
-		sessionID, role, content, now,
+		`INSERT INTO chat_messages(session_id,role,content,created_at,kind,meta) VALUES(?,?,?,?,?,?)`,
+		sessionID, role, content, now, kind, metaStr,
 	)
 	if err != nil {
 		return err

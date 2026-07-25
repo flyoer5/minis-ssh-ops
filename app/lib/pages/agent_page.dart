@@ -189,11 +189,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     }
   }
 
-  Future<void> _openSession(AppState state, String id) async {
+  Future<void> _openSession(AppState state, String id, {String? title}) async {
     try {
       final raw = await state.api.getAgentSessionMessages(id);
       final msgs = [for (final j in raw) ChatMessage.fromJson(j)];
-      state.openAgentSessionRaw(id, msgs);
+      state.openAgentSessionRaw(id, msgs, title: title);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('加载会话失败: $e')));
@@ -394,7 +394,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                                             style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
                                           ),
                                           onTap: () {
-                                            _openSession(state, s.id);
+                                            _openSession(state, s.id, title: s.title);
                                             Navigator.pop(c);
                                           },
                                           trailing: PopupMenuButton<String>(
@@ -492,9 +492,62 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
         leading: NavMenuButton.leadingOf(context),
         leadingWidth: NavMenuButton.leadingWidthOf(context),
         titleSpacing: 4,
-        title: Text(
-          state.selectedHostId == null ? 'Agent' : state.hostLabel,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        title: InkWell(
+          onTap: (_busy || state.agentBusy || state.agentSessionId == null)
+              ? null
+              : () async {
+                  final ctrl = TextEditingController(text: state.agentSessionTitle);
+                  final name = await showDialog<String>(
+                    context: context,
+                    builder: (d) => AlertDialog(
+                      title: const Text('会话标题'),
+                      content: TextField(
+                        controller: ctrl,
+                        autofocus: true,
+                        maxLength: 48,
+                        decoration: const InputDecoration(labelText: '标题'),
+                        onSubmitted: (x) => Navigator.pop(d, x),
+                      ),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(d), child: const Text('取消')),
+                        FilledButton(onPressed: () => Navigator.pop(d, ctrl.text), child: const Text('保存')),
+                      ],
+                    ),
+                  );
+                  if (name != null && name.trim().isNotEmpty) {
+                    await state.renameOpenSessionTitle(name);
+                  }
+                },
+          borderRadius: BorderRadius.circular(6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      state.agentSessionTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  if (state.agentSessionId != null)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 2),
+                      child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textFaint),
+                    ),
+                ],
+              ),
+              Text(
+                state.selectedHostId == null ? '未选主机' : state.hostLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+              ),
+            ],
+          ),
         ),
         actions: [
           if (_busy || state.agentBusy)
@@ -531,6 +584,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                       final sid = r['sessionId'] ?? r['id'] ?? '';
                       if (sid is String && sid.isNotEmpty) {
                         state.agentSessionId = sid;
+                        state.agentSessionTitle = '新会话';
+                        state.notifyListeners();
                       }
                     } catch (_) {}
                     if (mounted) {

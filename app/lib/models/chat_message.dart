@@ -24,16 +24,72 @@ class ChatMessage {
     if (rawAt != null) {
       at = DateTime.tryParse(rawAt.toString())?.toLocal() ?? DateTime.now();
     }
-    // Server currently stores plain role/content; map tool roles to toolResult kind.
-    ChatKind kind = ChatKind.text;
-    if (role == 'tool') {
-      kind = ChatKind.toolResult;
-    } else if (role == 'system') {
-      kind = ChatKind.status;
-    }
+
     Map<String, dynamic>? meta;
     final m = j['meta'];
     if (m is Map) meta = Map<String, dynamic>.from(m);
+
+    final kindStr = (j['kind'] ?? meta?['part'] ?? '').toString().toLowerCase();
+    ChatKind kind = ChatKind.text;
+    switch (kindStr) {
+      case 'reasoning':
+        kind = ChatKind.reasoning;
+        break;
+      case 'tooluse':
+      case 'tool_use':
+        kind = ChatKind.toolUse;
+        break;
+      case 'toolresult':
+      case 'tool_result':
+      case 'stepresult':
+        kind = ChatKind.toolResult;
+        break;
+      case 'plan':
+        kind = ChatKind.plan;
+        break;
+      case 'error':
+        kind = ChatKind.error;
+        break;
+      case 'status':
+        kind = ChatKind.status;
+        break;
+      case 'text':
+      case '':
+        if (role == 'tool') {
+          kind = ChatKind.toolResult;
+        } else if (role == 'system') {
+          kind = ChatKind.status;
+        } else {
+          kind = ChatKind.text;
+        }
+        break;
+      default:
+        if (role == 'tool') {
+          kind = ChatKind.toolResult;
+        } else {
+          kind = ChatKind.text;
+        }
+    }
+
+    // Ensure tool cards have part meta for _Bubble / _MinisToolBlock.
+    if (kind == ChatKind.toolUse || kind == ChatKind.toolResult) {
+      meta = {
+        ...?meta,
+        'part': kind == ChatKind.toolUse ? 'toolUse' : 'toolResult',
+        if (meta?['success'] == null && kind == ChatKind.toolResult && content.isNotEmpty)
+          'output': content,
+      };
+      // Infer success when missing
+      if (kind == ChatKind.toolResult && meta?['success'] == null && meta?['pendingConfirm'] != true) {
+        final low = content.toLowerCase();
+        final failed = low.startsWith('error:') || low.contains('needs_confirm');
+        meta!['success'] = !failed;
+      }
+    }
+    if (kind == ChatKind.reasoning) {
+      meta = {...?meta, 'part': 'reasoning'};
+    }
+
     return ChatMessage(role: role, content: content, kind: kind, meta: meta, at: at);
   }
 }

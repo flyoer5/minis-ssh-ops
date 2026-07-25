@@ -1,3 +1,11 @@
+## 1.5.3
+
+### Agent sessions P1
+- Persist tool/reasoning/assistant parts (kind+meta) for history replay
+- chat_messages columns: kind, meta; ListChat returns them
+- App bar: session title + host subtitle; tap title to rename
+- Open history restores structured bubbles; title tracks first user message
+
 ## 1.5.2
 
 ### Agent sessions (Minis-style)
