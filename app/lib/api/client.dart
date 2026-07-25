@@ -293,7 +293,7 @@ class ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
-  Future<List<Map<String, dynamic>>> getAgentSessionMessages(String id, {int limit = 200}) async {
+  Future<List<Map<String, dynamic>>> getAgentSessionMessages(String id, {int limit = 500}) async {
     final uri = Uri.parse('$baseUrl/v1/agent/sessions/$id/messages')
         .replace(queryParameters: {'limit': '$limit'});
     final r = await _c.get(uri, headers: _headers).timeout(const Duration(seconds: 30));

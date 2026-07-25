@@ -92,11 +92,14 @@ func (s *Server) handleGetAgentSession(w http.ResponseWriter, r *http.Request) {
 // GET /v1/agent/sessions/{id}/messages?limit=
 func (s *Server) handleGetAgentSessionMessages(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	limit := 200
+	limit := 500
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			limit = n
 		}
+	}
+	if limit > 2000 {
+		limit = 2000
 	}
 	if _, err := s.Store.GetAgentSession(id); err != nil && err != sql.ErrNoRows {
 		writeErr(w, http.StatusInternalServerError, err.Error())

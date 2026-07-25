@@ -1,3 +1,10 @@
+## 1.5.12
+
+### Self-check
+- Offline host footer: scrub SSH errors from uptime/sys (⏱ no longer shows dial errors)
+- Status chip: prefer 离线 over raw error oneLiners
+- Session messages limit default 200 → 500 (cap 2000)
+
 ## 1.5.11
 
 ### Bugfix (nightly self-check)

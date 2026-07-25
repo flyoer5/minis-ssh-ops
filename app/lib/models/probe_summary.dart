@@ -210,21 +210,7 @@ class ProbeSummary {
     }
     distro = distro.trim();
     if (distro.length > 40) distro = '${distro.substring(0, 40)}…';
-    final sys = arch.isEmpty ? distro : '$distro · $arch';
-    final one = ok ? 'cpu $cpuHint · mem $memHint · disk $diskHint' : '离线';
-
-    final lines = <ProbeLine>[
-      ProbeLine('系统', sys),
-      ProbeLine('CPU', cpuHint),
-      ProbeLine('负载', loadHint),
-      ProbeLine('磁盘', diskSub.isEmpty ? diskHint : '$diskHint ($diskSub)'),
-      ProbeLine('内存', memSub.isEmpty ? memHint : '$memHint ($memSub)'),
-      ProbeLine('运行', upHint),
-      ProbeLine('CPU%', cpuHint),
-      ProbeLine('磁盘%', diskHint),
-      ProbeLine('内存主', memHint),
-      ProbeLine('负载1', loadParts.isNotEmpty ? loadParts[0] : '—'),
-    ];
+    var sys = arch.isEmpty ? distro : '$distro · $arch';
 
     final detail = StringBuffer()
       ..writeln('os:\n$osName\n')
@@ -235,27 +221,56 @@ class ProbeSummary {
       ..writeln('disk:\n$disk\n')
       ..writeln('memory:\n$memory\n');
 
-    // Offline / hard probe failure: never show error blobs in metric columns.
+    // Offline / hard probe failure: never show error blobs in metric columns or ⏱.
+    bool errish(String s) {
+      final l = s.toLowerCase();
+      return s.startsWith('错误') ||
+          l.contains('error:') ||
+          l.contains('ssh dial') ||
+          l.contains('timeout') ||
+          l.contains('deadline') ||
+          l.contains('handshake') ||
+          l.contains('connection refused') ||
+          l.contains('no route') ||
+          l.contains('connection timed out');
+    }
+
     if (!ok) {
       bool metricOk(String s) {
         final t = s.replaceAll(' ', '');
         return t == '—' || RegExp(r'^[\d.]+%?$').hasMatch(t);
       }
-      if (!metricOk(cpuHint)) cpuHint = '—';
-      if (!metricOk(memHint)) {
+      if (!metricOk(cpuHint) || errish(cpuHint)) cpuHint = '—';
+      if (!metricOk(memHint) || errish(memHint)) {
         memHint = '—';
         memSub = '';
       }
-      if (!metricOk(diskHint)) {
+      if (!metricOk(diskHint) || errish(diskHint)) {
         diskHint = '—';
         diskSub = '';
       }
+      if (errish(upHint) || upHint.contains('ssh')) upHint = '—';
+      if (errish(loadHint)) loadHint = '—';
+      if (errish(sys) || sys.startsWith('错误')) sys = '—';
     }
+
+    final lines2 = <ProbeLine>[
+      ProbeLine('系统', sys),
+      ProbeLine('CPU', cpuHint),
+      ProbeLine('负载', loadHint),
+      ProbeLine('磁盘', diskSub.isEmpty ? diskHint : '$diskHint ($diskSub)'),
+      ProbeLine('内存', memSub.isEmpty ? memHint : '$memHint ($memSub)'),
+      ProbeLine('运行', upHint),
+      ProbeLine('CPU%', cpuHint),
+      ProbeLine('磁盘%', diskHint),
+      ProbeLine('内存主', memHint),
+      ProbeLine('负载1', loadParts.isNotEmpty && !errish(loadParts[0]) ? loadParts[0] : '—'),
+    ];
 
     return ProbeSummary(
       ok: ok,
-      oneLine: one,
-      lines: lines,
+      oneLine: ok ? 'cpu $cpuHint · mem $memHint · disk $diskHint' : '离线',
+      lines: lines2,
       detail: detail.toString().trim(),
     );
   }

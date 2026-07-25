@@ -693,10 +693,12 @@ class _StatusCard extends StatelessWidget {
     if (loading) return '探测中';
     if (summary == null) return '未探测';
     if (summary!.ok) return '在线';
-    // prefer short friendly oneLine (超时/认证失败/…) over generic Offline
+    // Never dump raw SSH errors into the status chip; details live in 探针详情.
     final o = summary!.oneLine.trim();
-    if (o.isNotEmpty && o != '离线' && o != '—' && o.toLowerCase() != 'offline') return o;
-    return '离线';
+    if (o.isEmpty || o == '—' || o == '离线' || o.toLowerCase() == 'offline') return '离线';
+    if (o.startsWith('错误') || o.toLowerCase().contains('ssh') || o.length > 24) return '离线';
+    // Short friendly reasons only (e.g. 认证失败)
+    return o;
   }
 
   @override
