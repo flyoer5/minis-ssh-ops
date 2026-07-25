@@ -95,6 +95,7 @@ class SshAiAgentApp extends StatelessWidget {
       create: (_) => AppState(ApiClient())..bootstrap(),
       child: MaterialApp(
         title: '机枢',
+        debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
         builder: (context, child) {
           // Keep ErrorWidget theme-consistent even outside routes.

@@ -420,7 +420,30 @@ class _FileEditorPageState extends State<FileEditorPage> {
         if (didPop) return;
         if (await _confirmLeave() && mounted) Navigator.of(context).pop();
       },
-      child: Scaffold(
+      child: Shortcuts(
+        shortcuts: const <ShortcutActivator, Intent>{
+          SingleActivator(LogicalKeyboardKey.keyS, control: true): _SaveIntent(),
+          SingleActivator(LogicalKeyboardKey.keyS, meta: true): _SaveIntent(),
+          SingleActivator(LogicalKeyboardKey.keyF, control: true): _FindIntent(),
+          SingleActivator(LogicalKeyboardKey.keyF, meta: true): _FindIntent(),
+        },
+        child: Actions(
+          actions: <Type, Action<Intent>>{
+            _SaveIntent: CallbackAction<_SaveIntent>(onInvoke: (_) {
+              if (dirty && !_saving && !_readOnly) _save();
+              return null;
+            }),
+            _FindIntent: CallbackAction<_FindIntent>(onInvoke: (_) {
+              setState(() {
+                _showFind = true;
+                _recomputeFinds();
+              });
+              return null;
+            }),
+          },
+          child: Focus(
+            autofocus: false,
+            child: Scaffold(
         backgroundColor: AppColors.bg,
         appBar: AppBar(
           backgroundColor: AppColors.surface,
@@ -724,12 +747,25 @@ class _FileEditorPageState extends State<FileEditorPage> {
                     const SizedBox(width: 8),
                   ],
                   Text('${_ctrl.text.length} 字符', style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
+                  const SizedBox(width: 8),
+                  Text('${_fontSize.toInt()}sp', style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
                 ],
               ),
             ),
           ],
         ),
       ),
+          ),
+        ),
+      ),
     );
   }
+}
+
+class _SaveIntent extends Intent {
+  const _SaveIntent();
+}
+
+class _FindIntent extends Intent {
+  const _FindIntent();
 }

@@ -20,6 +20,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
   final llmBase = TextEditingController();
   final llmKey = TextEditingController();
   final llmModel = TextEditingController(text: 'grok-4.5');
+  final customPrompt = TextEditingController();
   String thinkingLevel = 'auto';
   bool loaded = false;
   String? pingMsg;
@@ -27,6 +28,17 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
   List<String> _modelIds = [];
   bool _loadingModels = false;
   bool _obscureKey = true;
+
+  // Local slider drafts — write SharedPreferences only onChangeEnd (avoids lag).
+  double? _draftMaxRounds;
+  double? _draftTemp;
+  double? _draftProbeConc;
+  double? _draftAutoProbe;
+  double? _draftTermFont;
+  double? _draftAgentFont;
+  double? _draftRecordsFont;
+  double? _draftUiFont;
+  double? _draftEditorFont;
 
   @override
   // Settings is rarely sticky; free memory when off-tab.
@@ -40,6 +52,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     final s = context.read<AppState>();
     baseUrl.text = s.api.baseUrl;
     token.text = s.api.localToken;
+    customPrompt.text = s.agentCustomPrompt;
     final llm = s.llm;
     if (llm != null) {
       llmBase.text = (llm['baseUrl'] as String?) ?? '';
@@ -61,6 +74,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     llmBase.dispose();
     llmKey.dispose();
     llmModel.dispose();
+    customPrompt.dispose();
     super.dispose();
   }
 
@@ -492,7 +506,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.0',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.1',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
@@ -812,18 +826,22 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                     child: Text('探针并发', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
                   ),
                   Text(
-                    '${state.probeConcurrency}',
+                    '${(_draftProbeConc ?? state.probeConcurrency.toDouble()).round()}',
                     style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
                   ),
                 ],
               ),
               Slider(
-                value: state.probeConcurrency.toDouble().clamp(1, 6),
+                value: (_draftProbeConc ?? state.probeConcurrency.toDouble()).clamp(1, 6),
                 min: 1,
                 max: 6,
                 divisions: 5,
-                label: '${state.probeConcurrency}',
-                onChanged: (v) => state.setProbeConcurrency(v.round()),
+                label: '${(_draftProbeConc ?? state.probeConcurrency.toDouble()).round()}',
+                onChanged: (v) => setState(() => _draftProbeConc = v),
+                onChangeEnd: (v) {
+                  state.setProbeConcurrency(v.round());
+                  setState(() => _draftProbeConc = null);
+                },
               ),
               const Text(
                 '刷新主机列表时同时探测的 SSH 数（1–6）',
@@ -836,22 +854,26 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                     child: Text('自动探针间隔', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
                   ),
                   Text(
-                    state.hostAutoProbeSec == 0 ? '关' : '${state.hostAutoProbeSec}s',
+                    (() { final n = (_draftAutoProbe ?? state.hostAutoProbeSec.toDouble()).round(); return n == 0 ? '关' : '${n}s'; })(),
                     style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
                   ),
                 ],
               ),
               Slider(
-                value: state.hostAutoProbeSec.toDouble().clamp(0, 300),
+                value: (_draftAutoProbe ?? state.hostAutoProbeSec.toDouble()).clamp(0, 300),
                 min: 0,
                 max: 300,
                 divisions: 30,
-                label: state.hostAutoProbeSec == 0 ? '关' : '${state.hostAutoProbeSec}s',
-                onChanged: (v) {
-                  // snap to 0 or 10s steps
+                label: (() {
+                  final n = (_draftAutoProbe ?? state.hostAutoProbeSec.toDouble()).round();
+                  return n == 0 ? '关' : '${n}s';
+                })(),
+                onChanged: (v) => setState(() => _draftAutoProbe = v),
+                onChangeEnd: (v) {
                   final raw = v.round();
                   final snapped = raw == 0 ? 0 : ((raw / 10).round() * 10).clamp(10, 300);
                   state.setHostAutoProbeSec(snapped);
+                  setState(() => _draftAutoProbe = null);
                 },
               ),
               const Text(
@@ -862,50 +884,55 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               _fontSlider(
                 context: context,
                 label: '终端字号',
-                value: state.termFontSize,
+                value: _draftTermFont ?? state.termFontSize,
                 min: 10,
                 max: 20,
-                onChanged: (v) => state.setTermFontSize(v),
+                onChanged: (v) => setState(() => _draftTermFont = v),
+                onChangeEnd: (v) { state.setTermFontSize(v); setState(() => _draftTermFont = null); },
                 hint: '终端页也可用 A+ / A−',
               ),
               const SizedBox(height: 6),
               _fontSlider(
                 context: context,
                 label: 'Agent 正文字号',
-                value: state.agentFontSize,
+                value: _draftAgentFont ?? state.agentFontSize,
                 min: 12,
                 max: 20,
-                onChanged: (v) => state.setAgentFontSize(v),
+                onChanged: (v) => setState(() => _draftAgentFont = v),
+                onChangeEnd: (v) { state.setAgentFontSize(v); setState(() => _draftAgentFont = null); },
                 hint: '影响助手、用户气泡、工具/思考块',
               ),
               const SizedBox(height: 6),
               _fontSlider(
                 context: context,
                 label: '记录字号',
-                value: state.recordsFontSize,
+                value: _draftRecordsFont ?? state.recordsFontSize,
                 min: 11,
                 max: 18,
-                onChanged: (v) => state.setRecordsFontSize(v),
+                onChanged: (v) => setState(() => _draftRecordsFont = v),
+                onChangeEnd: (v) { state.setRecordsFontSize(v); setState(() => _draftRecordsFont = null); },
                 hint: '审计列表与详情',
               ),
               const SizedBox(height: 6),
               _fontSlider(
                 context: context,
                 label: '界面列表字号',
-                value: state.uiFontSize,
+                value: _draftUiFont ?? state.uiFontSize,
                 min: 11,
                 max: 20,
-                onChanged: (v) => state.setUiFontSize(v),
+                onChanged: (v) => setState(() => _draftUiFont = v),
+                onChangeEnd: (v) { state.setUiFontSize(v); setState(() => _draftUiFont = null); },
                 hint: '主机卡片、文件列表等',
               ),
               const SizedBox(height: 6),
               _fontSlider(
                 context: context,
                 label: '编辑器默认字号',
-                value: state.editorFontSize,
+                value: _draftEditorFont ?? state.editorFontSize,
                 min: 10,
                 max: 24,
-                onChanged: (v) => state.setEditorFontSize(v),
+                onChanged: (v) => setState(() => _draftEditorFont = v),
+                onChangeEnd: (v) { state.setEditorFontSize(v); setState(() => _draftEditorFont = null); },
                 hint: '远程文件编辑器打开时的默认大小',
               ),
               const SizedBox(height: 8),
@@ -965,7 +992,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             icon: Icons.rule_folder_outlined,
             accent: AppColors.warning,
             title: 'Agent 行为',
-            subtitle: '确认 · 循环 · 显示 · 输入',
+            subtitle: '温度 · 轮数 · 提示词 · 输入体验',
             children: [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -992,19 +1019,23 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       border: Border.all(color: AppColors.border),
                     ),
                     child: Text(
-                      '${state.agentMaxRounds}',
+                      '${(_draftMaxRounds ?? state.agentMaxRounds.toDouble()).round()}',
                       style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: AppColors.chipBlue, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
               ),
               Slider(
-                value: state.agentMaxRounds.toDouble().clamp(1, 99),
+                value: (_draftMaxRounds ?? state.agentMaxRounds.toDouble()).clamp(1, 99),
                 min: 1,
                 max: 99,
                 divisions: 98,
-                label: '${state.agentMaxRounds}',
-                onChanged: (v) => state.setAgentMaxRounds(v.round()),
+                label: '${(_draftMaxRounds ?? state.agentMaxRounds.toDouble()).round()}',
+                onChanged: (v) => setState(() => _draftMaxRounds = v),
+                onChangeEnd: (v) {
+                  state.setAgentMaxRounds(v.round());
+                  setState(() => _draftMaxRounds = null);
+                },
               ),
               Wrap(
                 spacing: 6,
@@ -1021,7 +1052,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               ),
               const SizedBox(height: 4),
               const Text(
-                '每次提问最多调几轮工具（3–32，默认 12）。长排障/安装建议 16–24。',
+                '每次提问最多调几轮工具（1–99，默认 12）。步骤越多耗时越长。',
                 style: TextStyle(fontSize: 11, color: AppColors.textFaint),
               ),
               const SizedBox(height: 6),
@@ -1031,26 +1062,35 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                     child: Text('模型温度', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
                   ),
                   Text(
-                    state.agentTemperature == 0 ? '默认' : '${state.agentTemperature.toStringAsFixed(1)}',
+                    (() {
+                      final x = _draftTemp ?? state.agentTemperature;
+                      return x == 0 ? '默认' : x.toStringAsFixed(1);
+                    })(),
                     style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: AppColors.chipBlue, fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
               Slider(
-                value: state.agentTemperature.clamp(0, 2),
+                value: (_draftTemp ?? state.agentTemperature).clamp(0, 2),
                 min: 0,
                 max: 2,
                 divisions: 20,
-                label: state.agentTemperature == 0 ? '默认' : '${state.agentTemperature.toStringAsFixed(1)}',
-                onChanged: (v) => state.setAgentTemperature(v),
+                label: (() {
+                  final x = _draftTemp ?? state.agentTemperature;
+                  return x == 0 ? '默认' : x.toStringAsFixed(1);
+                })(),
+                onChanged: (v) => setState(() => _draftTemp = v),
+                onChangeEnd: (v) {
+                  state.setAgentTemperature(v);
+                  setState(() => _draftTemp = null);
+                },
               ),
               const Text('0=默认 0.2，越高越随机。适合创意任务调高。', style: TextStyle(fontSize: 11, color: AppColors.textFaint)),
               const SizedBox(height: 8),
               const Text('自定义提示词', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
               TextField(
-                controller: TextEditingController(text: state.agentCustomPrompt)
-                  ..selection = TextSelection.collapsed(offset: state.agentCustomPrompt.length),
+                controller: customPrompt,
                 decoration: const InputDecoration(
                   hintText: '追加到系统提示词末尾（如：优先使用 Docker）',
                   isDense: true,
@@ -1061,7 +1101,6 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 minLines: 1,
                 style: const TextStyle(fontSize: 12.5, fontFamily: 'monospace'),
                 onChanged: (v) => state.setAgentCustomPrompt(v),
-                onSubmitted: (v) => state.setAgentCustomPrompt(v),
               ),
               const SizedBox(height: 6),
               SwitchListTile(

@@ -66,6 +66,7 @@ part of 'settings_page.dart';
     required double min,
     required double max,
     required ValueChanged<double> onChanged,
+    ValueChanged<double>? onChangeEnd,
     String? hint,
   }) {
     return Column(
@@ -99,9 +100,10 @@ part of 'settings_page.dart';
             value: value.clamp(min, max),
             min: min,
             max: max,
-            divisions: (max - min).round(),
+            divisions: (max - min).round().clamp(1, 200),
             label: value.toStringAsFixed(0),
             onChanged: onChanged,
+            onChangeEnd: onChangeEnd,
           ),
         ),
         if (hint != null)

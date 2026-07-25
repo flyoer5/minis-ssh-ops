@@ -48,6 +48,7 @@ class ProbeSummary {
       return t.split('\n').first.trim();
     }
 
+    final osName = pick('os');
     final uname = pick('uname');
     final uptime = pick('uptime');
     final disk = pick('disk');
@@ -166,27 +167,42 @@ class ProbeSummary {
     final upm = RegExp(r'up\s+([^,]+)').firstMatch(uptime);
     if (upm != null) upHint = upm.group(1)!.trim();
 
-    // uname -a → short: sysname release machine
-    String sys = firstLine(uname);
+    // Prefer /etc/os-release pretty name + machine arch (not kernel version).
+    String arch = '';
     {
-      final parts = sys.split(RegExp(r'\s+'));
-      if (parts.length >= 5) {
-        final sysname = parts[0];
-        final release = parts[2];
-        String machine = '';
-        for (var i = parts.length - 1; i >= 3; i--) {
-          final p = parts[i];
-          if (RegExp(r'^(x86_64|amd64|aarch64|arm64|armv\d+l?|i[3-6]86|riscv64|ppc64le|s390x)$', caseSensitive: false).hasMatch(p)) {
-            machine = p;
-            break;
-          }
+      final parts = firstLine(uname).split(RegExp(r'\s+'));
+      for (var i = parts.length - 1; i >= 0; i--) {
+        final p = parts[i];
+        if (RegExp(
+          r'^(x86_64|amd64|aarch64|arm64|armv\d+l?|i[3-6]86|riscv64|ppc64le|s390x|loongarch64)$',
+          caseSensitive: false,
+        ).hasMatch(p)) {
+          arch = p;
+          break;
         }
-        if (machine.isEmpty && parts.length >= 12) machine = parts[11];
-        sys = machine.isEmpty ? '$sysname $release' : '$sysname $release $machine';
-      } else if (sys.length > 48) {
-        sys = '${sys.substring(0, 48)}…';
+      }
+      // uname -m style often near end; fallback: 3rd token is kernel, last may be arch
+      if (arch.isEmpty && parts.length >= 3) {
+        final last = parts.last;
+        if (RegExp(r'^[A-Za-z0-9_]+$').hasMatch(last) && last.length <= 16) {
+          arch = last;
+        }
       }
     }
+    String distro = firstLine(osName);
+    if (distro == '-' || distro.isEmpty || distro.startsWith('错误:')) {
+      // Fallback: sysname only from uname (not kernel release)
+      final parts = firstLine(uname).split(RegExp(r'\s+'));
+      distro = parts.isNotEmpty ? parts[0] : 'Linux';
+    }
+    // Strip wrapping quotes from PRETTY_NAME
+    if ((distro.startsWith('"') && distro.endsWith('"')) ||
+        (distro.startsWith("'") && distro.endsWith("'"))) {
+      distro = distro.substring(1, distro.length - 1);
+    }
+    distro = distro.trim();
+    if (distro.length > 40) distro = '${distro.substring(0, 40)}…';
+    final sys = arch.isEmpty ? distro : '$distro · $arch';
     final one = ok ? 'cpu $cpuHint · mem $memHint · disk $diskHint' : '离线';
 
     final lines = <ProbeLine>[
@@ -203,6 +219,7 @@ class ProbeSummary {
     ];
 
     final detail = StringBuffer()
+      ..writeln('os:\n$osName\n')
       ..writeln('uname:\n$uname\n')
       ..writeln('uptime:\n$uptime\n')
       ..writeln('cpu:\n$cpuRaw\n')

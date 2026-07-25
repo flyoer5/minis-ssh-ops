@@ -113,7 +113,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     final text = _input.text.trim();
     if (text.isEmpty || _busy) return;
     if (!state.backendOk) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('后端未连接')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('本地后端未连接')));
       return;
     }
     if (state.selectedHostId == null) {
@@ -471,8 +471,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                   Expanded(
                     child: Text(
                       !state.backendOk
-                          ? '后端未连接'
-                          : (state.selectedHostId == null ? '未选主机' : state.hostLabel),
+                          ? '本地后端未连接'
+                          : (state.selectedHostId == null ? '尚未选择主机' : state.hostLabel),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 12, color: AppColors.textMuted),

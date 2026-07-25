@@ -1,3 +1,20 @@
+## 1.5.1
+
+### Hosts
+- 系统行改为「发行版 · 架构」（读 /etc/os-release + uname arch），不再显示内核版本
+
+### App
+- 关闭 Flutter 右上角 DEBUG 角标
+
+### Settings
+- 所有 Slider 改为本地 draft + onChangeEnd 落盘，滑动不卡
+- 自定义提示词使用稳定 TextEditingController
+- 文案修正（轮数 1–99）
+
+### Editor
+- Ctrl/Cmd+S 保存、Ctrl/Cmd+F 查找
+- 状态栏显示字号
+
 ## 1.5.0
 
 ### 高度自定义

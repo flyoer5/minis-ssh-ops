@@ -160,7 +160,7 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	// Durable memory + recent window (does not hard-forget older turns).
 	history, _ := agent.BuildMemoryMessages(s.Store, body.SessionID, body.Message, 16)
 
-	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; grep -m1 '^cpu ' /proc/stat 2>/dev/null; sleep 1; grep -m1 '^cpu ' /proc/stat 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	probeScript := `printf '%s\n' '___O___'; ( . /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-${NAME:-}} ${VERSION_ID:-}" ) | sed 's/  */ /g;s/^ //;s/ $//'; printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; grep -m1 '^cpu ' /proc/stat 2>/dev/null; sleep 1; grep -m1 '^cpu ' /proc/stat 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 
 	run := func(name string, args map[string]any) (string, error) {
 		switch name {
@@ -305,7 +305,7 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 	_ = s.Store.AddChat(body.SessionID, "user", body.Message)
 	history, _ := agent.BuildMemoryMessages(s.Store, body.SessionID, body.Message, 16)
 
-	probeScript := `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; grep -m1 '^cpu ' /proc/stat 2>/dev/null; sleep 1; grep -m1 '^cpu ' /proc/stat 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	probeScript := `printf '%s\n' '___O___'; ( . /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-${NAME:-}} ${VERSION_ID:-}" ) | sed 's/  */ /g;s/^ //;s/ $//'; printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; grep -m1 '^cpu ' /proc/stat 2>/dev/null; sleep 1; grep -m1 '^cpu ' /proc/stat 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 	run := func(name string, args map[string]any) (string, error) {
 		switch name {
 		case "probe_host":
@@ -521,10 +521,12 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	// One SSH session / one compound command — much faster than 5 sequential dials.
-	const script = `printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; grep -m1 '^cpu ' /proc/stat 2>/dev/null; sleep 1; grep -m1 '^cpu ' /proc/stat 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	// O = os-release pretty name; U = uname -a (arch still parsed client-side)
+	const script = `printf '%s\n' '___O___'; ( . /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-${NAME:-}} ${VERSION_ID:-}" ) | sed 's/  */ /g;s/^ //;s/ $//'; printf '%s\n' '___O___'; ( . /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-${NAME:-}} ${VERSION_ID:-}" ) | sed 's/  */ /g;s/^ //;s/ $//'; printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; grep -m1 '^cpu ' /proc/stat 2>/dev/null; sleep 1; grep -m1 '^cpu ' /proc/stat 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 	res, err := s.runSSH(id, script)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
+			"os":     map[string]any{"error": err.Error()},
 			"uname":  map[string]any{"error": err.Error()},
 			"uptime": map[string]any{"error": err.Error()},
 			"load":   map[string]any{"error": err.Error()},
@@ -540,6 +542,7 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 		return map[string]any{"exitCode": res.ExitCode, "stdout": strings.TrimSpace(s), "stderr": ""}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
+		"os":     mk(parts["O"]),
 		"uname":  mk(parts["U"]),
 		"uptime": mk(parts["T"]),
 		"load":   mk(parts["L"]),
@@ -617,7 +620,7 @@ func cpuUsageFromProcStat(raw string) string {
 
 
 func splitProbe(stdout string) map[string]string {
-	out := map[string]string{"U": "", "T": "", "L": "", "C": "", "D": "", "M": ""}
+	out := map[string]string{"O": "", "U": "", "T": "", "L": "", "C": "", "D": "", "M": ""}
 	cur := ""
 	for _, line := range strings.Split(stdout, "\n") {
 		if strings.HasPrefix(line, "___") && strings.HasSuffix(line, "___") && len(line) >= 7 {
