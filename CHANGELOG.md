@@ -1,3 +1,11 @@
+## 1.5.16
+
+### Keyboard / IME (real root fix)
+- Android windowSoftInputMode: adjustResize → adjustNothing (window size no longer changes every IME frame)
+- ImeInset: plain Padding only (no AnimatedPadding fighting system curve)
+- Agent bubbles: LayoutBuilder width instead of MediaQuery.sizeOf
+- Settings body padded with ImeInset under adjustNothing
+
 ## 1.5.15
 
 ### Hotfix

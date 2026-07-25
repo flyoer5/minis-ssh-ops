@@ -987,6 +987,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
               ),
             ),
           Expanded(
+            // List must NOT depend on viewInsets (adjustNothing + no sizeOf in bubbles).
             child: state.agentMessages.isEmpty
                 ? Center(
                     child: Padding(

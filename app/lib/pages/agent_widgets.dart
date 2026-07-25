@@ -402,12 +402,18 @@ class _Bubble extends StatelessWidget {
           ),
         );
       }
-      return Align(
+      // LayoutBuilder: no MediaQuery.sizeOf — IME frames must not dirty every bubble.
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final maxW = constraints.maxWidth.isFinite
+              ? constraints.maxWidth * 0.78
+              : 280.0;
+          return Align(
         alignment: Alignment.centerRight,
         child: GestureDetector(
           onLongPress: () => _copy(context, msg.content),
           child: Container(
-            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
+            constraints: BoxConstraints(maxWidth: maxW),
             margin: const EdgeInsets.only(bottom: 8, left: 40),
             padding: EdgeInsets.symmetric(horizontal: 11, vertical: fs > 16 ? 9 : 7),
             decoration: const BoxDecoration(
@@ -425,6 +431,8 @@ class _Bubble extends StatelessWidget {
             ),
           ),
         ),
+      );
+        },
       );
     }
 

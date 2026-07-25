@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/widgets/ime_inset.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
@@ -495,7 +496,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     context.select((AppState s) => s.navIsMenu);
     final state = context.read<AppState>();
     return Scaffold(
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         leading: NavMenuButton.leadingOf(context),
@@ -505,7 +506,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
         titleSpacing: 12,
         title: const Text('设置', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       ),
-      body: ListView(
+      body: ImeInset(child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 28),
         children: [
           // —— 关于 ——
@@ -534,7 +535,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.15',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.16',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
@@ -1430,6 +1431,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             ],
           ),
         ],
+      ), // ImeInset
       ),
     );
   }
