@@ -48,13 +48,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final id = context.select((AppState s) => s.selectedHostId);
-    final backendOk = context.select((AppState s) => s.backendOk);
-    if (id != null && id != hostId && backendOk) {
-      hostId = id;
-      _load(_left);
-      _load(_right);
-    }
+    // Host reload is handled in build() via select + post-frame.
   }
 
   Future<void> _load(_Pane pane) async {
@@ -947,11 +941,21 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final hostId = context.select((AppState s) => s.selectedHostId);
+    final selectedId = context.select((AppState s) => s.selectedHostId);
     final backendOk = context.select((AppState s) => s.backendOk);
     context.select((AppState s) => s.pathFavorites.length);
     final state = context.read<AppState>();
-    if (hostId == null) {
+    if (selectedId != null && selectedId != hostId && backendOk) {
+      final next = selectedId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (next != state.selectedHostId) return;
+        hostId = next;
+        _load(_left);
+        _load(_right);
+      });
+    }
+    if (selectedId == null) {
       return Scaffold(
         appBar: AppBar(
           toolbarHeight: 44,

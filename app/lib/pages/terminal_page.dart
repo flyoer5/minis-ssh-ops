@@ -78,13 +78,7 @@ class _TerminalPageState extends State<TerminalPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // select avoids rebuild on every Agent stream notifyListeners.
-    final id = context.select((AppState s) => s.selectedHostId);
-    final backendOk = context.select((AppState s) => s.backendOk);
-    if (id != null && id != _hostId && backendOk) {
-      _hostId = id;
-      _connect(context.read<AppState>());
-    }
+    // Host reconnect is handled in build() via select + post-frame (select not allowed here).
   }
 
   @override
@@ -460,7 +454,17 @@ class _TerminalPageState extends State<TerminalPage>
     final hostId = context.select((AppState s) => s.selectedHostId);
     final fontSize = context.select((AppState s) => s.termFontSize);
     final hostLabel = context.select((AppState s) => s.hostLabel);
+    final backendOk = context.select((AppState s) => s.backendOk);
     final state = context.read<AppState>();
+    if (hostId != null && hostId != _hostId && backendOk) {
+      final connectId = hostId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (connectId != state.selectedHostId) return;
+        _hostId = connectId;
+        _connect(state);
+      });
+    }
     if (hostId == null) {
       return Scaffold(
         appBar: AppBar(

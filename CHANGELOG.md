@@ -1,3 +1,9 @@
+## 1.5.15
+
+### Hotfix
+- Crash: context.select only in build() (was in didChangeDependencies → ProviderError)
+- Hosts/Terminal/Files: side effects via post-frame after select in build
+
 ## 1.5.14
 
 ### Performance (global jank)

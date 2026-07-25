@@ -53,18 +53,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Only react to host-list / probe prefs — not Agent stream ticks.
-    final backendOk = context.select((AppState s) => s.backendOk);
-    final hostCount = context.select((AppState s) => s.hosts.length);
-    final autoSec = context.select((AppState s) => s.hostAutoProbeSec);
-    final state = context.read<AppState>();
-    if (!_autoStarted && backendOk && hostCount > 0) {
-      _autoStarted = true;
-      unawaited(_probeMany(state, force: false));
-    }
-    // autoSec in select so timer resyncs when pref changes without full watch.
-    _syncAutoProbeTimer(state);
-    assert(autoSec == state.hostAutoProbeSec);
+    // context.select/watch only legal in build() — side effects moved to build.
   }
 
   Future<void> _probeMany(AppState state, {required bool force}) async {
@@ -128,15 +117,23 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    // Rebuild host list only when hosts / selection / probe data / layout prefs change.
-    context.select((AppState s) => s.hosts.length);
+    // Rebuild only when these change (not every Agent stream tick).
+    final hostCount = context.select((AppState s) => s.hosts.length);
     context.select((AppState s) => s.selectedHostId);
     context.select((AppState s) => s.probeGen);
     context.select((AppState s) => s.uiFontSize);
     context.select((AppState s) => s.hostCardCompact);
-    context.select((AppState s) => s.backendOk);
+    final backendOk = context.select((AppState s) => s.backendOk);
     context.select((AppState s) => s.probeConcurrency);
+    context.select((AppState s) => s.hostAutoProbeSec);
     final state = context.read<AppState>();
+    if (!_autoStarted && backendOk && hostCount > 0) {
+      _autoStarted = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_probeMany(state, force: false));
+      });
+    }
+    _syncAutoProbeTimer(state);
     final total = state.hosts.length;
     final online = state.hosts.where((h) {
       final id = h['id']?.toString();
