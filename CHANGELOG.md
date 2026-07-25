@@ -1,3 +1,10 @@
+## 1.5.18
+
+### Open command policy
+- risk.Classify always Read; NeedsConfirm always false — no blocked list, no NEEDS_CONFIRM gate
+- loopSystem: drop "never destructive" language; state no blacklist / no write-confirm
+- Settings copy updated; plan steps no longer status=blocked
+
 ## 1.5.17
 
 ### IME jank (real fix)
