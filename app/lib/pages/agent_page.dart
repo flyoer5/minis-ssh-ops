@@ -987,7 +987,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
               ),
             ),
           Expanded(
-            // List must NOT depend on viewInsets (adjustNothing + no sizeOf in bubbles).
+            // Freeze viewInsets so list/scrollables never rebuild or relayout on IME.
+            child: WithoutViewInsets(
             child: state.agentMessages.isEmpty
                 ? Center(
                     child: Padding(
@@ -1129,7 +1130,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                         ),
                     ],
                   ),
-          ),
+          ), // WithoutViewInsets
+          ), // Expanded
           // Don't stack retry while a turn is still running (looks like 重试中 + 运行中 + 停止).
           if (!_busy && !state.agentBusy && _canRetryLast(state))
             Material(
@@ -1160,10 +1162,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                 ),
               ),
             ),
-          // Minis-like composer — ImeInset isolates keyboard rebuilds from the list.
-          SafeArea(
-            top: false,
-            child: ImeInset(
+          // Composer: ImeInset translates up (no height change → list does not relayout).
+          // No SafeArea here — SafeArea uses MediaQuery.of and rebuilds every IME frame.
+          ImeInset(
+              child: Material(
+              color: AppColors.bg,
               child: Container(
               decoration: const BoxDecoration(
                 color: AppColors.bg,

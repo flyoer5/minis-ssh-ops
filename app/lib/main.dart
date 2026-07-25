@@ -9,6 +9,7 @@ import 'package:ssh_ai_agent/pages/settings_page.dart';
 import 'package:ssh_ai_agent/pages/terminal_page.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/widgets/ime_inset.dart';
 import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 void main() {
@@ -174,8 +175,8 @@ class _HomeShellState extends State<HomeShell> {
             if (!backendOk || starting)
               Material(
                 color: starting ? AppColors.surface2 : AppColors.errorPanel,
-                child: SafeArea(
-                  bottom: false,
+                // TopSafePad: stable viewPadding — SafeArea would rebuild shell on every IME frame.
+                child: TopSafePad(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
                     child: Row(

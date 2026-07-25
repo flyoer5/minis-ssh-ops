@@ -506,7 +506,7 @@ class _TerminalPageState extends State<TerminalPage>
       backgroundColor: _bg,
       // Shell already freezes outer resize; keep terminal body stable while IME animates.
       resizeToAvoidBottomInset: false,
-      body: SafeArea(
+      body: TopSafePad(
         child: Column(
           children: [
             // Single slim bar: menu | ● host · status | A-/A+ | 键盘 | ⋯
@@ -742,6 +742,7 @@ class _TerminalPageState extends State<TerminalPage>
                 ),
               ),
             Expanded(
+              child: WithoutViewInsets(
               child: Stack(
                 children: [
                   // Terminal surface: tap opens IME
@@ -790,7 +791,8 @@ class _TerminalPageState extends State<TerminalPage>
                   ),
                 ],
               ),
-            ),
+              ), // WithoutViewInsets
+            ), // Expanded
             ImeInset(
               child: Container(
                 color: _bar,

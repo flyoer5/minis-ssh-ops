@@ -1,3 +1,12 @@
+## 1.5.17
+
+### IME jank (real fix)
+- Root cause: Column Padding from ImeInset relayouts Expanded list every keyboard frame; SafeArea/MediaQuery.of rebuilds shell
+- ImeInset: Transform.translate only (layout size fixed, list does not reflow)
+- Agent/Terminal message+scroll: WithoutViewInsets freezes viewInsets for list subtree
+- TopSafePad replaces SafeArea on shell banner and terminal body (viewPadding, stable)
+- Composer: no SafeArea
+
 ## 1.5.16
 
 ### Keyboard / IME (real root fix)
