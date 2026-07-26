@@ -354,7 +354,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
       backgroundColor: AppColors.surface,
       isScrollControlled: true,
       builder: (c) => Padding(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(c).bottom),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.viewPaddingOf(c).bottom),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

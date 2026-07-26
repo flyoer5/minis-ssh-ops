@@ -495,7 +495,8 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     context.select((AppState s) => s.hostCardCompact);
     context.select((AppState s) => s.navIsMenu);
     final state = context.read<AppState>();
-    return Scaffold(
+    return WithoutViewInsets(
+      child: Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.bg,
       appBar: AppBar(
@@ -535,7 +536,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.18',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.19',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
@@ -1432,7 +1433,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           ),
         ],
       ), // ImeInset
-      ),
-    );
+      ), // Scaffold
+    ); // WithoutViewInsets
   }
 }

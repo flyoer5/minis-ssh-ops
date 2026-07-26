@@ -168,14 +168,16 @@ class _HomeShellState extends State<HomeShell> {
       menuMode: menu,
       // Outer shell must NOT resize with IME — each tab's own Scaffold / padding
       // handles the keyboard. Double-resize (shell + page) janks the IME animation.
-      child: Scaffold(
+      child: WithoutViewInsets(
+        // Scaffold uses MediaQuery.of — freeze so IME frames do not rebuild
+        // IndexedStack / every kept-alive tab.
+        child: Scaffold(
         resizeToAvoidBottomInset: false,
         body: Column(
           children: [
             if (!backendOk || starting)
               Material(
                 color: starting ? AppColors.surface2 : AppColors.errorPanel,
-                // TopSafePad: stable viewPadding — SafeArea would rebuild shell on every IME frame.
                 child: TopSafePad(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
@@ -238,6 +240,7 @@ class _HomeShellState extends State<HomeShell> {
                     ),
                 ],
               ),
+      ),
       ),
     );
   }

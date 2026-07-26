@@ -1,3 +1,11 @@
+## 1.5.19
+
+### IME jank (Scaffold MediaQuery.of)
+- Root cause: Scaffold always depends on MediaQuery.of; viewInsets/padding animate every frame → full page rebuild
+- WithoutViewInsets: freeze viewInsets=0 and padding=viewPadding; wrap HomeShell / Agent / Terminal / Settings scaffolds
+- ImeInset: StatefulWidget + didChangeMetrics reading FlutterView.viewInsets (no MediaQuery) — only composer/keybar setStates
+- TopSafePad: viewPaddingOf not paddingOf
+
 ## 1.5.18
 
 ### Open command policy

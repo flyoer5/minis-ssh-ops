@@ -751,10 +751,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     super.build(context);
     final state = context.watch<AppState>();
     _autoFollow(state);
-    // Do NOT read viewInsets here — it rebuilds the whole transcript every IME frame.
-    return Scaffold(
+    // Freeze MediaQuery for Scaffold (it uses MediaQuery.of every IME frame).
+    // ImeInset reads FlutterView metrics itself — safe inside the freeze.
+    return WithoutViewInsets(
+      child: Scaffold(
       backgroundColor: AppColors.bg,
-      // Avoid full-body reflow; only the composer pads for IME (smoother keyboard).
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         toolbarHeight: 44,
@@ -987,8 +988,6 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
               ),
             ),
           Expanded(
-            // Freeze viewInsets so list/scrollables never rebuild or relayout on IME.
-            child: WithoutViewInsets(
             child: state.agentMessages.isEmpty
                 ? Center(
                     child: Padding(
@@ -1130,7 +1129,6 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                         ),
                     ],
                   ),
-          ), // WithoutViewInsets
           ), // Expanded
           // Don't stack retry while a turn is still running (looks like 重试中 + 运行中 + 停止).
           if (!_busy && !state.agentBusy && _canRetryLast(state))
@@ -1162,8 +1160,6 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                 ),
               ),
             ),
-          // Composer: ImeInset translates up (no height change → list does not relayout).
-          // No SafeArea here — SafeArea uses MediaQuery.of and rebuilds every IME frame.
           ImeInset(
               child: Material(
               color: AppColors.bg,
@@ -1249,8 +1245,9 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
             ),
           ),
         ],
-      ),
-    );
+      ), // body Column
+    ), // Scaffold
+    ); // WithoutViewInsets
   }
 
   void _stopGeneration(AppState state) {

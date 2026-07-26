@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
-/// Lifts [child] above the keyboard **without changing layout size**.
+/// Lifts [child] above the keyboard **without** depending on [MediaQuery].
 ///
-/// Why translate (not Padding):
-/// - [Padding] grows the leaf every IME frame → parent [Column] shrinks
-///   [Expanded] siblings → ListView/terminal scrollback **relayout every frame**
-///   (that is the stutter users feel).
-/// - [Transform.translate] only moves paint/hit-test; flex children keep a
-///   stable size for the whole animation.
+/// Flutter's [Scaffold] uses `MediaQuery.of` even with
+/// `resizeToAvoidBottomInset: false`, so every IME frame rebuilds the whole
+/// page if anything in the tree still sees animating viewInsets/padding.
+///
+/// This widget reads [FlutterView.viewInsets] via [WidgetsBindingObserver]
+/// and only [setState]s **itself** — ancestors/siblings stay cold.
+///
+/// Layout size does not change ([Transform.translate] only), so parent
+/// [Column]/[Expanded] children do not relayout during the animation.
 ///
 /// Pair with Android `windowSoftInputMode=adjustNothing` and
-/// `Scaffold.resizeToAvoidBottomInset: false`.
-///
-/// Depends only on [MediaQuery.viewInsetsOf] so siblings that never read
-/// viewInsets are not marked dirty by this widget.
-class ImeInset extends StatelessWidget {
+/// [WithoutViewInsets] around [Scaffold] / page body.
+class ImeInset extends StatefulWidget {
   const ImeInset({
     super.key,
     required this.child,
@@ -28,17 +29,57 @@ class ImeInset extends StatelessWidget {
   final double left;
   final double right;
   final double top;
-  /// Extra lift (e.g. small gap). Applied on top of viewInsets.bottom.
   final double extraBottom;
 
   @override
+  State<ImeInset> createState() => _ImeInsetState();
+}
+
+class _ImeInsetState extends State<ImeInset> with WidgetsBindingObserver {
+  double _ime = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // First frame: context may not have a View yet.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    _sync();
+  }
+
+  void _sync() {
+    if (!mounted) return;
+    final double ime;
+    try {
+      final view = View.of(context);
+      ime = view.viewInsets.bottom / view.devicePixelRatio;
+    } catch (_) {
+      final views = WidgetsBinding.instance.platformDispatcher.views;
+      if (views.isEmpty) return;
+      final view = views.first;
+      ime = view.viewInsets.bottom / view.devicePixelRatio;
+    }
+    if ((ime - _ime).abs() < 0.5) return;
+    setState(() => _ime = ime);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final ime = MediaQuery.viewInsetsOf(context).bottom;
-    final dy = ime + extraBottom;
-    Widget w = child;
-    if (left != 0 || right != 0 || top != 0) {
+    final dy = _ime + widget.extraBottom;
+    Widget w = widget.child;
+    if (widget.left != 0 || widget.right != 0 || widget.top != 0) {
       w = Padding(
-        padding: EdgeInsets.fromLTRB(left, top, right, 0),
+        padding: EdgeInsets.fromLTRB(widget.left, widget.top, widget.right, 0),
         child: w,
       );
     }
@@ -50,15 +91,18 @@ class ImeInset extends StatelessWidget {
   }
 }
 
-/// Freezes [MediaQuery.viewInsets] at zero for [child].
+/// Freezes IME-driven [MediaQuery] fields so [Scaffold] / lists do not rebuild.
 ///
-/// Under `adjustNothing`, viewInsets still animates every frame. Any descendant
-/// that calls [MediaQuery.of] (e.g. [SafeArea], some scrollables) would
-/// otherwise rebuild. This wrapper re-provides a stable MediaQueryData so
-/// those dependents are not notified during the IME animation.
+/// Under `adjustNothing`, Flutter still animates viewInsets every frame and
+/// shrinks [MediaQueryData.padding]. [Scaffold] calls `MediaQuery.of`, so it
+/// rebuilds the entire page unless a parent re-provides a **stable**
+/// [MediaQueryData].
 ///
-/// The wrapper itself rebuilds cheaply; when stripped data is equal across
-/// frames, [MediaQuery] does not notify its dependents.
+/// Frozen data:
+/// - `viewInsets: EdgeInsets.zero`
+/// - `padding: viewPadding` (keyboard must not eat safe padding)
+///
+/// [ImeInset] does **not** read MediaQuery — safe as a descendant.
 class WithoutViewInsets extends StatelessWidget {
   const WithoutViewInsets({super.key, required this.child});
   final Widget child;
@@ -66,18 +110,15 @@ class WithoutViewInsets extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = MediaQuery.of(context);
-    if (data.viewInsets == EdgeInsets.zero) return child;
-    return MediaQuery(
-      data: data.copyWith(viewInsets: EdgeInsets.zero),
-      child: child,
+    final frozen = data.copyWith(
+      viewInsets: EdgeInsets.zero,
+      padding: data.viewPadding,
     );
+    return MediaQuery(data: frozen, child: child);
   }
 }
 
-/// Top (and optional sides) safe padding without [SafeArea].
-///
-/// [SafeArea] uses [MediaQuery.of] (full data) so it rebuilds on every IME
-/// frame. [MediaQuery.paddingOf] only depends on padding.
+/// Top/side safe padding using stable [MediaQuery.viewPaddingOf].
 class TopSafePad extends StatelessWidget {
   const TopSafePad({
     super.key,
@@ -96,7 +137,7 @@ class TopSafePad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pad = MediaQuery.paddingOf(context);
+    final pad = MediaQuery.viewPaddingOf(context);
     return Padding(
       padding: EdgeInsets.only(
         left: left ? pad.left : 0,

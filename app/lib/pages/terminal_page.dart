@@ -501,10 +501,10 @@ class _TerminalPageState extends State<TerminalPage>
       );
     }
 
-    // Do NOT read viewInsets here — rebuilds whole scrollback every IME frame.
-    return Scaffold(
+    // Freeze MediaQuery so Scaffold does not rebuild every IME frame.
+    return WithoutViewInsets(
+      child: Scaffold(
       backgroundColor: _bg,
-      // Shell already freezes outer resize; keep terminal body stable while IME animates.
       resizeToAvoidBottomInset: false,
       body: TopSafePad(
         child: Column(
@@ -742,7 +742,6 @@ class _TerminalPageState extends State<TerminalPage>
                 ),
               ),
             Expanded(
-              child: WithoutViewInsets(
               child: Stack(
                 children: [
                   // Terminal surface: tap opens IME
@@ -791,7 +790,6 @@ class _TerminalPageState extends State<TerminalPage>
                   ),
                 ],
               ),
-              ), // WithoutViewInsets
             ), // Expanded
             ImeInset(
               child: Container(
@@ -824,8 +822,9 @@ class _TerminalPageState extends State<TerminalPage>
               ),
             ),
           ],
-        ),
-      ),
-    );
+        ), // Column
+      ), // TopSafePad
+    ), // Scaffold
+    ); // WithoutViewInsets
   }
 }

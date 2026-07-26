@@ -234,7 +234,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
-                      SizedBox(height: MediaQuery.of(context).size.height * 0.18),
+                      SizedBox(height: MediaQuery.sizeOf(context).height * 0.18),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 28),
                         child: Column(
