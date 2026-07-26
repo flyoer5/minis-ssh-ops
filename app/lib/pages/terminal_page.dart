@@ -43,6 +43,12 @@ class _TerminalPageState extends State<TerminalPage>
   String _prev = '';
   int _searchIdx = 0;
   List<int> _searchHits = [];
+  // Memoized non-search scrollback span: the 400KB ANSI parse is the hot cost
+  // on every paint, so cache by exact buffer content + font size and rebuild
+  // only when either changes.
+  String? _spanCacheRaw;
+  double? _spanCacheFont;
+  TextSpan? _spanCache;
   // Batched repaint: high-frequency PTY chunks coalesce into one setState per
   // frame-ish window instead of a full scrollback rebuild per chunk.
   Timer? _appendFlush;
@@ -328,7 +334,14 @@ class _TerminalPageState extends State<TerminalPage>
   TextSpan _buildScrollbackSpan(double fontSize) {
     final raw = _buf.isEmpty ? '' : _buf.toString();
     if (!_showSearch || _searchCtrl.text.trim().isEmpty || _searchHits.isEmpty) {
-      return AnsiPainter(fontSize: fontSize, defaultFg: AppColors.text).build(raw);
+      if (_spanCache != null && _spanCacheRaw == raw && _spanCacheFont == fontSize) {
+        return _spanCache!;
+      }
+      final span = AnsiPainter(fontSize: fontSize, defaultFg: AppColors.text).build(raw);
+      _spanCacheRaw = raw;
+      _spanCacheFont = fontSize;
+      _spanCache = span;
+      return span;
     }
     final plain = _plainScrollback;
     final q = _searchCtrl.text.trim();
