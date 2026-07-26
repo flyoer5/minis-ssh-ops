@@ -114,7 +114,7 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
         }
       }
       if (lastErr != null) {
-        backendError = '启动内置后端失败: $lastErr';
+        backendError = '启动内置后端失败：${friendlyError(lastErr)}';
       }
     }
 
@@ -184,7 +184,7 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
       if (ver != null && ver.isNotEmpty) backendVersion = ver;
     } catch (e) {
       backendOk = false;
-      backendError = e.toString();
+      backendError = friendlyError(e);
     }
     notifyListeners();
   }
@@ -547,6 +547,54 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
     }
     llm = await api.putLlm(body);
     notifyListeners();
+  }
+
+  String friendlyError(Object e) {
+    final s = e.toString();
+    final low = s.toLowerCase();
+    
+    if (low.contains('timeout') || low.contains('timed out')) {
+      return '请求超时，请检查网络连接';
+    }
+    if (low.contains('connection refused') || low.contains('connection abort')) {
+      return '连接被拒绝，请检查后端服务';
+    }
+    if (low.contains('network is unreachable') || low.contains('no route')) {
+      return '网络不可达，请检查网络连接';
+    }
+    if (low.contains('connection reset')) {
+      return '连接被重置，请稍后重试';
+    }
+    if (low.contains('socketexception')) {
+      return '网络连接异常，请检查网络';
+    }
+    if (low.contains('host is down')) {
+      return '主机不可达，请检查主机状态';
+    }
+    if (low.contains('permission denied') || low.contains('auth')) {
+      return '认证失败，请检查凭据';
+    }
+    if (low.contains('401') || low.contains('unauthorized')) {
+      return '认证失败，请检查API密钥';
+    }
+    if (low.contains('403') || low.contains('forbidden')) {
+      return '访问被拒绝，请检查权限';
+    }
+    if (low.contains('404') || low.contains('not found')) {
+      return '资源未找到，请检查配置';
+    }
+    if (low.contains('500') || low.contains('internal server error')) {
+      return '服务器内部错误，请稍后重试';
+    }
+    if (low.contains('502') || low.contains('bad gateway')) {
+      return '网关错误，请检查服务状态';
+    }
+    if (low.contains('503') || low.contains('service unavailable')) {
+      return '服务不可用，请稍后重试';
+    }
+    
+    // 默认错误信息
+    return '操作失败：${s.length > 100 ? s.substring(0, 100) : s}';
   }
 
   @override
