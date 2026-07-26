@@ -113,7 +113,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         toolbarHeight: 44,
         leading: NavMenuButton.leadingOf(context),

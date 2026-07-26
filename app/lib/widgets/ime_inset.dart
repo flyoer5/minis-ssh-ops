@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 
-/// Lifts [child] above the keyboard **without** depending on [MediaQuery].
+/// Bottom pad/lift for a **leaf** (composer / keybar) using live IME height.
 ///
-/// Flutter's [Scaffold] uses `MediaQuery.of` even with
-/// `resizeToAvoidBottomInset: false`, so every IME frame rebuilds the whole
-/// page if anything in the tree still sees animating viewInsets/padding.
+/// Reads [FlutterView.viewInsets] via [WidgetsBindingObserver] so only this
+/// State setStates — does not require ancestors to depend on [MediaQuery].
 ///
-/// This widget reads [FlutterView.viewInsets] via [WidgetsBindingObserver]
-/// and only [setState]s **itself** — ancestors/siblings stay cold.
+/// Uses [Padding] (layout) rather than [Transform.translate]: with
+/// [windowSoftInputMode] `adjustResize` the window already shrinks; padding
+/// the leaf is still correct when the parent Scaffold has
+/// `resizeToAvoidBottomInset: false` and only the composer should move.
 ///
-/// Layout size does not change ([Transform.translate] only), so parent
-/// [Column]/[Expanded] children do not relayout during the animation.
-///
-/// Pair with Android `windowSoftInputMode=adjustNothing` and
-/// [WithoutViewInsets] around [Scaffold] / page body.
+/// When [usePadding] is false, uses translate (layout size fixed) — prefer
+/// for chat lists that must not reflow.
 class ImeInset extends StatefulWidget {
   const ImeInset({
     super.key,
@@ -23,6 +21,7 @@ class ImeInset extends StatefulWidget {
     this.right = 0,
     this.top = 0,
     this.extraBottom = 0,
+    this.usePadding = true,
   });
 
   final Widget child;
@@ -30,6 +29,8 @@ class ImeInset extends StatefulWidget {
   final double right;
   final double top;
   final double extraBottom;
+  /// true: [Padding] (forms / default). false: [Transform.translate] (chat).
+  final bool usePadding;
 
   @override
   State<ImeInset> createState() => _ImeInsetState();
@@ -42,7 +43,6 @@ class _ImeInsetState extends State<ImeInset> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // First frame: context may not have a View yet.
     WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
   }
 
@@ -75,7 +75,18 @@ class _ImeInsetState extends State<ImeInset> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final dy = _ime + widget.extraBottom;
+    final bottom = _ime + widget.extraBottom;
+    if (widget.usePadding) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          widget.left,
+          widget.top,
+          widget.right,
+          bottom,
+        ),
+        child: widget.child,
+      );
+    }
     Widget w = widget.child;
     if (widget.left != 0 || widget.right != 0 || widget.top != 0) {
       w = Padding(
@@ -83,26 +94,18 @@ class _ImeInsetState extends State<ImeInset> with WidgetsBindingObserver {
         child: w,
       );
     }
-    if (dy == 0) return w;
-    return Transform.translate(
-      offset: Offset(0, -dy),
-      child: w,
-    );
+    if (bottom == 0) return w;
+    return Transform.translate(offset: Offset(0, -bottom), child: w);
   }
 }
 
-/// Freezes IME-driven [MediaQuery] fields so [Scaffold] / lists do not rebuild.
+/// Freeze IME-driven MediaQuery for a **subtree only** (e.g. message list).
 ///
-/// Under `adjustNothing`, Flutter still animates viewInsets every frame and
-/// shrinks [MediaQueryData.padding]. [Scaffold] calls `MediaQuery.of`, so it
-/// rebuilds the entire page unless a parent re-provides a **stable**
-/// [MediaQueryData].
+/// Do **not** wrap the whole app or form pages — focused [TextField]s need
+/// real [MediaQuery.viewInsets] for ensureVisible / Scaffold inset.
 ///
-/// Frozen data:
-/// - `viewInsets: EdgeInsets.zero`
-/// - `padding: viewPadding` (keyboard must not eat safe padding)
-///
-/// [ImeInset] does **not** read MediaQuery — safe as a descendant.
+/// When frozen [MediaQueryData] is equal across frames, list descendants skip
+/// rebuild even if an ancestor [Scaffold] rebuilds.
 class WithoutViewInsets extends StatelessWidget {
   const WithoutViewInsets({super.key, required this.child});
   final Widget child;
@@ -110,15 +113,18 @@ class WithoutViewInsets extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = MediaQuery.of(context);
-    final frozen = data.copyWith(
-      viewInsets: EdgeInsets.zero,
-      padding: data.viewPadding,
+    return MediaQuery(
+      data: data.copyWith(
+        viewInsets: EdgeInsets.zero,
+        // Keep padding stable: under some modes padding shrinks with IME.
+        padding: data.viewPadding,
+      ),
+      child: child,
     );
-    return MediaQuery(data: frozen, child: child);
   }
 }
 
-/// Top/side safe padding using stable [MediaQuery.viewPaddingOf].
+/// Top/side safe pad via stable [MediaQuery.viewPaddingOf] (not paddingOf).
 class TopSafePad extends StatelessWidget {
   const TopSafePad({
     super.key,

@@ -166,12 +166,11 @@ class _HomeShellState extends State<HomeShell> {
       index: index,
       go: (i) => setState(() => index = i),
       menuMode: menu,
-      // Outer shell must NOT resize with IME — each tab's own Scaffold / padding
-      // handles the keyboard. Double-resize (shell + page) janks the IME animation.
-      child: WithoutViewInsets(
-        // Scaffold uses MediaQuery.of — freeze so IME frames do not rebuild
-        // IndexedStack / every kept-alive tab.
-        child: Scaffold(
+      // Shell: resizeToAvoidBottomInset false so IndexedStack tabs do not
+      // double-shrink. Do NOT wrap with WithoutViewInsets — that zeroed
+      // viewInsets for every form TextField (settings/hosts/etc).
+      // Agent/terminal freeze only their message/scroll subtrees.
+      child: Scaffold(
         resizeToAvoidBottomInset: false,
         body: Column(
           children: [
@@ -240,7 +239,6 @@ class _HomeShellState extends State<HomeShell> {
                     ),
                 ],
               ),
-      ),
       ),
     );
   }

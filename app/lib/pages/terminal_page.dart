@@ -501,9 +501,9 @@ class _TerminalPageState extends State<TerminalPage>
       );
     }
 
-    // Freeze MediaQuery so Scaffold does not rebuild every IME frame.
-    return WithoutViewInsets(
-      child: Scaffold(
+    // Do not freeze whole Scaffold — TextField needs real viewInsets.
+    // Freeze only the scrollback Expanded subtree.
+    return Scaffold(
       backgroundColor: _bg,
       resizeToAvoidBottomInset: false,
       body: TopSafePad(
@@ -742,6 +742,7 @@ class _TerminalPageState extends State<TerminalPage>
                 ),
               ),
             Expanded(
+              child: WithoutViewInsets(
               child: Stack(
                 children: [
                   // Terminal surface: tap opens IME
@@ -789,9 +790,11 @@ class _TerminalPageState extends State<TerminalPage>
                     ),
                   ),
                 ],
-              ),
+              ), // Stack
+              ), // WithoutViewInsets
             ), // Expanded
             ImeInset(
+              usePadding: false,
               child: Container(
                 color: _bar,
                 padding: const EdgeInsets.only(left: 4, right: 4, top: 4, bottom: 6),
@@ -824,7 +827,6 @@ class _TerminalPageState extends State<TerminalPage>
           ],
         ), // Column
       ), // TopSafePad
-    ), // Scaffold
-    ); // WithoutViewInsets
+    ); // Scaffold
   }
 }

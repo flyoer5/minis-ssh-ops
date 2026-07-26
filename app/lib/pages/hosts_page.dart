@@ -142,7 +142,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
       return s != null && s.ok;
     }).length;
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         toolbarHeight: 44,
         leading: NavMenuButton.leadingOf(context),

@@ -495,9 +495,9 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     context.select((AppState s) => s.hostCardCompact);
     context.select((AppState s) => s.navIsMenu);
     final state = context.read<AppState>();
-    return WithoutViewInsets(
-      child: Scaffold(
-      resizeToAvoidBottomInset: false,
+    return Scaffold(
+      // Form page: let Scaffold pad for IME so TextFields ensureVisible works.
+      resizeToAvoidBottomInset: true,
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         leading: NavMenuButton.leadingOf(context),
@@ -507,7 +507,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
         titleSpacing: 12,
         title: const Text('设置', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       ),
-      body: ImeInset(child: ListView(
+      body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 28),
         children: [
           // —— 关于 ——
@@ -536,7 +536,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.19',
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.20',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
                     ),
                   ),
@@ -1433,8 +1433,6 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
           ),
         ],
       ), // ListView
-      ), // ImeInset
-    ), // Scaffold
-    ); // WithoutViewInsets
+    ); // Scaffold
   }
 }

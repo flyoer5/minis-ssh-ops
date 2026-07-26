@@ -1,3 +1,12 @@
+## 1.5.20
+
+### IME: fix all TextFields covered / broken
+- Root cause of 1.5.19 regression: WithoutViewInsets wrapped **whole** HomeShell → viewInsets=0 everywhere → settings/hosts/dialogs could not lift above keyboard
+- Remove shell-level freeze; freeze **only** Agent message list + Terminal scrollback
+- softInputMode adjustNothing (stable window size) + form Scaffolds resizeToAvoidBottomInset:true (pad via real viewInsets)
+- Agent/Terminal composer: ImeInset usePadding:false (translate) outside freeze; TextField sees real MediaQuery
+- Settings: no double ImeInset; hosts/records search resize true
+
 ## 1.5.19
 
 ### IME jank (Scaffold MediaQuery.of)

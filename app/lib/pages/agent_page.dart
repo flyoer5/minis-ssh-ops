@@ -751,10 +751,9 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     super.build(context);
     final state = context.watch<AppState>();
     _autoFollow(state);
-    // Freeze MediaQuery for Scaffold (it uses MediaQuery.of every IME frame).
-    // ImeInset reads FlutterView metrics itself — safe inside the freeze.
-    return WithoutViewInsets(
-      child: Scaffold(
+    // Shell already resizeToAvoidBottomInset:false. Do not freeze whole Scaffold
+    // (forms elsewhere need real viewInsets). Freeze only the message list.
+    return Scaffold(
       backgroundColor: AppColors.bg,
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
@@ -988,6 +987,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
               ),
             ),
           Expanded(
+            child: WithoutViewInsets(
             child: state.agentMessages.isEmpty
                 ? Center(
                     child: Padding(
@@ -1129,6 +1129,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                         ),
                     ],
                   ),
+            ), // WithoutViewInsets (list only)
           ), // Expanded
           // Don't stack retry while a turn is still running (looks like 重试中 + 运行中 + 停止).
           if (!_busy && !state.agentBusy && _canRetryLast(state))
@@ -1160,94 +1161,95 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                 ),
               ),
             ),
+          // Composer OUTSIDE list freeze so TextField gets real viewInsets.
+          // usePadding:false → translate only, list Expanded does not reflow.
           ImeInset(
-              child: Material(
+            usePadding: false,
+            child: Material(
               color: AppColors.bg,
               child: Container(
-              decoration: const BoxDecoration(
-                color: AppColors.bg,
-                border: Border(top: BorderSide(color: AppColors.surface2)),
-              ),
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _input,
-                      focusNode: _focus,
-                      enabled: !(_busy || state.agentBusy),
-                      minLines: 1,
-                      maxLines: 6,
-                      style: TextStyle(fontSize: state.agentFontSize, color: AppColors.text),
-                      textInputAction:
-                          state.agentEnterToSend ? TextInputAction.send : TextInputAction.newline,
-                      onSubmitted: (_) {
-                        if (state.agentEnterToSend && !(_busy || state.agentBusy)) {
-                          _send(state);
-                        }
-                      },
-                      decoration: InputDecoration(
-                        hintText: state.selectedHostId == null
-                            ? '先选主机'
-                            : ((_busy || state.agentBusy)
-                                ? '生成中… 可点停止'
-                                : (state.agentEnterToSend ? '消息 · 回车发送' : '消息 · 回车换行')),
-                        hintStyle: const TextStyle(color: AppColors.textFaint),
-                        filled: true,
-                        fillColor: AppColors.surface,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(color: AppColors.border),
+                decoration: const BoxDecoration(
+                  color: AppColors.bg,
+                  border: Border(top: BorderSide(color: AppColors.surface2)),
+                ),
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _input,
+                        focusNode: _focus,
+                        enabled: !(_busy || state.agentBusy),
+                        minLines: 1,
+                        maxLines: 6,
+                        style: TextStyle(fontSize: state.agentFontSize, color: AppColors.text),
+                        textInputAction:
+                            state.agentEnterToSend ? TextInputAction.send : TextInputAction.newline,
+                        onSubmitted: (_) {
+                          if (state.agentEnterToSend && !(_busy || state.agentBusy)) {
+                            _send(state);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          hintText: state.selectedHostId == null
+                              ? '先选主机'
+                              : ((_busy || state.agentBusy)
+                                  ? '生成中… 可点停止'
+                                  : (state.agentEnterToSend ? '消息 · 回车发送' : '消息 · 回车换行')),
+                          hintStyle: const TextStyle(color: AppColors.textFaint),
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: const BorderSide(color: AppColors.linkFocus),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(color: AppColors.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(color: AppColors.linkFocus),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Send ↔ Stop toggle
-                  Material(
-                    color: (_busy || state.agentBusy)
-                        ? AppColors.danger
-                        : ((!state.backendOk || state.selectedHostId == null)
-                            ? AppColors.surface2
-                            : AppColors.sendGreen),
-                    shape: const CircleBorder(),
-                    child: IconButton(
-                      tooltip: (_busy || state.agentBusy) ? '停止生成' : '发送',
-                      onPressed: (!state.backendOk || state.selectedHostId == null)
-                          ? null
-                          : () {
-                              if (_busy || state.agentBusy) {
-                                _stopGeneration(state);
-                              } else {
-                                _send(state);
-                              }
-                            },
-                      icon: Icon(
-                        (_busy || state.agentBusy) ? Icons.stop_rounded : Icons.arrow_upward,
-                        color: Colors.white,
-                        size: 20,
+                    const SizedBox(width: 8),
+                    Material(
+                      color: (_busy || state.agentBusy)
+                          ? AppColors.danger
+                          : ((!state.backendOk || state.selectedHostId == null)
+                              ? AppColors.surface2
+                              : AppColors.sendGreen),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        tooltip: (_busy || state.agentBusy) ? '停止生成' : '发送',
+                        onPressed: (!state.backendOk || state.selectedHostId == null)
+                            ? null
+                            : () {
+                                if (_busy || state.agentBusy) {
+                                  _stopGeneration(state);
+                                } else {
+                                  _send(state);
+                                }
+                              },
+                        icon: Icon(
+                          (_busy || state.agentBusy) ? Icons.stop_rounded : Icons.arrow_upward,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             ),
           ),
         ],
-      ), // body Column
-    ), // Scaffold
-    ); // WithoutViewInsets
+      ),
+    );
   }
 
   void _stopGeneration(AppState state) {
