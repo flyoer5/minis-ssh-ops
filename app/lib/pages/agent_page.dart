@@ -1163,8 +1163,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
             ),
           // Composer OUTSIDE list freeze so TextField gets real viewInsets.
           // usePadding:false → translate only, list Expanded does not reflow.
+          // reservedBottom = shell NavigationBar height so we do not hide the
+          // bar (setState mid-IME dismisses the keyboard on this page).
           ImeInset(
             usePadding: false,
+            reservedBottom: kBottomNavigationBarHeight,
             fillColor: AppColors.bg,
             child: Material(
               color: AppColors.bg,

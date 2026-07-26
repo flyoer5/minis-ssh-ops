@@ -5,17 +5,21 @@ import 'package:flutter/material.dart';
 /// Reads [FlutterView.viewInsets] via [WidgetsBindingObserver.didChangeMetrics]
 /// — **not** [MediaQuery] — so only this leaf [setState]s on keyboard frames.
 ///
-/// **Stable element tree**: always the same [Stack] → [Transform]/[Padding] →
-/// [child] structure, even when IME height is 0. Switching `return child` ↔
-/// wrapped tree remounts the [TextField] and drops keyboard focus (Agent bug).
+/// **Stable element tree**: always the same widget skeleton, even when IME
+/// height is 0. Conditional `return child` / conditional Stack children remount
+/// the [TextField] and drop keyboard focus (Agent auto-dismiss bug).
 ///
-/// Sheet helpers: [left]/[right]/[top]/[extraBottom] add fixed padding around
-/// [child] (host editor / session settings sheets).
+/// [reservedBottom]: shell chrome already under the composer (e.g. NavigationBar).
+/// Lift by max(0, ime - reservedBottom) so we do **not** need to hide the bar
+/// (hiding Scaffold.bottomNavigationBar mid-IME still dismisses the keyboard).
+///
+/// Sheet helpers: [left]/[right]/[top]/[extraBottom] fixed padding.
 class ImeInset extends StatefulWidget {
   const ImeInset({
     super.key,
     required this.child,
     this.usePadding = true,
+    this.reservedBottom = 0,
     this.fillColor,
     this.left = 0,
     this.right = 0,
@@ -24,21 +28,15 @@ class ImeInset extends StatefulWidget {
   });
 
   final Widget child;
-
-  /// When true (default): pad bottom by IME height (forms / sheets).
-  /// When false: translate up only — parent layout height unchanged (Agent /
-  /// Terminal composer so the message list does not reflow every frame).
   final bool usePadding;
 
-  /// When [usePadding] is false, paint this under the translated child to fill
-  /// the gap that would otherwise show the window background.
-  final Color? fillColor;
+  /// Height already occupied under [child] (bottom nav). Subtracted from IME lift.
+  final double reservedBottom;
 
+  final Color? fillColor;
   final double left;
   final double right;
   final double top;
-
-  /// Extra bottom padding beyond IME (safe area / sheet chrome).
   final double extraBottom;
 
   @override
@@ -80,6 +78,11 @@ class _ImeInsetState extends State<ImeInset> with WidgetsBindingObserver {
     setState(() => _ime = ime);
   }
 
+  double get _lift {
+    final v = _ime - widget.reservedBottom;
+    return v > 0 ? v : 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final padded = (widget.left > 0 ||
@@ -97,28 +100,30 @@ class _ImeInsetState extends State<ImeInset> with WidgetsBindingObserver {
           )
         : widget.child;
 
-    // Always the same skeleton so TextField Elements are not remounted when
-    // IME goes 0 ↔ non-zero (that auto-dismissed the Agent keyboard).
+    final lift = _lift;
+
     if (widget.usePadding) {
+      // Always Padding — never swap with bare child.
       return Padding(
-        padding: EdgeInsets.only(bottom: _ime),
+        padding: EdgeInsets.only(bottom: lift),
         child: padded,
       );
     }
 
+    // Always Stack → [gap fill, translate] — never conditional children.
+    final fill = widget.fillColor ?? const Color(0x00000000);
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        if (widget.fillColor != null && _ime > 0.5)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: -_ime,
-            height: _ime,
-            child: ColoredBox(color: widget.fillColor!),
-          ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: -lift,
+          height: lift < 0.5 ? 0 : lift,
+          child: ColoredBox(color: fill),
+        ),
         Transform.translate(
-          offset: Offset(0, -_ime),
+          offset: Offset(0, -lift),
           child: padded,
         ),
       ],
@@ -128,8 +133,7 @@ class _ImeInsetState extends State<ImeInset> with WidgetsBindingObserver {
 
 /// Freezes MediaQuery for a **subtree** (message list / scrollback only).
 ///
-/// Do **not** wrap the whole shell or Scaffold that hosts form [TextField]s —
-/// zeroed [viewInsets] breaks ensureVisible / keyboard lift for every field.
+/// Do **not** wrap the whole shell or Scaffold that hosts form [TextField]s.
 class WithoutViewInsets extends StatelessWidget {
   const WithoutViewInsets({super.key, required this.child});
 
@@ -141,8 +145,6 @@ class WithoutViewInsets extends StatelessWidget {
     return MediaQuery(
       data: mq.copyWith(
         viewInsets: EdgeInsets.zero,
-        // Keep padding == viewPadding so system does not shrink padding when
-        // the IME opens (another MediaQuery rebuild path).
         padding: mq.viewPadding,
       ),
       child: child,
@@ -160,54 +162,5 @@ class TopSafePad extends StatelessWidget {
   Widget build(BuildContext context) {
     final top = MediaQuery.viewPaddingOf(context).top;
     return Padding(padding: EdgeInsets.only(top: top), child: child);
-  }
-}
-
-/// Hides [child] (bottom nav) while the IME is open — **local** [setState] only.
-/// Does not rebuild [HomeShell] / [IndexedStack] / Agent (preserves TextField focus).
-class ImeAwareBottomBar extends StatefulWidget {
-  const ImeAwareBottomBar({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  State<ImeAwareBottomBar> createState() => _ImeAwareBottomBarState();
-}
-
-class _ImeAwareBottomBarState extends State<ImeAwareBottomBar>
-    with WidgetsBindingObserver {
-  bool _open = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeMetrics() => _sync();
-
-  void _sync() {
-    if (!mounted) return;
-    final views = WidgetsBinding.instance.platformDispatcher.views;
-    if (views.isEmpty) return;
-    final view = views.first;
-    final ime = view.viewInsets.bottom / view.devicePixelRatio;
-    final open = _open ? ime > 4 : ime > 12;
-    if (open == _open) return;
-    setState(() => _open = open);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_open) return const SizedBox.shrink();
-    return widget.child;
   }
 }

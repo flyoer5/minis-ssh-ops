@@ -795,6 +795,7 @@ class _TerminalPageState extends State<TerminalPage>
             ), // Expanded
             ImeInset(
               usePadding: false,
+              reservedBottom: kBottomNavigationBarHeight,
               fillColor: _bar,
               child: Container(
                 color: _bar,

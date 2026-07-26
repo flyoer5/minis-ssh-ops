@@ -224,27 +224,26 @@ class _HomeShellState extends State<HomeShell> {
             ),
           ],
         ),
-        // Hide bottom nav while IME open via local ImeAwareBottomBar setState —
-        // not HomeShell setState (that rebuilt IndexedStack and killed Agent focus).
+        // Always keep NavigationBar mounted. Hiding it on IME open (even with a
+        // local StatefulWidget) changes Scaffold body size and dismisses the
+        // Agent keyboard. Composer ImeInset uses reservedBottom instead.
         bottomNavigationBar: menu
             ? null
-            : ImeAwareBottomBar(
-                child: NavigationBar(
-                  height: 56,
-                  backgroundColor: AppColors.surface,
-                  surfaceTintColor: Colors.transparent,
-                  labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                  selectedIndex: index,
-                  onDestinationSelected: (i) => setState(() => index = i),
-                  destinations: [
-                    for (var i = 0; i < AppNav.labels.length; i++)
-                      NavigationDestination(
-                        icon: Icon(AppNav.icons[i], size: 22),
-                        selectedIcon: Icon(AppNav.selectedIcons[i], size: 22),
-                        label: AppNav.labels[i],
-                      ),
-                  ],
-                ),
+            : NavigationBar(
+                height: 56,
+                backgroundColor: AppColors.surface,
+                surfaceTintColor: Colors.transparent,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                selectedIndex: index,
+                onDestinationSelected: (i) => setState(() => index = i),
+                destinations: [
+                  for (var i = 0; i < AppNav.labels.length; i++)
+                    NavigationDestination(
+                      icon: Icon(AppNav.icons[i], size: 22),
+                      selectedIcon: Icon(AppNav.selectedIcons[i], size: 22),
+                      label: AppNav.labels[i],
+                    ),
+                ],
               ),
       ),
     );
