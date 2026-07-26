@@ -1,3 +1,11 @@
+## 1.5.23
+
+### LLM DNS on Android (502 dial tcp lookup [::1]:53)
+- Symptom: `ApiException(502): dial tcp: lookup cpa.lgh123.online on [::1]:53: connection refused`
+- Cause: pure Go backend on Android has no resolv.conf / netd → DefaultResolver uses localhost:53
+- Fix: `netx.ConfigureDefault()` PreferGo resolver with public DNS (Ali/DNSPod/Google/Cloudflare); LLM HTTP DialContext uses it
+- Override: env `SSH_AI_DNS=8.8.8.8,1.1.1.1`
+
 ## 1.5.22
 
 ### Agent keyboard auto-dismiss

@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/flyoer5/ssh-ai-agent/backend/internal/netx"
 )
 
 // Matches <think>…</think>, <thinking>…</thinking>, <reasoning>…</reasoning>.
@@ -267,7 +268,7 @@ func (c *Client) postChat(body []byte) (LoopMsg, error) {
 	if c.HTTP == nil {
 		c.HTTP = &http.Client{Timeout: 120 * time.Second, Transport: &http.Transport{
 			Proxy:               http.ProxyFromEnvironment,
-			DialContext:         (&net.Dialer{Timeout: 15 * time.Second}).DialContext,
+			DialContext:         netx.Dialer(15 * time.Second).DialContext,
 			ForceAttemptHTTP2:   false,
 			TLSHandshakeTimeout: 15 * time.Second,
 		}}

@@ -11,10 +11,14 @@ import (
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/config"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/crypto"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/sshx"
+	"github.com/flyoer5/ssh-ai-agent/backend/internal/netx"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/store"
 )
 
 func main() {
+	// Android: pure Go DNS, not [::1]:53
+	netx.ConfigureDefault()
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("config: %v", err)

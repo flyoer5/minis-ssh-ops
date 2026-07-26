@@ -7,10 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/flyoer5/ssh-ai-agent/backend/internal/netx"
 )
 
 // chatToolsStream calls chat/completions with stream=true and emits:
@@ -112,7 +113,7 @@ func (c *Client) postChatStream(body []byte, onDelta func(kind, text string)) (L
 			Timeout: 0,
 			Transport: &http.Transport{
 				Proxy:                 http.ProxyFromEnvironment,
-				DialContext:           (&net.Dialer{Timeout: 15 * time.Second}).DialContext,
+				DialContext:           netx.Dialer(15 * time.Second).DialContext,
 				ForceAttemptHTTP2:     false,
 				TLSHandshakeTimeout:   15 * time.Second,
 				ResponseHeaderTimeout: 120 * time.Second,

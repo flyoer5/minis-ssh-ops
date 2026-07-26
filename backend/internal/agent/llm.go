@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/flyoer5/ssh-ai-agent/backend/internal/netx"
 )
 
 type Client struct {
@@ -31,11 +32,8 @@ type Msg struct {
 
 func NewClient(baseURL, apiKey, model string) *Client {
 	tr := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   15 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
+		Proxy:       http.ProxyFromEnvironment,
+		DialContext: netx.Dialer(15 * time.Second).DialContext,
 		ForceAttemptHTTP2:     false, // some gateways flake on h2
 		MaxIdleConns:          4,
 		IdleConnTimeout:       60 * time.Second,
