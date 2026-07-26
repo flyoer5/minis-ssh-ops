@@ -2,8 +2,9 @@
 
 ### Agent keyboard auto-dismiss
 - Cause A: ImeInset switched `return child` ↔ `Stack(Transform(child))` when IME opened → TextField Element remounted → focus lost
-- Cause B: Shell setState on IME open rebuilt entire HomeShell/IndexedStack while swapping bottomNavigationBar
-- Fix: ImeInset always uses the same Stack/Transform|Padding tree; ImeAwareBottomBar hides nav with local setState only
+- Cause B: HomeShell setState on IME open rebuilt IndexedStack while swapping bottomNavigationBar
+- Cause C: TextField `enabled: !busy` forced unfocus whenever a turn started
+- Fix: ImeInset always same tree + restore sheet left/right/top/extraBottom API; ImeAwareBottomBar local hide only; Agent TextField stays enabled
 
 ## 1.5.21
 

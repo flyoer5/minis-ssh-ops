@@ -1181,7 +1181,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                       child: TextField(
                         controller: _input,
                         focusNode: _focus,
-                        enabled: !(_busy || state.agentBusy),
+                        // Never disable — enabled:false drops IME focus immediately.
+                        // Send is gated by the button / onSubmitted instead.
                         minLines: 1,
                         maxLines: 6,
                         style: TextStyle(fontSize: state.agentFontSize, color: AppColors.text),
