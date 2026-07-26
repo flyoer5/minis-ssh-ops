@@ -819,7 +819,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                 ),
                                 const SizedBox(height: 10),
                                 TextButton.icon(
-                                  onPressed: () => _load(pane, path: pane.path),
+                                  onPressed: () => _load(pane),
                                   icon: const Icon(Icons.refresh, size: 16),
                                   label: const Text('刷新'),
                                 ),
