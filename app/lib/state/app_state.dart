@@ -24,6 +24,7 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
   String? backendError;
   String? backendNote;
   List<dynamic> hosts = [];
+  bool isLoadingHosts = false;
   Map<String, dynamic>? llm;
   String? selectedHostId;
 
@@ -189,11 +190,17 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
   }
 
   Future<void> refreshHosts() async {
-    hosts = await api.listHosts();
-    if (selectedHostId == null && hosts.isNotEmpty) {
-      selectedHostId = hosts.first['id'] as String?;
-    }
+    isLoadingHosts = true;
     notifyListeners();
+    try {
+      hosts = await api.listHosts();
+      if (selectedHostId == null && hosts.isNotEmpty) {
+        selectedHostId = hosts.first['id'] as String?;
+      }
+    } finally {
+      isLoadingHosts = false;
+      notifyListeners();
+    }
   }
 
   /// Persist user drag order (ids in display order).

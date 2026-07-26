@@ -124,6 +124,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     context.select((AppState s) => s.uiFontSize);
     context.select((AppState s) => s.hostCardCompact);
     final backendOk = context.select((AppState s) => s.backendOk);
+    final isLoadingHosts = context.select((AppState s) => s.isLoadingHosts);
     context.select((AppState s) => s.probeConcurrency);
     context.select((AppState s) => s.hostAutoProbeSec);
     final state = context.read<AppState>();
@@ -198,6 +199,11 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                 )
               : Column(
                   children: [
+                    if (isLoadingHosts)
+                      const LinearProgressIndicator(
+                        backgroundColor: AppColors.surface2,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.accentSoft),
+                      ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
                       child: TextField(
