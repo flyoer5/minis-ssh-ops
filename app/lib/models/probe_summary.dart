@@ -2,6 +2,10 @@ class ProbeLine {
   final String label;
   final String value;
   ProbeLine(this.label, this.value);
+
+  Map<String, dynamic> toJson() => {'label': label, 'value': value};
+  factory ProbeLine.fromJson(Map<String, dynamic> j) =>
+      ProbeLine((j['label'] ?? '').toString(), (j['value'] ?? '').toString());
 }
 
 class ProbeSummary {
@@ -16,6 +20,28 @@ class ProbeSummary {
     required this.lines,
     required this.detail,
   });
+
+  Map<String, dynamic> toJson() => {
+        'ok': ok,
+        'oneLine': oneLine,
+        'detail': detail,
+        'lines': [for (final l in lines) l.toJson()],
+      };
+
+  factory ProbeSummary.fromJson(Map<String, dynamic> j) {
+    final rawLines = j['lines'];
+    return ProbeSummary(
+      ok: j['ok'] == true,
+      oneLine: (j['oneLine'] ?? '').toString(),
+      detail: (j['detail'] ?? '').toString(),
+      lines: rawLines is List
+          ? [
+              for (final e in rawLines)
+                if (e is Map) ProbeLine.fromJson(Map<String, dynamic>.from(e)),
+            ]
+          : const [],
+    );
+  }
 
   factory ProbeSummary.fromProbeJson(Map<String, dynamic> res) {
     String pick(String key) {

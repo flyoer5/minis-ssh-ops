@@ -87,6 +87,9 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
     onboarded = true; // onboarding removed
     loadUiPrefs(prefs);
     loadAgentSessionsFromPrefs(prefs);
+    // Last-known host metrics so the hosts page shows CPU/MEM instantly on
+    // cold start (marked stale via probeCacheTime).
+    unawaited(loadPersistedProbeCache());
 
     if (NativeBackend.isAndroidNative) {
       Object? lastErr;
@@ -305,21 +308,67 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
 
   void putProbeCache(String hostId, ProbeSummary s) {
     probeGen++;
+    final at = DateTime.now().millisecondsSinceEpoch;
     probeCache[hostId] = {
       'ok': s.ok,
       'oneLine': s.oneLine,
       'detail': s.detail,
       'lines': [for (final l in s.lines) {'label': l.label, 'value': l.value}],
-      'at': DateTime.now().millisecondsSinceEpoch,
+      'at': at,
     };
     notifyListeners();
+    // Persist so a cold start can show last-known CPU/MEM instantly.
+    _persistProbeCache(hostId, at);
+  }
+
+  /// Async fire-and-forget: write this host's snapshot to SharedPreferences.
+  void _persistProbeCache(String hostId, int at) {
+    SharedPreferences.getInstance().then((prefs) {
+      final m = probeCache[hostId];
+      if (m == null) return;
+      try {
+        prefs.setString('probeCache.$hostId', jsonEncode(m));
+      } catch (_) {}
+    });
+  }
+
+  /// Load persisted probe snapshots into memory on bootstrap. These are older
+  /// than the live 2-min window by nature, so [getProbeCache] callers pass a
+  /// longer maxAge (or accept the default for the in-memory path).
+  Future<void> loadPersistedProbeCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in prefs.getKeys()) {
+        if (!key.startsWith('probeCache.')) continue;
+        final id = key.substring('probeCache.'.length);
+        final raw = prefs.getString(key);
+        if (raw == null) continue;
+        try {
+          final m = jsonDecode(raw);
+          if (m is Map) {
+            final mm = Map<String, dynamic>.from(m);
+            mm['persisted'] = true;
+            probeCache[id] = mm;
+          }
+        } catch (_) {}
+      }
+      if (probeCache.isNotEmpty) {
+        probeGen++;
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   ProbeSummary? getProbeCache(String hostId, {Duration maxAge = const Duration(minutes: 2)}) {
     final m = probeCache[hostId];
     if (m == null) return null;
     final at = m['at'] as int? ?? 0;
-    if (DateTime.now().millisecondsSinceEpoch - at > maxAge.inMilliseconds) return null;
+    // Entries restored from disk bypass the short live window so cold start can
+    // show last-known metrics; the UI marks them via probeCacheTime anyway.
+    final fromDisk = m['persisted'] == true;
+    if (!fromDisk && DateTime.now().millisecondsSinceEpoch - at > maxAge.inMilliseconds) {
+      return null;
+    }
     final lines = <ProbeLine>[];
     final rawLines = m['lines'];
     if (rawLines is List) {
