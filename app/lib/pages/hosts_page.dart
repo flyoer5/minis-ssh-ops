@@ -310,7 +310,41 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                 onRetry: () => _refreshProbe(state, id, force: true),
                               ),
                             ));
-                            if (!canReorder) return card;
+                            if (!canReorder) {
+                              return Dismissible(
+                                key: Key(id),
+                                direction: DismissDirection.endToStart,
+                                background: Container(
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.only(right: 20),
+                                  color: AppColors.danger,
+                                  child: const Icon(Icons.delete, color: Colors.white),
+                                ),
+                                confirmDismiss: (direction) async {
+                                  return await showDialog<bool>(
+                                    context: context,
+                                    builder: (d) => AlertDialog(
+                                      title: const Text('删除主机'),
+                                      content: Text('确定要删除主机「$name」吗？'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(d, false),
+                                          child: const Text('取消'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(d, true),
+                                          child: const Text('删除', style: TextStyle(color: AppColors.danger)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                                onDismissed: (direction) async {
+                                  await state.removeHost(id);
+                                },
+                                child: card,
+                              );
+                            }
                             // Delayed listener = long-press then drag (not immediate press-drag).
                             return ReorderableDelayedDragStartListener(
                               key: ValueKey(id),
