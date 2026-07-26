@@ -347,14 +347,24 @@ object BackendRuntime {
                     BufferedReader(InputStreamReader(proc.inputStream)).use { br ->
                         val sink = StringBuilder()
                         var line: String?
+                        var lastFlush = 0L
                         while (br.readLine().also { line = it } != null) {
                             Log.i(TAG, "go: $line")
                             sink.append(line).append('\n')
                             if (sink.length > 32_000) sink.delete(0, sink.length - 16_000)
-                            try {
-                                logFile.writeText(sink.toString())
-                            } catch (_: Exception) {
+                            // Flush to disk at most every 500ms — not every log line (startup IO).
+                            val now = System.currentTimeMillis()
+                            if (now - lastFlush >= 500L) {
+                                lastFlush = now
+                                try {
+                                    logFile.writeText(sink.toString())
+                                } catch (_: Exception) {
+                                }
                             }
+                        }
+                        try {
+                            logFile.writeText(sink.toString())
+                        } catch (_: Exception) {
                         }
                     }
                 } catch (e: Exception) {
@@ -387,7 +397,7 @@ object BackendRuntime {
                     Log.i(TAG, "backend healthy")
                     return resultMap(finalTok, already = false)
                 }
-                Thread.sleep(100)
+                Thread.sleep(40)
             }
             val tail = try {
                 logFile.readText().takeLast(800)

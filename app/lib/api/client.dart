@@ -31,7 +31,7 @@ class ApiClient {
   Uri _u(String path) => Uri.parse('$baseUrl$path');
 
   Future<Map<String, dynamic>> health() async {
-    final r = await _c.get(_u('/v1/health')).timeout(const Duration(seconds: 3));
+    final r = await _c.get(_u('/v1/health')).timeout(const Duration(milliseconds: 800));
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
@@ -42,7 +42,7 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> getLlm() async {
-    final r = await _c.get(_u('/v1/settings/llm'), headers: _headers).timeout(const Duration(seconds: 10));
+    final r = await _c.get(_u('/v1/settings/llm'), headers: _headers).timeout(const Duration(seconds: 6));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -65,7 +65,7 @@ class ApiClient {
   }
 
   Future<List<dynamic>> listHosts() async {
-    final r = await _c.get(_u('/v1/hosts'), headers: _headers).timeout(const Duration(seconds: 10));
+    final r = await _c.get(_u('/v1/hosts'), headers: _headers).timeout(const Duration(seconds: 6));
     _ensureOk(r);
     final m = jsonDecode(r.body) as Map<String, dynamic>;
     return (m['hosts'] as List<dynamic>? ?? []);
@@ -120,7 +120,7 @@ class ApiClient {
   Future<Map<String, dynamic>> probe(String id) async {
     final r = await _c
         .post(_u('/v1/hosts/$id/probe'), headers: _headers, body: '{}')
-        .timeout(const Duration(seconds: 45));
+        .timeout(const Duration(seconds: 25));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }

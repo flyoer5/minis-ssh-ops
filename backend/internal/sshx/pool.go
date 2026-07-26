@@ -50,9 +50,13 @@ func (p *Pool) get(key string) *ssh.Client {
 		delete(p.clients, key)
 		return nil
 	}
-	// cheap liveness without full session handshake cost
+	// Skip keepalive RTT when connection was used recently (probe/exec burst).
+	if time.Since(e.last) < 45*time.Second {
+		e.last = time.Now()
+		return e.cli
+	}
+	// Liveness only after idle gap.
 	if _, _, err := e.cli.Conn.SendRequest("kevin@golang.org/keepalive@golang", true, nil); err != nil {
-		// fallback: try new session
 		s, err2 := e.cli.NewSession()
 		if err2 != nil {
 			_ = e.cli.Close()

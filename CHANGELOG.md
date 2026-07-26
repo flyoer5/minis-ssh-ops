@@ -1,3 +1,17 @@
+## 1.5.24
+
+### Startup + overall speed
+- Bootstrap: paint HomeShell as soon as backend healthy; hosts/LLM load after first frame
+- RootGate no longer waits on startingBackend after bootstrapped
+- Drop redundant multi-health polls (Kotlin already waited for /v1/health)
+- Health HTTP timeout 3s→800ms; hosts/llm 10s→6s; probe client 45s→25s
+- Probe script CPU sample sleep 1s→0.12s (~0.9s faster per host)
+- SSH pool: skip keepalive RTT when connection used within 45s
+- SQLite: synchronous=NORMAL + temp_store=MEMORY
+- Backend log drain: flush disk ≤2/s (was every line)
+- Kotlin health poll interval 100ms→40ms
+- Agent stream UI throttle 50ms→80ms; default probe concurrency 3→4
+
 ## 1.5.23
 
 ### LLM DNS on Android (502 dial tcp lookup [::1]:53)

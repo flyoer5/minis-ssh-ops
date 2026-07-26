@@ -116,7 +116,7 @@ class RootGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ready = context.select((AppState s) => s.bootstrapped && !s.startingBackend);
+    final ready = context.select((AppState s) => s.bootstrapped);
     if (!ready) {
       return const Scaffold(
         body: Center(

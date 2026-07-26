@@ -52,7 +52,7 @@ type HostSecrets struct {
 }
 
 func Open(path string, box *crypto.Box) (*Store, error) {
-	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(3000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=temp_store(MEMORY)")
 	if err != nil {
 		return nil, err
 	}

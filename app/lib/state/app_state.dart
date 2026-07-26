@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -97,8 +98,9 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
             final tok = (info['token'] as String?) ?? '';
             api.baseUrl = base;
             if (tok.isNotEmpty) api.localToken = tok;
-            await prefs.setString('baseUrl', api.baseUrl);
-            await prefs.setString('localToken', api.localToken);
+            // Persist off critical path.
+            unawaited(prefs.setString('baseUrl', api.baseUrl));
+            unawaited(prefs.setString('localToken', api.localToken));
             backendNote = info['alreadyRunning'] == true ? '本机 Go 已在运行' : '已启动内置 Go 后端';
             lastErr = null;
             break;
@@ -107,7 +109,7 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
           lastErr = e;
           backendNote = '启动后端重试 ${i + 1}/2…';
           notifyListeners();
-          await Future<void>.delayed(Duration(milliseconds: 250 * (i + 1)));
+          await Future<void>.delayed(Duration(milliseconds: 120 * (i + 1)));
         }
       }
       if (lastErr != null) {
@@ -115,27 +117,30 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
       }
     }
 
-    // Fast path: short health polls (backend already waits until healthy).
-    for (var i = 0; i < 5; i++) {
+    // Kotlin ensureStarted already blocks until /v1/health is 200 — one check is enough.
+    await refreshHealth();
+    if (!backendOk) {
+      await Future<void>.delayed(const Duration(milliseconds: 80));
       await refreshHealth();
-      if (backendOk) break;
-      await Future<void>.delayed(const Duration(milliseconds: 150));
     }
 
     startingBackend = false;
+    bootstrapped = true;
+    notifyListeners(); // paint HomeShell immediately
+
+    // Hosts/LLM/battery after first frame — do not block RootGate.
     if (backendOk) {
       try {
-        // Load hosts + llm in parallel; audit is not needed on cold start.
         await Future.wait<void>([refreshHosts(), refreshLlm()]);
       } catch (e) {
         backendError = '加载数据失败: $e';
+        notifyListeners();
       }
     }
     try {
       batteryIgnored = await NativeBackend.isIgnoringBatteryOptimizations();
+      notifyListeners();
     } catch (_) {}
-    bootstrapped = true;
-    notifyListeners();
   }
 
   Future<void> completeOnboarding() async {

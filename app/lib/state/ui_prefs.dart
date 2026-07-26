@@ -28,7 +28,7 @@ mixin UiPrefs on ChangeNotifier {
   bool streamMarkdown = false;
 
   /// Concurrent SSH probes when refreshing host list (1–6).
-  int probeConcurrency = 3;
+  int probeConcurrency = 4;
 
   // —— Agent ——
   /// Tool-loop rounds per user turn (1–99). Backend clamps.
@@ -74,7 +74,7 @@ mixin UiPrefs on ChangeNotifier {
     final fav = prefs.getStringList('pathFavorites') ?? const <String>[];
     pathFavorites = List<String>.from(fav);
     streamMarkdown = prefs.getBool('streamMarkdown') ?? false;
-    final pc = prefs.getInt('probeConcurrency') ?? 3;
+    final pc = prefs.getInt('probeConcurrency') ?? 4;
     probeConcurrency = pc.clamp(1, 6);
 
     // Migrate old low defaults: stored 5 → keep; clamp to new ceiling 32.
