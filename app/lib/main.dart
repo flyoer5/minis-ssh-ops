@@ -142,8 +142,14 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int index = 0;
+
+  /// Keyboard open (threshold). Not updated every IME frame — only open/close.
+  /// When open, hide [NavigationBar] so ImeInset translate by full viewInsets
+  /// sits flush on the keyboard (otherwise a ~56px dark band appears between
+  /// composer and keyboard).
+  bool _imeOpen = false;
 
   final _pages = const <Widget>[
     HostsPage(),
@@ -155,6 +161,34 @@ class _HomeShellState extends State<HomeShell> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncImeOpen());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() => _syncImeOpen();
+
+  void _syncImeOpen() {
+    if (!mounted) return;
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) return;
+    final view = views.first;
+    final ime = view.viewInsets.bottom / view.devicePixelRatio;
+    // Hysteresis: open quickly, close only when fully dismissed.
+    final open = _imeOpen ? ime > 4 : ime > 12;
+    if (open == _imeOpen) return;
+    setState(() => _imeOpen = open);
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Select only shell fields — full watch() rebuilds every Agent stream tick.
     final menu = context.select((AppState s) => s.navIsMenu);
@@ -162,6 +196,7 @@ class _HomeShellState extends State<HomeShell> {
     final starting = context.select((AppState s) => s.startingBackend);
     final backendNote = context.select((AppState s) => s.backendNote);
     final backendError = context.select((AppState s) => s.backendError);
+    final showNav = !menu && !_imeOpen;
     return NavScope(
       index: index,
       go: (i) => setState(() => index = i),
@@ -171,6 +206,7 @@ class _HomeShellState extends State<HomeShell> {
       // viewInsets for every form TextField (settings/hosts/etc).
       // Agent/terminal freeze only their message/scroll subtrees.
       child: Scaffold(
+        backgroundColor: AppColors.bg,
         resizeToAvoidBottomInset: false,
         body: Column(
           children: [
@@ -223,10 +259,11 @@ class _HomeShellState extends State<HomeShell> {
             ),
           ],
         ),
-        bottomNavigationBar: menu
-            ? null
-            : NavigationBar(
+        bottomNavigationBar: showNav
+            ? NavigationBar(
                 height: 56,
+                backgroundColor: AppColors.surface,
+                surfaceTintColor: Colors.transparent,
                 labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                 selectedIndex: index,
                 onDestinationSelected: (i) => setState(() => index = i),
@@ -238,7 +275,8 @@ class _HomeShellState extends State<HomeShell> {
                       label: AppNav.labels[i],
                     ),
                 ],
-              ),
+              )
+            : null,
       ),
     );
   }

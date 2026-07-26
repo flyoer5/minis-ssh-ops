@@ -6,13 +6,10 @@ import 'package:flutter/widgets.dart';
 /// Reads [FlutterView.viewInsets] via [WidgetsBindingObserver] so only this
 /// State setStates — does not require ancestors to depend on [MediaQuery].
 ///
-/// Uses [Padding] (layout) rather than [Transform.translate]: with
-/// [windowSoftInputMode] `adjustResize` the window already shrinks; padding
-/// the leaf is still correct when the parent Scaffold has
-/// `resizeToAvoidBottomInset: false` and only the composer should move.
-///
-/// When [usePadding] is false, uses translate (layout size fixed) — prefer
-/// for chat lists that must not reflow.
+/// [usePadding] true (forms): layout [Padding] so parent reflow lifts content.
+/// [usePadding] false (chat/terminal): [Transform.translate] so Expanded lists
+/// do not reflow every IME frame. Optionally paints [fillColor] in the vacated
+/// strip so a dark window band does not show through.
 class ImeInset extends StatefulWidget {
   const ImeInset({
     super.key,
@@ -22,6 +19,7 @@ class ImeInset extends StatefulWidget {
     this.top = 0,
     this.extraBottom = 0,
     this.usePadding = true,
+    this.fillColor,
   });
 
   final Widget child;
@@ -31,6 +29,9 @@ class ImeInset extends StatefulWidget {
   final double extraBottom;
   /// true: [Padding] (forms / default). false: [Transform.translate] (chat).
   final bool usePadding;
+  /// When translating, paint this under the leaf to cover the strip above the
+  /// keyboard (defaults to no fill).
+  final Color? fillColor;
 
   @override
   State<ImeInset> createState() => _ImeInsetState();
@@ -95,7 +96,28 @@ class _ImeInsetState extends State<ImeInset> with WidgetsBindingObserver {
       );
     }
     if (bottom == 0) return w;
-    return Transform.translate(offset: Offset(0, -bottom), child: w);
+    // Translate leaf up. Layout slot stays put — paint fill in that slot and
+    // extend a strip the same height as the lift so nothing "black" shows
+    // between the composer and the keyboard during/after the animation.
+    final fill = widget.fillColor;
+    if (fill == null) {
+      return Transform.translate(offset: Offset(0, -bottom), child: w);
+    }
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.bottomCenter,
+      children: [
+        // Extends downward from the layout slot into the keyboard gap.
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: -bottom,
+          child: ColoredBox(color: fill),
+        ),
+        Transform.translate(offset: Offset(0, -bottom), child: w),
+      ],
+    );
   }
 }
 

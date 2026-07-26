@@ -1,3 +1,11 @@
+## 1.5.21
+
+### IME black band above keyboard
+- Cause: bottom NavigationBar (56px) stayed while ImeInset translated composer by full viewInsets → empty strip between input and keyboard; windowBackground was system black
+- Hide NavigationBar while keyboard open (open/close only, not every IME frame)
+- ImeInset fillColor paints strip under translated composer/keybar
+- Android NormalTheme windowBackground = #0D1117 (AppColors.bg)
+
 ## 1.5.20
 
 ### IME: fix all TextFields covered / broken

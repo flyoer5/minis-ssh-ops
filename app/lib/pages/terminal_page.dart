@@ -795,6 +795,7 @@ class _TerminalPageState extends State<TerminalPage>
             ), // Expanded
             ImeInset(
               usePadding: false,
+              fillColor: _bar,
               child: Container(
                 color: _bar,
                 padding: const EdgeInsets.only(left: 4, right: 4, top: 4, bottom: 6),

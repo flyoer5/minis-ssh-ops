@@ -1165,6 +1165,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
           // usePadding:false → translate only, list Expanded does not reflow.
           ImeInset(
             usePadding: false,
+            fillColor: AppColors.bg,
             child: Material(
               color: AppColors.bg,
               child: Container(
