@@ -1432,8 +1432,9 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
             ],
           ),
         ],
+      ), // ListView
       ), // ImeInset
-      ), // Scaffold
+    ), // Scaffold
     ); // WithoutViewInsets
   }
 }
