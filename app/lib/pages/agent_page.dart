@@ -653,9 +653,44 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                                     final hostHint = s.hostId == null ? '' : state.hostLabelFor(s.hostId);
                                     final open = state.agentSessionId == s.id;
                                     final ts = _relTime(s.updatedAt);
-                                    return Column(
-                                      children: [
-                                        ListTile(
+                                    return Dismissible(
+                                      key: Key(s.id),
+                                      direction: DismissDirection.endToStart,
+                                      background: Container(
+                                        alignment: Alignment.centerRight,
+                                        padding: const EdgeInsets.only(right: 20),
+                                        color: AppColors.danger,
+                                        child: const Icon(Icons.delete, color: Colors.white),
+                                      ),
+                                      confirmDismiss: (direction) async {
+                                        return await showDialog<bool>(
+                                          context: context,
+                                          builder: (d) => AlertDialog(
+                                            title: const Text('删除会话'),
+                                            content: Text('确定要删除会话「${s.title}」吗？'),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(d, false),
+                                                child: const Text('取消'),
+                                              ),
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(d, true),
+                                                child: const Text('删除', style: TextStyle(color: AppColors.danger)),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                      onDismissed: (direction) async {
+                                        try {
+                                          await state.api.deleteAgentSessionRemote(s.id);
+                                        } catch (_) {}
+                                        _loadSessions(state);
+                                        setModal(() {});
+                                      },
+                                      child: Column(
+                                        children: [
+                                          ListTile(
                                           dense: true,
                                           selected: open,
                                           selectedTileColor: AppColors.accentDeep.withAlpha(0x18),
