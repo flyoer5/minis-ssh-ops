@@ -415,7 +415,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
         final raw = e.toString();
         String msg = raw.replaceFirst(RegExp(r'^Exception:\s*'), '');
         if (msg.toLowerCase().contains('too large') || msg.contains('file too large')) {
-          msg = '文件过大，文件过大？回到主机上用 scp/rsync 或压缩再下';
+          msg = '文件过大，建议回到主机用 scp/rsync 或压缩后再下载';
         }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }

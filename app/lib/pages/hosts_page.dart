@@ -251,20 +251,31 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                 addr.contains(q);
                           }).toList();
                           if (list.isEmpty) {
-                            return Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text('无匹配主机', style: TextStyle(color: AppColors.slate)),
-                                  const SizedBox(height: 8),
-                                  TextButton(
-                                    onPressed: () {
-                                      _search.clear();
-                                      setState(() => _query = '');
-                                    },
-                                    child: const Text('清除搜索'),
+                            // Scrollable so pull-to-refresh still works in the
+                            // no-match state (Center alone can't be pulled).
+                            return LayoutBuilder(
+                              builder: (c, cons) => RefreshIndicator(
+                                onRefresh: () => _refreshAll(state),
+                                child: SingleChildScrollView(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(minHeight: cons.maxHeight),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Text('无匹配主机', style: TextStyle(color: AppColors.slate)),
+                                        const SizedBox(height: 8),
+                                        TextButton(
+                                          onPressed: () {
+                                            _search.clear();
+                                            setState(() => _query = '');
+                                          },
+                                          child: const Text('清除搜索'),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ],
+                                ),
                               ),
                             );
                           }
