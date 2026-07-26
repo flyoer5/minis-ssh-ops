@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -111,13 +112,13 @@ type planBody struct {
 }
 
 type chatBody struct {
-	HostID         string  `json:"hostId"`
-	Message        string  `json:"message"`
-	SessionID      string  `json:"sessionId"`
-	ConfirmWrites  bool    `json:"confirmWrites"`
-	MaxRounds      int     `json:"maxRounds"`
-	Temperature    float64 `json:"temperature"`
-	CustomPrompt   string  `json:"customPrompt"`
+	HostID        string  `json:"hostId"`
+	Message       string  `json:"message"`
+	SessionID     string  `json:"sessionId"`
+	ConfirmWrites bool    `json:"confirmWrites"`
+	MaxRounds     int     `json:"maxRounds"`
+	Temperature   float64 `json:"temperature"`
+	CustomPrompt  string  `json:"customPrompt"`
 }
 
 func clampMaxRounds(n int) int {
@@ -220,8 +221,10 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.Temperature > 0 { cli.Temperature = body.Temperature }
-events, _, err := cli.RunLoop(body.Message, history, run, clampMaxRounds(body.MaxRounds))
+	if body.Temperature > 0 {
+		cli.Temperature = body.Temperature
+	}
+	events, _, err := cli.RunLoop(body.Message, history, run, clampMaxRounds(body.MaxRounds))
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
@@ -357,8 +360,10 @@ func (s *Server) handleAgentChatStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.Temperature > 0 { cli.Temperature = body.Temperature }
-events, _, err := cli.RunLoopStream(body.Message, history, run, clampMaxRounds(body.MaxRounds), func(ev agent.LoopEvent) {
+	if body.Temperature > 0 {
+		cli.Temperature = body.Temperature
+	}
+	events, _, err := cli.RunLoopStream(body.Message, history, run, clampMaxRounds(body.MaxRounds), func(ev agent.LoopEvent) {
 		if !writeEv(ev) {
 			// Client closed SSE mid-event — request context should already be cancelled.
 			log.Printf("agent stream: write failed session=%s (client stop?)", body.SessionID)
@@ -502,7 +507,19 @@ func (s *Server) handleAgentExecStep(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
-	list, err := s.Store.ListAudit(100)
+	limit := 100
+	if q := r.URL.Query().Get("limit"); q != "" {
+		if n, err := strconv.Atoi(q); err == nil {
+			if n < 1 {
+				n = 1
+			}
+			if n > 1000 {
+				n = 1000
+			}
+			limit = n
+		}
+	}
+	list, err := s.Store.ListAudit(limit)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -534,17 +551,16 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 		return map[string]any{"exitCode": res.ExitCode, "stdout": strings.TrimSpace(s), "stderr": ""}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"os":     mk(parts["O"]),
-		"uname":  mk(parts["U"]),
-		"uptime": mk(parts["T"]),
-		"load":   mk(parts["L"]),
-		"cpu":    mk(parts["C"]),
-		"disk":   mk(parts["D"]),
-		"memory": mk(parts["M"]),
+		"os":         mk(parts["O"]),
+		"uname":      mk(parts["U"]),
+		"uptime":     mk(parts["T"]),
+		"load":       mk(parts["L"]),
+		"cpu":        mk(parts["C"]),
+		"disk":       mk(parts["D"]),
+		"memory":     mk(parts["M"]),
 		"durationMs": res.DurationMs,
 	})
 }
-
 
 // cpuUsageFromProcStat parses two "cpu ..." lines (~1s apart) → utilization 0–100.
 func cpuUsageFromProcStat(raw string) string {
@@ -610,7 +626,6 @@ func cpuUsageFromProcStat(raw string) string {
 	return fmt.Sprintf("%d", pct)
 }
 
-
 func splitProbe(stdout string) map[string]string {
 	out := map[string]string{"O": "", "U": "", "T": "", "L": "", "C": "", "D": "", "M": ""}
 	cur := ""
@@ -641,8 +656,6 @@ func truncate(s string, n int) string {
 	}
 	return s[:n] + "\n...[truncated]"
 }
-
-
 
 // persistAgentEvents writes tool/reasoning/assistant parts for session history replay.
 func (s *Server) persistAgentEvents(sessionID string, events []agent.LoopEvent) {

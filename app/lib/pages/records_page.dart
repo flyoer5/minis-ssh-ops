@@ -280,9 +280,27 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                 : ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.only(bottom: 16),
-                    itemCount: list.length,
+                    // +1 footer row: load-more when the page likely hit the cap.
+                    itemCount: list.length + 1,
                     separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.surface2),
                     itemBuilder: (ctx, i) {
+                      if (i == list.length) {
+                        final st = context.watch<AppState>();
+                        // Heuristic: if we got exactly the page size back, there
+                        // may be more on the server.
+                        if (list.length < st.auditLimit) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Center(
+                            child: TextButton.icon(
+                              onPressed: () => st.refreshAudit(limit: st.auditLimit + 100),
+                              icon: const Icon(Icons.expand_more, size: 16),
+                              label: Text('加载更多（当前 ${st.auditLimit} 条）',
+                                  style: TextStyle(fontSize: fs - 1)),
+                            ),
+                          ),
+                        );
+                      }
                       final e = list[i];
                       final risk = e['risk']?.toString() ?? '';
                       final cmd = e['command']?.toString() ?? '';

@@ -227,8 +227,10 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
     notifyListeners();
   }
 
-  Future<void> refreshAudit() async {
-    audit = await api.listAudit();
+  int auditLimit = 100;
+  Future<void> refreshAudit({int? limit}) async {
+    if (limit != null) auditLimit = limit;
+    audit = await api.listAudit(limit: auditLimit);
     notifyListeners();
   }
 

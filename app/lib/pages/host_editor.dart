@@ -186,6 +186,9 @@ class _HostEditorSheetState extends State<_HostEditorSheet> {
                     labelText: isEdit ? '密码（留空不改）' : '密码',
                   ),
                   obscureText: true,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  keyboardType: TextInputType.visiblePassword,
                   validator: (v) {
                     if (isEdit) return null;
                     if (v == null || v.isEmpty) return '请填写密码，或改用私钥';
@@ -200,6 +203,8 @@ class _HostEditorSheetState extends State<_HostEditorSheet> {
                     alignLabelWithHint: true,
                     hintText: '-----BEGIN OPENSSH PRIVATE KEY-----\n...',
                   ),
+                  enableSuggestions: false,
+                  autocorrect: false,
                   minLines: 4,
                   maxLines: 8,
                   style: const TextStyle(fontFamily: 'monospace', fontSize: 11.5),
@@ -216,6 +221,9 @@ class _HostEditorSheetState extends State<_HostEditorSheet> {
                     labelText: isEdit ? '密钥口令（可选，留空不改）' : '密钥口令（可选）',
                   ),
                   obscureText: true,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  keyboardType: TextInputType.visiblePassword,
                 ),
               ],
               const SizedBox(height: 16),
