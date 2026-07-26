@@ -59,7 +59,7 @@ class _ImeInsetState extends State<ImeInset> with WidgetsBindingObserver {
 
   void _sync() {
     if (!mounted) return;
-    final double ime;
+    double ime;
     try {
       final view = View.of(context);
       ime = view.viewInsets.bottom / view.devicePixelRatio;
