@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/api"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/config"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/crypto"
-	"github.com/flyoer5/ssh-ai-agent/backend/internal/sshx"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/netx"
+	"github.com/flyoer5/ssh-ai-agent/backend/internal/sshx"
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/store"
 )
 
@@ -51,7 +52,15 @@ func main() {
 	log.Printf("data dir: %s", cfg.DataDir)
 	log.Printf("auth: header X-Local-Token (also written to %s/local.token)", cfg.DataDir)
 
-	if err := http.ListenAndServe(cfg.ListenAddr, srv.Handler()); err != nil {
+	// Timeouts: ReadHeaderTimeout guards slow-loris / stuck clients. Read/Write
+	// are left 0 because PTY (websocket) and LLM streaming are long-lived by
+	// design; the per-request clients above carry their own timeouts.
+	httpSrv := &http.Server{
+		Addr:              cfg.ListenAddr,
+		Handler:           srv.Handler(),
+		ReadHeaderTimeout: 15 * time.Second,
+	}
+	if err := httpSrv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
