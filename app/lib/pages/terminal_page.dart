@@ -43,6 +43,10 @@ class _TerminalPageState extends State<TerminalPage>
   String _prev = '';
   int _searchIdx = 0;
   List<int> _searchHits = [];
+  // Batched repaint: high-frequency PTY chunks coalesce into one setState per
+  // frame-ish window instead of a full scrollback rebuild per chunk.
+  Timer? _appendFlush;
+  bool _appendPending = false;
 
   static const _bg = AppColors.terminalBlack;
   static const _green = AppColors.success;
@@ -65,6 +69,7 @@ class _TerminalPageState extends State<TerminalPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _appendFlush?.cancel();
     _input.removeListener(_onChanged);
     _sub?.cancel();
     _ch?.sink.close();
@@ -109,9 +114,33 @@ class _TerminalPageState extends State<TerminalPage>
         ..write(t.substring(t.length - 200000));
     }
     if (!mounted) return;
+    // Coalesce bursts: rebuild scrollback at most ~12x/sec, not per chunk.
+    if (_appendFlush?.isActive == true) {
+      _appendPending = true;
+      return;
+    }
+    _appendFlush = Timer(const Duration(milliseconds: 80), _flushAppend);
+    _doAppendPaint();
+  }
+
+  void _flushAppend() {
+    _appendFlush = null;
+    if (!_appendPending) return;
+    _appendPending = false;
+    _doAppendPaint();
+  }
+
+  void _doAppendPaint() {
+    if (!mounted) return;
     setState(() {});
+    // Throttled follow: only jump when user is near the bottom so a scroll-up
+    // to read history isn't yanked back by incoming output.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      if (!_scroll.hasClients) return;
+      final pos = _scroll.position;
+      if (pos.maxScrollExtent - pos.pixels < 160) {
+        _scroll.jumpTo(pos.maxScrollExtent);
+      }
     });
   }
 
