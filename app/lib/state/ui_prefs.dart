@@ -152,7 +152,7 @@ mixin UiPrefs on ChangeNotifier {
     await setNavMode('bottom');
     await setHostCardCompact(false);
     await setStreamMarkdown(false);
-    await setProbeConcurrency(3);
+    await setProbeConcurrency(4);
     await setAgentMaxRounds(12);
     await setAgentAutoScroll(true);
     await setAgentShowReasoning(true);

@@ -182,7 +182,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          '添加主机后即可在 Agent / 终端 / 文件中使用',
+                          '添加后可在 Agent、终端、文件中使用。支持密码或密钥登录。',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 13, color: AppColors.textFaint, height: 1.4),
                         ),
@@ -206,7 +206,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                         style: const TextStyle(fontSize: 14),
                         decoration: InputDecoration(
                           isDense: true,
-                          hintText: '搜索 · 无搜索时：长按卡片拖动排序',
+                          hintText: '搜索名称 / IP / 用户 · 无搜索时长按排序',
                           prefixIcon: const Icon(Icons.search, size: 20),
                           suffixIcon: _query.isEmpty
                               ? null
@@ -251,7 +251,22 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                 addr.contains(q);
                           }).toList();
                           if (list.isEmpty) {
-                            return const Center(child: Text('无匹配主机', style: TextStyle(color: AppColors.slate)));
+                            return Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('无匹配主机', style: TextStyle(color: AppColors.slate)),
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed: () {
+                                      _search.clear();
+                                      setState(() => _query = '');
+                                    },
+                                    child: const Text('清除搜索'),
+                                  ),
+                                ],
+                              ),
+                            );
                           }
                           // Search results: plain list. Full list: long-press drag to reorder.
                           final canReorder = q.isEmpty && list.length > 1;

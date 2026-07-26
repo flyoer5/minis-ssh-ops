@@ -429,6 +429,29 @@ mixin AgentChatController on ChangeNotifier {
     if (low.contains('failed host lookup') || low.contains('network is unreachable')) {
       return '网络不可用，请检查连接后重试';
     }
+    if (low.contains('lookup ') && (low.contains('connection refused') || low.contains('[::1]:53') || low.contains('127.0.0.1:53'))) {
+      return 'DNS 解析失败（本机无可用 DNS）。请更新到最新版，或检查网络后重试。';
+    }
+    if (low.contains('dial tcp') && low.contains('lookup')) {
+      return '无法解析模型地址，请检查 Base URL 与网络';
+    }
+    if (low.contains('certificate') || low.contains('handshake') || low.contains('x509')) {
+      return 'TLS 证书校验失败，请检查 Base URL 是否为 https 且证书有效';
+    }
+    if (low.contains('502') || low.contains('bad gateway')) {
+      // Prefer more specific matches above; generic 502 last.
+      if (low.contains('模型请求失败') || low.contains('llm')) {
+        final m = RegExp(r'模型请求失败[:：]\s*(.*)').firstMatch(s);
+        if (m != null) {
+          final body = m.group(1)!.trim();
+          if (body.contains('lookup') && body.contains('connection refused')) {
+            return 'DNS 解析失败，无法连接模型网关。请重试或检查网络。';
+          }
+          if (body.length > 160) return '模型网关错误：${body.substring(0, 160)}…';
+          return '模型网关错误：$body';
+        }
+      }
+    }
     final m = RegExp(r'ApiException\(\d+\):\s*(.*)').firstMatch(s);
     if (m != null) {
       final body = m.group(1)!.trim();

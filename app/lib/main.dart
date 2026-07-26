@@ -119,13 +119,21 @@ class RootGate extends StatelessWidget {
     final ready = context.select((AppState s) => s.bootstrapped);
     if (!ready) {
       return const Scaffold(
+        backgroundColor: AppColors.bg,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 12),
-              Text('启动中…'),
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.accentSoft),
+              ),
+              SizedBox(height: 14),
+              Text(
+                '启动中…',
+                style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+              ),
             ],
           ),
         ),

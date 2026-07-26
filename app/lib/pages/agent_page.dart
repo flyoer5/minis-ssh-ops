@@ -66,10 +66,15 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     final state = context.read<AppState>();
     if (!force && !state.agentAutoScroll) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
-        _scroll.jumpTo(_scroll.position.maxScrollExtent);
-        if (_showJumpBottom && mounted) setState(() => _showJumpBottom = false);
+      if (!_scroll.hasClients) return;
+      final max = _scroll.position.maxScrollExtent;
+      // animate when user taps jump; jump while streaming (cheaper).
+      if (force && !_busy) {
+        _scroll.animateTo(max, duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic);
+      } else {
+        _scroll.jumpTo(max);
       }
+      if (_showJumpBottom && mounted) setState(() => _showJumpBottom = false);
     });
   }
 
@@ -89,7 +94,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     final nearBottom = pos.maxScrollExtent - pos.pixels < 160;
     if (nearBottom) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        if (!_scroll.hasClients) return;
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
       });
     }
   }
@@ -100,15 +106,25 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     final text = _input.text.trim();
     if (text.isEmpty || _busy) return;
     if (!state.backendOk) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('本地后端未连接')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('本地后端未连接'), duration: Duration(seconds: 2)),
+      );
       return;
     }
     if (state.selectedHostId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('先选主机')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('先选主机'),
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(label: '去主机', onPressed: () => NavScope.maybeOf(context)?.go(0)),
+        ),
+      );
       return;
     }
     if (state.agentBusy) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('上一轮还在进行，可点停止')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('上一轮还在进行，可点停止'), duration: Duration(seconds: 2)),
+      );
       return;
     }
     _input.clear();
@@ -133,7 +149,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
             .replaceFirst(RegExp(r'^Exception:\s*'), '')
             .replaceFirst(RegExp(r'^ApiException\(\d+\):\s*'), '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(short.length > 160 ? '${short.substring(0, 160)}…' : short)),
+          SnackBar(
+            content: Text(short.length > 160 ? '${short.substring(0, 160)}…' : short),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -1062,6 +1082,9 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                       ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                        cacheExtent: 480,
+                        physics: const ClampingScrollPhysics(),
+                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                         itemCount: state.agentMessages.length + (_busy ? 1 : 0),
                         itemBuilder: (_, i) {
                           if (_busy && i == state.agentMessages.length) {
@@ -1200,8 +1223,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                           hintText: state.selectedHostId == null
                               ? '先选主机'
                               : ((_busy || state.agentBusy)
-                                  ? '生成中… 可点停止'
-                                  : (state.agentEnterToSend ? '消息 · 回车发送' : '消息 · 回车换行')),
+                                  ? '生成中… 点右侧停止'
+                                  : (state.agentEnterToSend ? '输入消息 · 回车发送' : '输入消息 · 回车换行')),
                           hintStyle: const TextStyle(color: AppColors.textFaint),
                           filled: true,
                           fillColor: AppColors.surface,

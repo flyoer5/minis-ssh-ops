@@ -1,3 +1,15 @@
+## 1.5.25
+
+### UX polish (full pass)
+- Agent: clearer empty copy by host selection; jump-to-bottom animates; list cacheExtent + keyboard dismiss on drag; SnackBars with duration / floating / 去主机 action
+- Errors: friendly DNS / dial / TLS / 502 model gateway messages (no raw [::1]:53 dump)
+- Hosts: clearer search hint; no-match + clear search; empty state copy
+- Files: empty dir shows path + refresh
+- Settings: open-policy confirm switch subtitle shortened
+- RootGate: compact spinner + muted 启动中
+- Terminal: SnackBar 2s duration
+- Defaults: probe concurrency reset aligns to 4
+
 ## 1.5.24
 
 ### Startup + overall speed

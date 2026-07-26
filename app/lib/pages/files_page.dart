@@ -817,6 +817,12 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                                const SizedBox(height: 10),
+                                TextButton.icon(
+                                  onPressed: () => _load(pane, path: pane.path),
+                                  icon: const Icon(Icons.refresh, size: 16),
+                                  label: const Text('刷新'),
+                                ),
                               ],
                             ),
                           )
