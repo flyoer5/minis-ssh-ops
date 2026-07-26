@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/pages/agent_page.dart';
 import 'package:ssh_ai_agent/pages/files_page.dart';
 import 'package:ssh_ai_agent/pages/hosts_page.dart';
@@ -12,120 +12,138 @@ import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:ssh_ai_agent/widgets/ime_inset.dart';
 import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Never leave the user stuck on the default red/yellow ErrorWidget.
-  ErrorWidget.builder = (FlutterErrorDetails details) {
-    return _AppErrorSurface(details: details);
-  };
-  runApp(const SshAiAgentApp());
+  // Match Android windowBackground (#0D1117) — no flash of wrong color.
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: AppColors.bg,
+      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
+  final state = AppState();
+  runApp(
+    ChangeNotifierProvider.value(
+      value: state,
+      child: const SshAiApp(),
+    ),
+  );
+  // Defer native backend start until after first frame so UI paints immediately.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    state.bootstrap();
+  });
 }
 
-/// In-app recovery UI when a build/layout throws (instead of full-screen red).
-class _AppErrorSurface extends StatelessWidget {
-  const _AppErrorSurface({required this.details});
-  final FlutterErrorDetails details;
+class SshAiApp extends StatelessWidget {
+  const SshAiApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final msg = details.exceptionAsString();
-    return Material(
-      color: AppColors.bg,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 24),
-              const Icon(Icons.error_outline, size: 48, color: AppColors.danger),
-              const SizedBox(height: 12),
-              const Text(
-                '界面出错了',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.text),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '通常是某次操作触发了异常。可返回继续用；若反复出现请到设置导出日志。',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.4),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: SingleChildScrollView(
-                    child: SelectableText(
-                      msg,
-                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.dangerSoft),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () {
-                  // Best-effort: pop if possible; otherwise user can switch tabs via process restart.
-                  final nav = Navigator.maybeOf(context);
-                  if (nav != null && nav.canPop()) {
-                    nav.pop();
-                  }
-                },
-                child: const Text('关闭此页'),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return MaterialApp(
+      title: '机枢',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.dark(),
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        final scale = mq.textScaler.clamp(
+          minScaleFactor: 0.9,
+          maxScaleFactor: 1.15,
+        );
+        return MediaQuery(
+          data: mq.copyWith(textScaler: scale),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+      home: const RootGate(),
     );
   }
 }
 
-class SshAiAgentApp extends StatelessWidget {
-  const SshAiAgentApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AppState(ApiClient())..bootstrap(),
-      child: MaterialApp(
-        title: '机枢',
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        builder: (context, child) {
-          // Keep ErrorWidget theme-consistent even outside routes.
-          ErrorWidget.builder = (FlutterErrorDetails details) {
-            return _AppErrorSurface(details: details);
-          };
-          return child ?? const SizedBox.shrink();
-        },
-        home: const RootGate(),
-      ),
-    );
-  }
-}
-
-class RootGate extends StatelessWidget {
+/// Route side-effects (host select / terminal / files) after the frame so
+/// [build] never triggers [notifyListeners] (which would re-enter providers).
+class RootGate extends StatefulWidget {
   const RootGate({super.key});
 
   @override
+  State<RootGate> createState() => _RootGateState();
+}
+
+class _RootGateState extends State<RootGate> {
+  String? _scheduledHost;
+  String? _scheduledTerm;
+  String? _scheduledFiles;
+
+  @override
   Widget build(BuildContext context) {
-    final ready = context.select((AppState s) => s.bootstrapped && !s.startingBackend);
+    final ready = context.select((AppState s) => s.ready);
+    final selectedHostId = context.select((AppState s) => s.selectedHostId);
+    final openTerminalHostId =
+        context.select((AppState s) => s.openTerminalHostId);
+    final openFilesHostId = context.select((AppState s) => s.openFilesHostId);
+
+    if (ready && selectedHostId != null && selectedHostId != _scheduledHost) {
+      _scheduledHost = selectedHostId;
+      final id = selectedHostId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final s = context.read<AppState>();
+        if (s.selectedHostId == id) s.selectHost(id);
+      });
+    }
+    if (selectedHostId == null) _scheduledHost = null;
+
+    if (openTerminalHostId != null && openTerminalHostId != _scheduledTerm) {
+      _scheduledTerm = openTerminalHostId;
+      final id = openTerminalHostId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final s = context.read<AppState>();
+        if (s.openTerminalHostId == id) {
+          s.clearOpenTerminal();
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => TerminalPage(hostId: id)),
+          );
+        }
+        if (mounted) setState(() => _scheduledTerm = null);
+      });
+    }
+
+    if (openFilesHostId != null && openFilesHostId != _scheduledFiles) {
+      _scheduledFiles = openFilesHostId;
+      final id = openFilesHostId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final s = context.read<AppState>();
+        if (s.openFilesHostId == id) {
+          s.clearOpenFiles();
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => FilesPage(hostId: id)),
+          );
+        }
+        if (mounted) setState(() => _scheduledFiles = null);
+      });
+    }
+
     if (!ready) {
-      return const Scaffold(
+      final note = context.select((AppState s) => s.backendNote);
+      return Scaffold(
+        backgroundColor: AppColors.bg,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 12),
-              Text('启动中…'),
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                note ?? '启动中…',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+              ),
             ],
           ),
         ),
@@ -142,71 +160,30 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
+class _HomeShellState extends State<HomeShell> {
   int index = 0;
 
-  /// Keyboard open (threshold). Not updated every IME frame — only open/close.
-  /// When open, hide [NavigationBar] so ImeInset translate by full viewInsets
-  /// sits flush on the keyboard (otherwise a ~56px dark band appears between
-  /// composer and keyboard).
-  bool _imeOpen = false;
-
-  final _pages = const <Widget>[
+  static const _pages = <Widget>[
     HostsPage(),
     AgentPage(),
-    TerminalPage(),
-    FilesPage(),
     RecordsPage(),
     SettingsPage(),
   ];
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncImeOpen());
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeMetrics() => _syncImeOpen();
-
-  void _syncImeOpen() {
-    if (!mounted) return;
-    final views = WidgetsBinding.instance.platformDispatcher.views;
-    if (views.isEmpty) return;
-    final view = views.first;
-    final ime = view.viewInsets.bottom / view.devicePixelRatio;
-    // Hysteresis: open quickly, close only when fully dismissed.
-    final open = _imeOpen ? ime > 4 : ime > 12;
-    if (open == _imeOpen) return;
-    setState(() => _imeOpen = open);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // Select only shell fields — full watch() rebuilds every Agent stream tick.
-    final menu = context.select((AppState s) => s.navIsMenu);
     final backendOk = context.select((AppState s) => s.backendOk);
-    final starting = context.select((AppState s) => s.startingBackend);
+    final starting = context.select((AppState s) => s.backendStarting);
     final backendNote = context.select((AppState s) => s.backendNote);
     final backendError = context.select((AppState s) => s.backendError);
-    final showNav = !menu && !_imeOpen;
+    final menu = context.select((AppState s) => s.navStyle == 'menu');
+
     return NavScope(
       index: index,
       go: (i) => setState(() => index = i),
-      menuMode: menu,
-      // Shell: resizeToAvoidBottomInset false so IndexedStack tabs do not
-      // double-shrink. Do NOT wrap with WithoutViewInsets — that zeroed
-      // viewInsets for every form TextField (settings/hosts/etc).
-      // Agent/terminal freeze only their message/scroll subtrees.
       child: Scaffold(
-        backgroundColor: AppColors.bg,
+        // Do not resize shell with IME (avoids double-shrink with tabs).
+        // Do NOT wrap with WithoutViewInsets — that zeroed viewInsets for forms.
         resizeToAvoidBottomInset: false,
         body: Column(
           children: [
@@ -221,7 +198,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                         Icon(
                           starting ? Icons.hourglass_top : Icons.warning_amber,
                           size: 16,
-                          color: starting ? AppColors.textMuted : AppColors.dangerSoft,
+                          color: starting
+                              ? AppColors.textMuted
+                              : AppColors.dangerSoft,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -233,7 +212,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
-                              color: starting ? AppColors.textMuted : AppColors.dangerSoft,
+                              color: starting
+                                  ? AppColors.textMuted
+                                  : AppColors.dangerSoft,
                             ),
                           ),
                         ),
@@ -241,10 +222,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                           TextButton(
                             style: TextButton.styleFrom(
                               visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
                             ),
-                            onPressed: () => context.read<AppState>().bootstrap(),
-                            child: const Text('重试', style: TextStyle(fontSize: 12)),
+                            onPressed: () =>
+                                context.read<AppState>().bootstrap(),
+                            child: const Text('重试',
+                                style: TextStyle(fontSize: 12)),
                           ),
                       ],
                     ),
@@ -259,24 +243,25 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             ),
           ],
         ),
-        bottomNavigationBar: showNav
-            ? NavigationBar(
-                height: 56,
-                backgroundColor: AppColors.surface,
-                surfaceTintColor: Colors.transparent,
-                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                selectedIndex: index,
-                onDestinationSelected: (i) => setState(() => index = i),
-                destinations: [
-                  for (var i = 0; i < AppNav.labels.length; i++)
-                    NavigationDestination(
-                      icon: Icon(AppNav.icons[i], size: 22),
-                      selectedIcon: Icon(AppNav.selectedIcons[i], size: 22),
-                      label: AppNav.labels[i],
-                    ),
-                ],
-              )
-            : null,
+        // ImeAwareBottomBar setStates only itself — does not rebuild Agent.
+        bottomNavigationBar: menu
+            ? null
+            : ImeAwareBottomBar(
+                child: NavigationBar(
+                  height: 56,
+                  labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                  selectedIndex: index,
+                  onDestinationSelected: (i) => setState(() => index = i),
+                  destinations: [
+                    for (var i = 0; i < AppNav.labels.length; i++)
+                      NavigationDestination(
+                        icon: Icon(AppNav.icons[i], size: 22),
+                        selectedIcon: Icon(AppNav.selectedIcons[i], size: 22),
+                        label: AppNav.labels[i],
+                      ),
+                  ],
+                ),
+              ),
       ),
     );
   }

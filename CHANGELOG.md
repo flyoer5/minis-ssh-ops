@@ -1,3 +1,10 @@
+## 1.5.22
+
+### Agent keyboard auto-dismiss
+- Cause A: ImeInset switched `return child` ↔ `Stack(Transform(child))` when IME opened → TextField Element remounted → focus lost
+- Cause B: Shell setState on IME open rebuilt entire HomeShell/IndexedStack while swapping bottomNavigationBar
+- Fix: ImeInset always uses the same Stack/Transform|Padding tree; ImeAwareBottomBar hides nav with local setState only
+
 ## 1.5.21
 
 ### IME black band above keyboard

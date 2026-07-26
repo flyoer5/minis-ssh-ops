@@ -1,36 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 
-/// Bottom pad/lift for a **leaf** (composer / keybar) using live IME height.
+/// Lift [child] above the IME without rebuilding the rest of the page.
 ///
-/// Reads [FlutterView.viewInsets] via [WidgetsBindingObserver] so only this
-/// State setStates — does not require ancestors to depend on [MediaQuery].
+/// Reads [FlutterView.viewInsets] via [didChangeMetrics] (not MediaQuery),
+/// so only this leaf setStates during keyboard animation.
 ///
-/// [usePadding] true (forms): layout [Padding] so parent reflow lifts content.
-/// [usePadding] false (chat/terminal): [Transform.translate] so Expanded lists
-/// do not reflow every IME frame. Optionally paints [fillColor] in the vacated
-/// strip so a dark window band does not show through.
+/// Important: the widget tree shape around [child] is **stable** whether the
+/// keyboard is open or closed. Switching between `return child` and
+/// `Stack(Transform(child))` remounts TextFields and drops focus (Agent bug).
 class ImeInset extends StatefulWidget {
   const ImeInset({
     super.key,
     required this.child,
-    this.left = 0,
-    this.right = 0,
-    this.top = 0,
-    this.extraBottom = 0,
     this.usePadding = true,
     this.fillColor,
   });
 
   final Widget child;
-  final double left;
-  final double right;
-  final double top;
-  final double extraBottom;
-  /// true: [Padding] (forms / default). false: [Transform.translate] (chat).
+
+  /// true: [Padding] bottom (forms). false: [Transform.translate] (Agent/terminal).
   final bool usePadding;
-  /// When translating, paint this under the leaf to cover the strip above the
-  /// keyboard (defaults to no fill).
+
+  /// Paint under the lifted bar so the gap above the keyboard is not a black hole.
   final Color? fillColor;
 
   @override
@@ -54,9 +45,7 @@ class _ImeInsetState extends State<ImeInset> with WidgetsBindingObserver {
   }
 
   @override
-  void didChangeMetrics() {
-    _sync();
-  }
+  void didChangeMetrics() => _sync();
 
   void _sync() {
     if (!mounted) return;
@@ -76,104 +65,127 @@ class _ImeInsetState extends State<ImeInset> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = _ime + widget.extraBottom;
-    if (widget.usePadding) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(
-          widget.left,
-          widget.top,
-          widget.right,
-          bottom,
-        ),
-        child: widget.child,
-      );
-    }
-    Widget w = widget.child;
-    if (widget.left != 0 || widget.right != 0 || widget.top != 0) {
-      w = Padding(
-        padding: EdgeInsets.fromLTRB(widget.left, widget.top, widget.right, 0),
-        child: w,
-      );
-    }
-    if (bottom == 0) return w;
-    // Translate leaf up. Layout slot stays put — paint fill in that slot and
-    // extend a strip the same height as the lift so nothing "black" shows
-    // between the composer and the keyboard during/after the animation.
-    final fill = widget.fillColor;
-    if (fill == null) {
-      return Transform.translate(offset: Offset(0, -bottom), child: w);
-    }
+    final ime = _ime;
+    // Always the same parent chain so TextField Elements are not remounted
+    // when the keyboard opens (focus would be lost).
+    final Widget lifted = widget.usePadding
+        ? Padding(
+            padding: EdgeInsets.only(bottom: ime),
+            child: widget.child,
+          )
+        : Transform.translate(
+            offset: Offset(0, -ime),
+            child: widget.child,
+          );
+
     return Stack(
       clipBehavior: Clip.none,
-      alignment: Alignment.bottomCenter,
       children: [
-        // Extends downward from the layout slot into the keyboard gap.
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          bottom: -bottom,
-          child: ColoredBox(color: fill),
-        ),
-        Transform.translate(offset: Offset(0, -bottom), child: w),
+        lifted,
+        if (widget.fillColor != null && ime > 0.5)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: -ime,
+            height: ime,
+            child: IgnorePointer(
+              child: ColoredBox(color: widget.fillColor!),
+            ),
+          ),
       ],
     );
   }
 }
 
-/// Freeze IME-driven MediaQuery for a **subtree only** (e.g. message list).
-///
-/// Do **not** wrap the whole app or form pages — focused [TextField]s need
-/// real [MediaQuery.viewInsets] for ensureVisible / Scaffold inset.
-///
-/// When frozen [MediaQueryData] is equal across frames, list descendants skip
-/// rebuild even if an ancestor [Scaffold] rebuilds.
+/// Freeze MediaQuery for a heavy subtree (message list / scrollback only).
 class WithoutViewInsets extends StatelessWidget {
   const WithoutViewInsets({super.key, required this.child});
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final data = MediaQuery.of(context);
+    final mq = MediaQuery.of(context);
     return MediaQuery(
-      data: data.copyWith(
+      data: mq.copyWith(
         viewInsets: EdgeInsets.zero,
-        // Keep padding stable: under some modes padding shrinks with IME.
-        padding: data.viewPadding,
+        padding: mq.viewPadding,
       ),
       child: child,
     );
   }
 }
 
-/// Top/side safe pad via stable [MediaQuery.viewPaddingOf] (not paddingOf).
+/// Top inset via stable [viewPadding] (not [padding], which shrinks with IME).
 class TopSafePad extends StatelessWidget {
-  const TopSafePad({
-    super.key,
-    required this.child,
-    this.left = true,
-    this.right = true,
-    this.top = true,
-    this.bottom = false,
-  });
-
+  const TopSafePad({super.key, required this.child});
   final Widget child;
-  final bool left;
-  final bool right;
-  final bool top;
-  final bool bottom;
 
   @override
   Widget build(BuildContext context) {
-    final pad = MediaQuery.viewPaddingOf(context);
+    final top = MediaQuery.viewPaddingOf(context).top;
     return Padding(
-      padding: EdgeInsets.only(
-        left: left ? pad.left : 0,
-        right: right ? pad.right : 0,
-        top: top ? pad.top : 0,
-        bottom: bottom ? pad.bottom : 0,
-      ),
+      padding: EdgeInsets.only(top: top),
       child: child,
     );
+  }
+}
+
+/// Hides [child] (typically [NavigationBar]) while the IME is open.
+///
+/// setState stays **inside this widget** so [IndexedStack] / Agent TextField
+/// are not rebuilt by the shell when the keyboard opens (which drops focus).
+class ImeAwareBottomBar extends StatefulWidget {
+  const ImeAwareBottomBar({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<ImeAwareBottomBar> createState() => _ImeAwareBottomBarState();
+}
+
+class _ImeAwareBottomBarState extends State<ImeAwareBottomBar>
+    with WidgetsBindingObserver {
+  bool _open = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() => _sync();
+
+  void _sync() {
+    if (!mounted) return;
+    double ime = 0;
+    try {
+      final view = View.of(context);
+      ime = view.viewInsets.bottom / view.devicePixelRatio;
+    } catch (_) {
+      final views = WidgetsBinding.instance.platformDispatcher.views;
+      if (views.isEmpty) return;
+      ime = views.first.viewInsets.bottom / views.first.devicePixelRatio;
+    }
+    // Hysteresis: open quickly, close only when nearly gone.
+    final open = _open ? ime > 4 : ime > 12;
+    if (open == _open) return;
+    setState(() => _open = open);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Keep the child Element alive (Offstage) so Scaffold doesn't thrash;
+    // height collapses via zero-size when open.
+    if (_open) {
+      return const SizedBox.shrink();
+    }
+    return widget.child;
   }
 }
