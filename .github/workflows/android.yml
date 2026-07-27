@@ -28,7 +28,7 @@ jobs:
       - name: Build Go backend (linux smoke)
         run: |
           VER=$(grep '^version:' app/pubspec.yaml | head -1 | awk '{print $2}' | cut -d+ -f1)
-          (cd backend && go build -o bin/server \
+          (cd backend && go build -o ../bin/server \
             -ldflags="-X github.com/flyoer5/ssh-ai-agent/backend/internal/api.Version=$VER" \
             ./cmd/server)
           SSH_AI_DATA_DIR="$RUNNER_TEMP/ssh-ai-data" SSH_AI_PORT=17890 SSH_AI_LOCAL_TOKEN=citoken \
