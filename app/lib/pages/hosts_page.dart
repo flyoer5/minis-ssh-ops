@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/pages/host_editor.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/util/feedback.dart';
 import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 /// Host status cards (probe metrics). State kept in page + IndexedStack.
@@ -618,10 +619,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
       }
     } catch (e) {
       if (context.mounted) {
-        final msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('添加失败：$msg'), duration: const Duration(seconds: 4)),
-        );
+        showSnack(context, '添加失败：${cleanError(e)}', seconds: 4);
       }
     }
   }

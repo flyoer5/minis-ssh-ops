@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/util/feedback.dart';
 import 'package:ssh_ai_agent/util/time_fmt.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -145,9 +146,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       if (msg.contains('HOSTKEY_MISMATCH') || msg.toLowerCase().contains('hostkey_mismatch')) {
         if (mounted) await _handleHostKeyMismatch(state);
       } else if (mounted) {
-        final short = msg
-            .replaceFirst(RegExp(r'^Exception:\s*'), '')
-            .replaceFirst(RegExp(r'^ApiException\(\d+\):\s*'), '');
+        final short = cleanError(msg);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(short.length > 160 ? '${short.substring(0, 160)}…' : short),
@@ -1329,10 +1328,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       await state.agentChat(text);
     } catch (e) {
       if (mounted) {
-        final short = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(short.length > 160 ? '${short.substring(0, 160)}…' : short)),
-        );
+        showSnack(context, shortError(e));
       }
     } finally {
       if (mounted) {

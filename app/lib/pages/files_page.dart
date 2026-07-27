@@ -2,6 +2,7 @@ import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/util/feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
@@ -411,12 +412,11 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       );
     } catch (e) {
       if (mounted) {
-        final raw = e.toString();
-        String msg = raw.replaceFirst(RegExp(r'^Exception:\s*'), '');
+        String msg = cleanError(e);
         if (msg.toLowerCase().contains('too large') || msg.contains('file too large')) {
           msg = '文件过大，建议回到主机用 scp/rsync 或压缩后再下载';
         }
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        showSnack(context, msg);
       }
     } finally {
       if (mounted) {
