@@ -1,3 +1,11 @@
+## Unreleased
+
+### Security and build hardening
+- Restore command risk classification, confirmation gates, and blocking for critical host-destruction patterns.
+- Remove the exposed Android signing key from the current tree; release signing now requires Actions secrets and never falls back to the debug key.
+- Pin CI toolchains and Actions, add dependency updates, and generate a Flutter dependency lockfile for reproducible builds.
+- The previously committed Android keystore and password must be treated as compromised and replaced before the next release.
+
 ## 1.5.25
 
 ### UX polish (full pass)

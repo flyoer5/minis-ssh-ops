@@ -187,7 +187,6 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 				return "", fmt.Errorf("empty command")
 			}
 			lvl := risk.Classify(cmd)
-			// Keep only hard blacklist (app safety), not rssh confirm walls.
 			if lvl == risk.Blocked {
 				_ = s.Store.AddAudit(&store.AuditEntry{
 					HostID: body.HostID, SessionID: body.SessionID, Command: cmd,
@@ -531,7 +530,7 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	// One SSH session / one compound command — much faster than 5 sequential dials.
 	// O = os-release pretty name; U = uname -a (arch still parsed client-side)
-	const script = `printf '%s\n' '___O___'; ( . /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-${NAME:-}} ${VERSION_ID:-}" ) | sed 's/  */ /g;s/^ //;s/ $//'; printf '%s\n' '___O___'; ( . /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-${NAME:-}} ${VERSION_ID:-}" ) | sed 's/  */ /g;s/^ //;s/ $//'; printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; grep -m1 '^cpu ' /proc/stat 2>/dev/null; sleep 0.12 2>/dev/null || sleep 1; grep -m1 '^cpu ' /proc/stat 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
+	const script = `printf '%s\n' '___O___'; ( . /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-${NAME:-}} ${VERSION_ID:-}" ) | sed 's/  */ /g;s/^ //;s/ $//'; printf '%s\n' '___U___'; uname -a 2>/dev/null; printf '%s\n' '___T___'; uptime 2>/dev/null; printf '%s\n' '___L___'; cat /proc/loadavg 2>/dev/null; printf '%s\n' '___C___'; grep -m1 '^cpu ' /proc/stat 2>/dev/null; sleep 0.12 2>/dev/null || sleep 1; grep -m1 '^cpu ' /proc/stat 2>/dev/null; printf '%s\n' '___D___'; df -h 2>/dev/null; printf '%s\n' '___M___'; (free -h 2>/dev/null || head -5 /proc/meminfo 2>/dev/null)`
 	res, err := s.runSSH(id, script)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{

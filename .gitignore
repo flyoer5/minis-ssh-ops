@@ -16,7 +16,6 @@ app/.packages
 app/build/
 app/.pub-cache/
 app/.pub/
-app/pubspec.lock
 
 # Data / secrets
 **/.ssh-ai-agent/
@@ -24,6 +23,9 @@ app/pubspec.lock
 **/master.key
 **/data.db
 **/*.db
+app/android/key.properties
+**/*.jks
+**/*.keystore
 
 # IDE
 .idea/
