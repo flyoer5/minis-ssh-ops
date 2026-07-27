@@ -376,7 +376,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     VoidCallback? onRetry,
   }) {
     if (s == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('尚未探测，点「刷新」获取')));
+      showSnack(context, '尚未探测，点「刷新」获取');
       return;
     }
     showModalBottomSheet<void>(
@@ -553,11 +553,11 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
       await state.updateHost(id, result.body);
       await _refreshProbe(state, id, force: true);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+        showSnack(context, '已保存');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showSnack(context, cleanError(e));
       }
     }
   }

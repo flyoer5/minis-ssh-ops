@@ -267,7 +267,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       }
       await _pushEditor(id, p, r['text']?.toString() ?? '');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showSnack(context, cleanError(e));
     }
   }
 
@@ -322,7 +322,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       await s.api.fsMkdir(id, full, confirmed: true);
       await _load(pane);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showSnack(context, cleanError(e));
     }
   }
 
@@ -362,7 +362,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       await s.api.fsWrite(id, full, bodyCtrl.text, confirmed: true);
       await _load(pane);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showSnack(context, cleanError(e));
     }
   }
 
@@ -390,7 +390,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       await s.api.fsRename(id, oldPath, newPath, confirmed: true);
       await _load(active);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showSnack(context, cleanError(e));
     }
   }
 
@@ -475,7 +475,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     if (id == null) return;
     final srcs = singlePath != null ? {singlePath} : Set<String>.from(active.selected);
     if (srcs.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('先选中文件（多选）')));
+      showSnack(context, '先选中文件（多选）');
       return;
     }
     final destDir = inactive.path.isEmpty ? '/' : inactive.path;
@@ -532,7 +532,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     if (id == null) return;
     final srcs = Set<String>.from(active.selected);
     if (srcs.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('先多选项目')));
+      showSnack(context, '先多选项目');
       return;
     }
     final destDir = inactive.path.isEmpty ? '/' : inactive.path;

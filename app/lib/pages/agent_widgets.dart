@@ -61,7 +61,7 @@ class _ConfirmPlanCardState extends State<_ConfirmPlanCard> {
         final out = state.stepOutputs['step_$stepId'] ?? '';
         final blocked = out == 'blocked' || out == '已拦截' || out.startsWith('blocked');
         if (blocked) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(out)));
+          showSnack(context, out);
           return;
         }
         // Resume agent with the confirmed command result so the loop doesn't die at the wall.
@@ -79,7 +79,7 @@ class _ConfirmPlanCardState extends State<_ConfirmPlanCard> {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showSnack(context, cleanError(e));
       }
     } finally {
       if (mounted) setState(() => _running.remove(stepId));

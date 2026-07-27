@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:ssh_ai_agent/util/feedback.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
 
@@ -306,7 +307,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+        showSnack(context, '保存失败: ${cleanError(e)}');
       }
     } finally {
       if (mounted) setState(() => _saving = false);

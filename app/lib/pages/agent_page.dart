@@ -199,30 +199,38 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       if (_busy || state.agentBusy) {
         _stopGeneration(state);
       }
-      final meta = await state.api.getAgentSession(id);
-      final sess = AgentSession.fromJson(meta);
-      final raw = await state.api.getAgentSessionMessages(id);
-      final msgs = [for (final j in raw) ChatMessage.fromJson(j)];
-      state.openAgentSessionRaw(
-        id,
-        msgs,
-        title: title ?? sess.title,
-        ovMaxRounds: sess.ovMaxRounds,
-        ovTemperature: sess.ovTemperature,
-        ovConfirm: sess.ovConfirm,
-        ovPrompt: sess.ovPrompt,
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('加载会话失败: $e')));
+      // Meta + messages are independent — fetch in parallel (halves wait on
+      // slow networks) and show a transient loading hint.
+      setState(() => _sessionsLoading = true);
+      try {
+        final results = await Future.wait([
+          state.api.getAgentSession(id),
+          state.api.getAgentSessionMessages(id),
+        ]);
+        final sess = AgentSession.fromJson(results[0] as Map<String, dynamic>);
+        final raw = results[1] as List<Map<String, dynamic>>;
+        final msgs = [for (final j in raw) ChatMessage.fromJson(j)];
+        state.openAgentSessionRaw(
+          id,
+          msgs,
+          title: title ?? sess.title,
+          ovMaxRounds: sess.ovMaxRounds,
+          ovTemperature: sess.ovTemperature,
+          ovConfirm: sess.ovConfirm,
+          ovPrompt: sess.ovPrompt,
+        );
+      } finally {
+        if (mounted) setState(() => _sessionsLoading = false);
       }
+    } catch (e) {
+      if (mounted) showSnack(context, '加载会话失败: ${cleanError(e)}', seconds: 3);
     }
   }
 
   Future<void> _showSessionSettings(AppState state) async {
     final id = state.agentSessionId;
     if (id == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先开启或打开一个会话')));
+      showSnack(context, '请先开启或打开一个会话');
       return;
     }
     var rounds = state.sessionOvMaxRounds?.toDouble();
@@ -387,7 +395,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+        showSnack(context, '保存失败: ${cleanError(e)}');
       }
     }
     promptCtrl.dispose();
@@ -396,7 +404,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   Future<void> _showSessionMemory(AppState state) async {
     final id = state.agentSessionId;
     if (id == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先开启或打开一个会话')));
+      showSnack(context, '请先开启或打开一个会话');
       return;
     }
     Map<String, dynamic>? mem;
@@ -404,7 +412,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       mem = await state.api.getAgentSessionMemory(id);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('读取记忆失败: $e')));
+        showSnack(context, '读取记忆失败: ${cleanError(e)}');
       }
       return;
     }
