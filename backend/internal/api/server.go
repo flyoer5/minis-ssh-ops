@@ -14,6 +14,10 @@ import (
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/store"
 )
 
+// Version is the backend build version, injected at build time via
+// -ldflags "-X .../api.Version=x.y.z" from app/pubspec.yaml (single source).
+var Version = "dev"
+
 type Server struct {
 	Store      *store.Store
 	LocalToken string
@@ -129,7 +133,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"service":   "ssh-ai-agent-backend",
-		"version":   "1.5.35",
+		"version":   Version,
 		"startedAt": s.StartedAt.Format(time.RFC3339),
 		"listenHint": "127.0.0.1 only",
 		"features":  []string{"exec","probe","agent","audit","pty","sftp","tofu","stream","tokstream","models","longmem","fscopy","fsmove","sessions"},

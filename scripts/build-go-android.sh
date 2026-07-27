@@ -10,9 +10,12 @@ TOOLING_DIR="$ROOT/app/assets/go"
 
 mkdir -p "$ASSETS_DIR" "$JNI_DIR" "$TOOLING_DIR"
 
-echo "Building GOOS=android GOARCH=arm64 ..."
+# Single source of truth for version: app/pubspec.yaml → inject into Go binary.
+VER=$(grep '^version:' "$ROOT/app/pubspec.yaml" | head -1 | awk '{print $2}' | cut -d+ -f1)
+echo "Building GOOS=android GOARCH=arm64 (version=$VER) ..."
 cd "$ROOT/backend"
-CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -trimpath -ldflags='-s -w' \
+CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -trimpath \
+  -ldflags="-s -w -X github.com/flyoer5/ssh-ai-agent/backend/internal/api.Version=$VER" \
   -o "$ASSETS_DIR/ssh-ai-agent" ./cmd/server
 
 cp -f "$ASSETS_DIR/ssh-ai-agent" "$JNI_DIR/libssh_ai_agent.so"
