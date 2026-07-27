@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
-import 'package:ssh_ai_agent/widgets/ime_inset.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';

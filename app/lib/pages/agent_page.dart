@@ -490,7 +490,6 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   Future<void> _showSessions(AppState state) async {
     setState(() => _sessionsLoading = true);
     await _doLoad(state);
-    final sc = ScrollController();
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
@@ -912,9 +911,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                 );
                 final sid = r['sessionId'] ?? r['id'] ?? '';
                 if (sid is String && sid.isNotEmpty) {
-                  state.agentSessionId = sid;
-                  state.agentSessionTitle = '新会话';
-                  state.notifyListeners();
+                  state.setAgentSessionMeta(sid, '新会话');
                 }
               } catch (_) {}
               if (mounted) {

@@ -258,20 +258,6 @@ class _TerminalPageState extends State<TerminalPage>
     ch.sink.add(jsonEncode({'type': 'input', 'data': data}));
   }
 
-  void _sendResize() {
-    final ch = _ch;
-    if (ch == null || !_connected) return;
-    // approximate cols from width / char width ~ fontSize*0.6
-    final mq = MediaQuery.of(context);
-    final w = mq.size.width - 16;
-    // Use size only — reading viewInsets here is fine (not in build), but don't
-    // shrink rows by full IME every keyframe; keybar ImeInset already accounts for it.
-    final h = mq.size.height - 200;
-    final fs = context.read<AppState>().termFontSize;
-    final cols = (w / (fs * 0.6)).floor().clamp(40, 200);
-    final rows = (h / (fs * 1.3)).floor().clamp(10, 80);
-    ch.sink.add(jsonEncode({'type': 'resize', 'cols': cols, 'rows': rows}));
-  }
 
   /// Diff EditableText → PTY. System IME owns show/hide.
   void _onChanged() {

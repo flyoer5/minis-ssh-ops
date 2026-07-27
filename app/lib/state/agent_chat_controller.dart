@@ -27,6 +27,14 @@ mixin AgentChatController on ChangeNotifier {
   String? agentSessionId;
   /// Display title for the open session (Minis-style app bar).
   String agentSessionTitle = '新会话';
+
+  /// Public setter for session id/title from outside the notifier (replaces
+  /// the invalid external `state.notifyListeners()` call).
+  void setAgentSessionMeta(String id, String title) {
+    agentSessionId = id;
+    agentSessionTitle = title;
+    notifyListeners();
+  }
   /// Session-level overrides (null = inherit global UiPrefs).
   int? sessionOvMaxRounds;
   double? sessionOvTemperature;

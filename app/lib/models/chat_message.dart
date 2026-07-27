@@ -83,7 +83,7 @@ class ChatMessage {
       if (kind == ChatKind.toolResult && meta?['success'] == null && meta?['pendingConfirm'] != true) {
         final low = content.toLowerCase();
         final failed = low.startsWith('error:') || low.contains('needs_confirm');
-        meta!['success'] = !failed;
+        meta = {...?meta, 'success': !failed};
       }
     }
     if (kind == ChatKind.reasoning) {

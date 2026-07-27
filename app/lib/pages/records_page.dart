@@ -451,7 +451,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
                   height: 320,
                   child: SingleChildScrollView(
                     child: SelectableText(
-                      savedPath != null && savedPath!.isNotEmpty
+                      savedPath != null && savedPath.isNotEmpty
                           ? '文件: $savedPath\n\n$csv'
                           : csv,
                       style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
