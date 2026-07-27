@@ -23,6 +23,9 @@ class _Pane {
   String? err;
   final Set<String> selected = {};
   bool selecting = false;
+  // Monotonic request id: a slow in-flight _load must not overwrite a newer
+  // navigation (stale response race when tapping dirs quickly).
+  int loadGen = 0;
 }
 
 class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixin {
@@ -55,6 +58,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     final s = context.read<AppState>();
     final id = s.selectedHostId;
     if (id == null) return;
+    final gen = ++pane.loadGen;
+    final reqPath = pane.path; // capture: response must apply to this path only
     setState(() {
       pane.loading = true;
       pane.err = null;
@@ -62,7 +67,9 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
       pane.selecting = false;
     });
     try {
-      final r = await s.api.fsList(id, pane.path);
+      final r = await s.api.fsList(id, reqPath);
+      // A newer _load started while this one was in flight — drop stale result.
+      if (gen != pane.loadGen) return;
       final list = List<dynamic>.from((r['entries'] as List?) ?? []);
       _sortEntries(list);
       setState(() {
@@ -71,9 +78,14 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
         if (rp != null && rp.isNotEmpty) pane.path = rp;
       });
     } catch (e) {
+      if (gen != pane.loadGen) return;
       setState(() => pane.err = '$e');
     } finally {
-      setState(() => pane.loading = false);
+      // Only the latest request clears the spinner; a superseded one must not
+      // turn it off while the newer load is still running.
+      if (gen == pane.loadGen) {
+        setState(() => pane.loading = false);
+      }
     }
   }
 

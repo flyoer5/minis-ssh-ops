@@ -49,6 +49,8 @@ class _TerminalPageState extends State<TerminalPage>
   String? _spanCacheRaw;
   double? _spanCacheFont;
   TextSpan? _spanCache;
+  // Debounce scrollback search so each keystroke doesn't rescan 400KB.
+  Timer? _searchDebounce;
   // Batched repaint: high-frequency PTY chunks coalesce into one setState per
   // frame-ish window instead of a full scrollback rebuild per chunk.
   Timer? _appendFlush;
@@ -76,6 +78,7 @@ class _TerminalPageState extends State<TerminalPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _appendFlush?.cancel();
+    _searchDebounce?.cancel();
     _input.removeListener(_onChanged);
     _sub?.cancel();
     _ch?.sink.close();
@@ -353,6 +356,11 @@ class _TerminalPageState extends State<TerminalPage>
       spans.add(TextSpan(text: plain.substring(cursor), style: base));
     }
     return TextSpan(children: spans, style: base);
+  }
+
+  void _runSearchDebounced([String? q]) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 180), () => _runSearch(q));
   }
 
   void _runSearch([String? q]) {
@@ -681,7 +689,7 @@ class _TerminalPageState extends State<TerminalPage>
                             border: OutlineInputBorder(),
                             contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                           ),
-                          onChanged: _runSearch,
+                          onChanged: _runSearchDebounced,
                           onSubmitted: (_) => _searchNext(),
                         ),
                       ),

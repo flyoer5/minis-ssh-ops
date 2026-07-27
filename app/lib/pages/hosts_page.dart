@@ -106,7 +106,10 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
         });
       }
     } finally {
-      if (mounted) setState(() => _loading.remove(id));
+      // Always clear the in-flight flag even if the page was disposed/kept-alive
+      // mid-probe, or this host can never be probed again (contains() guard).
+      _loading.remove(id);
+      if (mounted) setState(() {});
     }
   }
 
