@@ -59,6 +59,10 @@ jobs:
         working-directory: app
         run: flutter pub get
 
+      - name: Flutter analyze
+        working-directory: app
+        run: flutter analyze --no-fatal-infos
+
       - name: Flutter unit tests
         working-directory: app
         run: flutter test
