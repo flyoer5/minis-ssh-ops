@@ -980,7 +980,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
           _right.selected.clear();
         });
         _load(_left);
-        if (_dual) _load(_right);
+        if (dualPane) _load(_right);
       });
     }
     if (selectedId == null) {
