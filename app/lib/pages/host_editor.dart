@@ -36,6 +36,7 @@ class _HostEditorSheet extends StatefulWidget {
 }
 
 class _HostEditorSheetState extends State<_HostEditorSheet> {
+  bool _saving = false;
   late final TextEditingController name;
   late final TextEditingController host;
   late final TextEditingController port;
@@ -232,16 +233,14 @@ class _HostEditorSheetState extends State<_HostEditorSheet> {
                   TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
                   const Spacer(),
                   FilledButton(
-                    onPressed: () {
-                      final result = _buildResult();
-                      if (result == null) {
-                        if (!isEdit && authMode == 0 && password.text.isEmpty) {
-                          // validation already shows field errors
-                        }
-                        return;
-                      }
-                      Navigator.pop(context, result);
-                    },
+                    onPressed: _saving
+                        ? null
+                        : () {
+                            final result = _buildResult();
+                            if (result == null) return;
+                            setState(() => _saving = true);
+                            Navigator.pop(context, result);
+                          },
                     child: Text(isEdit ? '保存' : '添加'),
                   ),
                 ],

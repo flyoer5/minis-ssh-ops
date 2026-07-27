@@ -127,7 +127,18 @@ mixin AgentChatController on ChangeNotifier {
       ..addAll(s.messages);
     agentSessionId = s.id;
     agentSessionTitle = s.title.isNotEmpty ? s.title : '会话';
-    if (s.hostId != null) selectedHostId = s.hostId;
+    // Prefer selectHost so selectedHostId is persisted across restarts.
+    if (s.hostId != null && s.hostId != selectedHostId) {
+      selectedHostId = s.hostId;
+      SharedPreferences.getInstance().then((p) {
+        final id = s.hostId;
+        if (id == null) {
+          p.remove('selectedHostId');
+        } else {
+          p.setString('selectedHostId', id);
+        }
+      });
+    }
     lastPlan = null;
     stepOutputs.clear();
     _lastPlanMsgIndex = null;

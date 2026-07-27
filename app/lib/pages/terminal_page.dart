@@ -497,6 +497,10 @@ class _TerminalPageState extends State<TerminalPage>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         if (connectId != state.selectedHostId) return;
+        // Drop previous host's scrollback so output isn't mixed across hosts.
+        _buf.clear();
+        _spanCache = null;
+        _spanCacheRaw = null;
         _hostId = connectId;
         _connect(state);
       });

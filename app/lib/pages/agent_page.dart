@@ -210,6 +210,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
         final sess = AgentSession.fromJson(results[0] as Map<String, dynamic>);
         final raw = results[1] as List<Map<String, dynamic>>;
         final msgs = [for (final j in raw) ChatMessage.fromJson(j)];
+        // Align selected host with the session so follow-up tools hit the right box.
+        final sidHost = sess.hostId;
+        if (sidHost != null && sidHost.isNotEmpty && state.selectedHostId != sidHost) {
+          state.selectHost(sidHost);
+        }
         state.openAgentSessionRaw(
           id,
           msgs,

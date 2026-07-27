@@ -540,6 +540,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
       );
       if (ok == true) {
         await state.removeHost(id);
+        if (!mounted) return;
         setState(() => _summary.remove(id));
       }
     }
