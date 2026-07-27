@@ -1143,11 +1143,13 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                             });
                             try {
                               final o = await state.testHostSsh();
+                              if (!mounted) return;
                               setState(() => pingMsg = 'SSH OK: $o');
                             } catch (e) {
-                              setState(() => pingMsg = 'SSH 失败: $e');
+                              if (!mounted) return;
+                              setState(() => pingMsg = 'SSH 失败: ${cleanError(e)}');
                             } finally {
-                              setState(() => pinging = false);
+                              if (mounted) setState(() => pinging = false);
                             }
                           },
                     icon: const Icon(Icons.terminal, size: 16),
@@ -1163,11 +1165,13 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                             });
                             try {
                               final o = await state.testLlmReachable();
+                              if (!mounted) return;
                               setState(() => pingMsg = o);
                             } catch (e) {
-                              setState(() => pingMsg = '模型失败: $e');
+                              if (!mounted) return;
+                              setState(() => pingMsg = '模型失败: ${cleanError(e)}');
                             } finally {
-                              setState(() => pinging = false);
+                              if (mounted) setState(() => pinging = false);
                             }
                           },
                     icon: const Icon(Icons.psychology_outlined, size: 16),

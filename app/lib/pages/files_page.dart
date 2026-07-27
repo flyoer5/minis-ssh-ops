@@ -968,8 +968,19 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
         if (!mounted) return;
         if (next != state.selectedHostId) return;
         hostId = next;
+        // Previous host's path may not exist — reset to home and clear list.
+        setState(() {
+          _left.path = '';
+          _right.path = '';
+          _left.entries = [];
+          _right.entries = [];
+          _left.err = null;
+          _right.err = null;
+          _left.selected.clear();
+          _right.selected.clear();
+        });
         _load(_left);
-        _load(_right);
+        if (_dual) _load(_right);
       });
     }
     if (selectedId == null) {
