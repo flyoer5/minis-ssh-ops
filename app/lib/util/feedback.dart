@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 
 /// Show a snackbar with sane defaults. [seconds] defaults to 2 (most are
 /// transient confirmations); pass a longer duration for errors the user must
-/// read, or an [action] for actionable messages.
+/// read, or an [action] for actionable messages. [floating] lifts it off the
+/// bottom edge (settings-style).
 void showSnack(
   BuildContext context,
   String message, {
   int seconds = 2,
   SnackBarAction? action,
+  bool floating = false,
 }) {
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
@@ -18,6 +20,7 @@ void showSnack(
       content: Text(message),
       duration: Duration(seconds: seconds),
       action: action,
+      behavior: floating ? SnackBarBehavior.floating : null,
     ),
   );
 }

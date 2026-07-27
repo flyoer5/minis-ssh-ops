@@ -1356,13 +1356,9 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     if (go == true) {
       try {
         await state.resetHostKeyForSelected();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已清除，请重试')));
-        }
+        if (mounted) showSnack(context, '已清除，请重试');
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-        }
+        if (mounted) showSnack(context, cleanError(e));
       }
     }
   }

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:ssh_ai_agent/widgets/nav_menu.dart';
+import 'package:ssh_ai_agent/util/feedback.dart';
 
 part 'settings_widgets.dart';
 
@@ -97,9 +98,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     }
   }
 
-  void _toast(String m) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m), behavior: SnackBarBehavior.floating));
-  }
+  void _toast(String m) => showSnack(context, m, floating: true);
 
 
   Future<void> _openHostKeySheet(AppState state) async {
