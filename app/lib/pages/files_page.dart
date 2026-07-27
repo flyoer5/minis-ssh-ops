@@ -721,22 +721,28 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                             tooltip: '收藏路径',
-                            icon: Icon(
-                              context.read<AppState>().pathFavorites.contains(pane.path.isEmpty ? '/' : pane.path)
-                                  ? Icons.star
-                                  : Icons.star_border,
-                              size: 18,
-                              color: context.read<AppState>().pathFavorites.contains(pane.path.isEmpty ? '/' : pane.path)
-                                  ? AppColors.warnBright
-                                  : null,
+                            icon: Builder(
+                              builder: (ctx) {
+                                final s = ctx.watch<AppState>();
+                                final hid = s.selectedHostId;
+                                final path = pane.path.isEmpty ? '/' : pane.path;
+                                final starred = hid != null && s.pathFavoritesFor(hid).contains(path);
+                                return Icon(
+                                  starred ? Icons.star : Icons.star_border,
+                                  size: 18,
+                                  color: starred ? AppColors.warnBright : null,
+                                );
+                              },
                             ),
                             onPressed: () async {
                               final s = context.read<AppState>();
+                              final hid = s.selectedHostId;
+                              if (hid == null) return;
                               final path = pane.path.isEmpty ? '/' : pane.path;
-                              if (s.pathFavorites.contains(path)) {
-                                await s.removePathFavorite(path);
+                              if (s.pathFavoritesFor(hid).contains(path)) {
+                                await s.removePathFavorite(hid, path);
                               } else {
-                                await s.addPathFavorite(path);
+                                await s.addPathFavorite(hid, path);
                               }
                             },
                           ),
@@ -769,7 +775,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                     // Path favorites shortcuts
                     Builder(
                       builder: (context) {
-                        final favs = context.read<AppState>().pathFavorites;
+                        final st = context.watch<AppState>();
+                        final favs = st.pathFavoritesFor(st.selectedHostId);
                         if (favs.isEmpty) return const SizedBox.shrink();
                         return SizedBox(
                           height: 32,
@@ -790,7 +797,10 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                                   setState(() => focus = idx);
                                   _go(pane, p);
                                 },
-                                onDeleted: () => context.read<AppState>().removePathFavorite(p),
+                                onDeleted: () {
+                                  final hid = st.selectedHostId;
+                                  if (hid != null) st.removePathFavorite(hid, p);
+                                },
                                 deleteIconColor: AppColors.gray9e,
                                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               );
@@ -960,7 +970,11 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     super.build(context);
     final selectedId = context.select((AppState s) => s.selectedHostId);
     final backendOk = context.select((AppState s) => s.backendOk);
-    context.select((AppState s) => s.pathFavorites.length);
+    // Rebuild chips/star when this host's favorites change.
+    context.select((AppState s) {
+      final hid = s.selectedHostId;
+      return Object.hash(hid, s.pathFavoritesFor(hid).join('\0'));
+    });
     final state = context.read<AppState>();
     if (selectedId != null && selectedId != hostId && backendOk) {
       final next = selectedId;

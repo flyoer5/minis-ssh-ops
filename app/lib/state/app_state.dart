@@ -192,6 +192,12 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
 
   Future<void> refreshHosts() async {
     hosts = await api.listHosts();
+    // Drop ghost selection if host was deleted while app was closed.
+    if (selectedHostId != null &&
+        !hosts.any((h) => h['id']?.toString() == selectedHostId)) {
+      selectedHostId = null;
+      SharedPreferences.getInstance().then((p) => p.remove('selectedHostId'));
+    }
     if (selectedHostId == null && hosts.isNotEmpty) {
       selectedHostId = hosts.first['id'] as String?;
     }
@@ -265,7 +271,18 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
 
   Future<void> removeHost(String id) async {
     await api.deleteHost(id);
-    if (selectedHostId == id) selectedHostId = null;
+    if (selectedHostId == id) {
+      selectedHostId = null;
+      // Drop stale id from prefs so cold start doesn't re-select a ghost host.
+      SharedPreferences.getInstance().then((p) => p.remove('selectedHostId'));
+    }
+    // Drop this host's path favorites (no longer useful).
+    if (pathFavoritesByHost.containsKey(id)) {
+      pathFavoritesByHost.remove(id);
+      SharedPreferences.getInstance().then((p) {
+        p.setString('pathFavoritesByHost', jsonEncode(pathFavoritesByHost));
+      });
+    }
     await refreshHosts();
   }
 
@@ -275,6 +292,13 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
   }
 
   void selectHost(String? id) {
+    if (id != null && id.isNotEmpty) {
+      final exists = hosts.any((h) => h['id']?.toString() == id);
+      if (!exists) {
+        // Session may reference a deleted host — don't pin a ghost selection.
+        id = null;
+      }
+    }
     selectedHostId = id;
     notifyListeners();
     SharedPreferences.getInstance().then((p) {

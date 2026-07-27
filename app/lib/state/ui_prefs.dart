@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -20,8 +21,22 @@ mixin UiPrefs on ChangeNotifier {
 
   bool confirmWrites = false;
 
-  /// Absolute remote paths for files page shortcuts (max 12).
-  List<String> pathFavorites = [];
+  /// Absolute remote paths for files page shortcuts, keyed by host id.
+  /// Legacy global list (pre-1.5.38) lives under [kPathFavShared] until a host
+  /// gets its own list.
+  static const kPathFavShared = '*';
+  Map<String, List<String>> pathFavoritesByHost = {};
+
+  /// Favorites for [hostId]. Falls back to shared legacy list when this host
+  /// has never been customized.
+  List<String> pathFavoritesFor(String? hostId) {
+    if (hostId == null || hostId.isEmpty) return const [];
+    final own = pathFavoritesByHost[hostId];
+    if (own != null) return List<String>.from(own);
+    final shared = pathFavoritesByHost[kPathFavShared];
+    if (shared != null) return List<String>.from(shared);
+    return const [];
+  }
 
   /// When true, render assistant Markdown while tokens stream (may jitter).
   /// Default false: plain text while streaming, Markdown after final.
@@ -71,8 +86,30 @@ mixin UiPrefs on ChangeNotifier {
     final nm = prefs.getString('navMode') ?? 'bottom';
     navMode = (nm == 'menu') ? 'menu' : 'bottom';
     hostCardCompact = prefs.getBool('hostCardCompact') ?? false;
-    final fav = prefs.getStringList('pathFavorites') ?? const <String>[];
-    pathFavorites = List<String>.from(fav);
+    pathFavoritesByHost = {};
+    final byHostRaw = prefs.getString('pathFavoritesByHost');
+    if (byHostRaw != null && byHostRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(byHostRaw);
+        if (decoded is Map) {
+          for (final e in decoded.entries) {
+            final k = e.key.toString();
+            final v = e.value;
+            if (v is List) {
+              pathFavoritesByHost[k] = [for (final x in v) x.toString()];
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    // Migrate pre-1.5.38 global list → shared bucket (shown until host has own).
+    final legacy = prefs.getStringList('pathFavorites');
+    if (legacy != null &&
+        legacy.isNotEmpty &&
+        !pathFavoritesByHost.containsKey(kPathFavShared) &&
+        pathFavoritesByHost.isEmpty) {
+      pathFavoritesByHost[kPathFavShared] = List<String>.from(legacy);
+    }
     streamMarkdown = prefs.getBool('streamMarkdown') ?? false;
     final pc = prefs.getInt('probeConcurrency') ?? 4;
     probeConcurrency = pc.clamp(1, 6);
@@ -99,7 +136,7 @@ mixin UiPrefs on ChangeNotifier {
         'confirmWrites': confirmWrites,
         'navMode': navMode,
         'hostCardCompact': hostCardCompact,
-        'pathFavorites': pathFavorites,
+        'pathFavoritesByHost': pathFavoritesByHost,
         'streamMarkdown': streamMarkdown,
         'probeConcurrency': probeConcurrency,
         'agentMaxRounds': agentMaxRounds,
@@ -123,8 +160,19 @@ mixin UiPrefs on ChangeNotifier {
     if (pr['confirmWrites'] is bool) await setConfirmWrites(pr['confirmWrites'] as bool);
     if (pr['navMode'] is String) await setNavMode(pr['navMode'] as String);
     if (pr['hostCardCompact'] is bool) await setHostCardCompact(pr['hostCardCompact'] as bool);
-    if (pr['pathFavorites'] is List) {
-      await setPathFavorites([
+    if (pr['pathFavoritesByHost'] is Map) {
+      final m = <String, List<String>>{};
+      for (final e in (pr['pathFavoritesByHost'] as Map).entries) {
+        final v = e.value;
+        if (v is List) m[e.key.toString()] = [for (final x in v) x.toString()];
+      }
+      pathFavoritesByHost = m;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('pathFavoritesByHost', jsonEncode(pathFavoritesByHost));
+      notifyListeners();
+    } else if (pr['pathFavorites'] is List) {
+      // Old export shape: treat as shared favorites.
+      await setPathFavoritesFor(kPathFavShared, [
         for (final e in pr['pathFavorites'] as List)
           if (e != null && e.toString().trim().isNotEmpty) e.toString().trim(),
       ]);
@@ -222,35 +270,48 @@ mixin UiPrefs on ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setPathFavorites(List<String> paths) async {
+  static String _normPath(String raw) {
+    var p = raw.trim();
+    if (p.isEmpty) return '';
+    if (!p.startsWith('/')) p = '/$p';
+    while (p.contains('//')) {
+      p = p.replaceAll('//', '/');
+    }
+    if (p.length > 1 && p.endsWith('/')) p = p.substring(0, p.length - 1);
+    return p;
+  }
+
+  Future<void> setPathFavoritesFor(String hostId, List<String> paths) async {
+    if (hostId.isEmpty) return;
     final cleaned = <String>[];
     for (final raw in paths) {
-      var p = raw.trim();
+      final p = _normPath(raw);
       if (p.isEmpty) continue;
-      if (!p.startsWith('/')) p = '/$p';
-      while (p.contains('//')) {
-        p = p.replaceAll('//', '/');
-      }
-      if (p.length > 1 && p.endsWith('/')) p = p.substring(0, p.length - 1);
       if (!cleaned.contains(p)) cleaned.add(p);
       if (cleaned.length >= 12) break;
     }
-    pathFavorites = cleaned;
+    pathFavoritesByHost[hostId] = cleaned;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('pathFavorites', pathFavorites);
+    await prefs.setString('pathFavoritesByHost', jsonEncode(pathFavoritesByHost));
+    // Drop legacy global key once we've written the per-host map.
+    await prefs.remove('pathFavorites');
     notifyListeners();
   }
 
-  Future<void> addPathFavorite(String path) async {
-    final list = List<String>.from(pathFavorites);
-    list.remove(path);
-    list.insert(0, path);
-    await setPathFavorites(list);
+  Future<void> addPathFavorite(String hostId, String path) async {
+    if (hostId.isEmpty) return;
+    final list = pathFavoritesFor(hostId);
+    final p = _normPath(path);
+    if (p.isEmpty) return;
+    list.remove(p);
+    list.insert(0, p);
+    await setPathFavoritesFor(hostId, list);
   }
 
-  Future<void> removePathFavorite(String path) async {
-    final list = List<String>.from(pathFavorites)..remove(path);
-    await setPathFavorites(list);
+  Future<void> removePathFavorite(String hostId, String path) async {
+    if (hostId.isEmpty) return;
+    final list = pathFavoritesFor(hostId)..remove(_normPath(path));
+    await setPathFavoritesFor(hostId, list);
   }
 
   Future<void> setStreamMarkdown(bool v) async {

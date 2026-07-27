@@ -122,7 +122,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       );
       return;
     }
-    if (state.agentBusy) {
+    if (_busy || state.agentBusy) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('上一轮还在进行，可点停止'), duration: Duration(seconds: 2)),
       );
