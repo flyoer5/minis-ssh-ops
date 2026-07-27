@@ -965,7 +965,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                 dense: true,
                 title: const Text('写操作需确认', style: TextStyle(fontSize: 13.5)),
                 subtitle: const Text(
-                  '当前版本无命令黑名单，此开关暂不生效（命令直接执行）。',
+                  '开启后，Agent 的写入和破坏性命令会等待确认；禁止命令始终拦截。',
                   style: TextStyle(fontSize: 11.5),
                 ),
                 value: state.confirmWrites,

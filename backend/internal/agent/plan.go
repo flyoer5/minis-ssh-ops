@@ -64,13 +64,12 @@ func ParsePlan(raw string) (*Plan, error) {
 		if p.Steps[i].ID == 0 {
 			p.Steps[i].ID = i + 1
 		}
-		// Open policy: never block plan steps; keep sideEffect labels for UI only.
 		r := risk.Classify(p.Steps[i].Command)
 		switch strings.ToLower(p.Steps[i].SideEffect) {
 		case "destructive":
-			r = risk.Destructive
+			r = risk.Max(r, risk.Destructive)
 		case "write":
-			r = risk.Write
+			r = risk.Max(r, risk.Write)
 		}
 		p.Steps[i].Risk = r
 		p.Steps[i].Status = "pending"

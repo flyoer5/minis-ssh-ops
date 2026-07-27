@@ -10,15 +10,33 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-go@v5
+      - name: Reject committed Android signing material
+        shell: bash
+        run: |
+          if git ls-files | grep -E '(^|/)(key\.properties|[^/]+\.(jks|keystore))$'; then
+            echo "::error::Android signing material must be stored in GitHub Actions secrets"
+            exit 1
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.22"
+          go-version: "1.22.12"
           cache-dependency-path: backend/go.sum
 
       - name: Go unit tests
@@ -26,15 +44,16 @@ jobs:
         run: go test ./...
 
       - name: Build Go backend (linux smoke)
+        shell: bash
         run: |
-          VER=$(grep '^version:' app/pubspec.yaml | head -1 | awk '{print $2}' | cut -d+ -f1)
-          (cd backend && go build -o ../bin/server \
-            -ldflags="-X github.com/flyoer5/ssh-ai-agent/backend/internal/api.Version=$VER" \
+          VER=$(awk '/^version:/ {print $2; exit}' app/pubspec.yaml | cut -d+ -f1)
+          (cd backend && go build -trimpath -o ../bin/server \
+            -ldflags="-s -w -X github.com/flyoer5/ssh-ai-agent/backend/internal/api.Version=$VER" \
             ./cmd/server)
           SSH_AI_DATA_DIR="$RUNNER_TEMP/ssh-ai-data" SSH_AI_PORT=17890 SSH_AI_LOCAL_TOKEN=citoken \
             ./bin/server >"$RUNNER_TEMP/be.log" 2>&1 &
           echo $! >"$RUNNER_TEMP/be.pid"
-          for i in $(seq 1 20); do
+          for _ in $(seq 1 20); do
             if curl -sf "http://127.0.0.1:17890/v1/health"; then
               echo
               break
@@ -44,22 +63,39 @@ jobs:
           curl -sf "http://127.0.0.1:17890/v1/health"
           kill "$(cat "$RUNNER_TEMP/be.pid")" || true
 
-      - name: Cross-compile Go for android/arm64 (assets + jniLibs)
+      - name: Cross-compile Go for android/arm64
         run: |
           chmod +x scripts/build-go-android.sh
           ./scripts/build-go-android.sh
           test -s app/android/app/src/main/assets/go/ssh-ai-agent
           test -s app/android/app/src/main/jniLibs/arm64-v8a/libssh_ai_agent.so
-          ls -lah app/android/app/src/main/assets/go/ app/android/app/src/main/jniLibs/arm64-v8a/
 
-      - uses: subosito/flutter-action@v2
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
+          flutter-version: "3.44.8"
           channel: stable
           cache: true
 
-      - name: Flutter pub get
+      - name: Resolve Flutter dependencies
         working-directory: app
-        run: flutter pub get
+        shell: bash
+        run: |
+          if [[ -f pubspec.lock ]]; then
+            flutter pub get --enforce-lockfile
+          else
+            flutter pub get
+            echo "::warning::pubspec.lock is missing; download the generated lockfile artifact and commit it"
+          fi
+
+      - name: Upload generated dependency lock
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flutter-lockfile
+          path: app/pubspec.lock
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Flutter analyze
         working-directory: app
@@ -73,27 +109,70 @@ jobs:
         working-directory: app
         run: flutter build apk --debug --target-platform android-arm64
 
-      # Release is slower; skip on PRs — still run on main/push and workflow_dispatch.
-      - name: Build release APK (arm64)
+      - name: Check release signing secrets
         if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          present=0
+          for value in "$ANDROID_KEYSTORE_BASE64" "$ANDROID_STORE_PASSWORD" "$ANDROID_KEY_PASSWORD" "$ANDROID_KEY_ALIAS"; do
+            [[ -n "$value" ]] && present=$((present + 1))
+          done
+          if [[ "$present" -eq 0 ]]; then
+            echo "RELEASE_SIGNING=false" >> "$GITHUB_ENV"
+            echo "::warning::Release APK skipped because Android signing secrets are not configured"
+          elif [[ "$present" -ne 4 ]]; then
+            echo "::error::Android signing secrets are only partially configured"
+            exit 1
+          else
+            echo "RELEASE_SIGNING=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Prepare release signing
+        if: env.RELEASE_SIGNING == 'true'
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          umask 077
+          mkdir -p app/android/keystore
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/android/keystore/release.jks
+          test -s app/android/keystore/release.jks
+          printf '%s\n' \
+            "storePassword=$ANDROID_STORE_PASSWORD" \
+            "keyPassword=$ANDROID_KEY_PASSWORD" \
+            "keyAlias=$ANDROID_KEY_ALIAS" \
+            "storeFile=keystore/release.jks" > app/android/key.properties
+
+      - name: Build release APK (arm64)
+        if: env.RELEASE_SIGNING == 'true'
         working-directory: app
         run: flutter build apk --release --target-platform android-arm64
 
       - name: Package artifacts with version
+        shell: bash
         run: |
-          VER=$(grep '^version:' app/pubspec.yaml | head -1 | awk '{print $2}' | cut -d+ -f1)
+          VER=$(awk '/^version:/ {print $2; exit}' app/pubspec.yaml | cut -d+ -f1)
           mkdir -p dist
           cp app/build/app/outputs/flutter-apk/app-debug.apk "dist/ssh-ai-agent-${VER}-debug.apk"
           cp app/build/app/outputs/flutter-apk/app-debug.apk dist/ssh-ai-agent-latest-debug.apk
-          if [ -f app/build/app/outputs/flutter-apk/app-release.apk ]; then
+          if [[ "$RELEASE_SIGNING" == "true" ]]; then
+            test -s app/build/app/outputs/flutter-apk/app-release.apk
             cp app/build/app/outputs/flutter-apk/app-release.apk "dist/ssh-ai-agent-${VER}-release.apk"
             cp app/build/app/outputs/flutter-apk/app-release.apk dist/ssh-ai-agent-latest-release.apk
           fi
           (cd dist && sha256sum *.apk > SHA256SUMS.txt)
           cat dist/SHA256SUMS.txt
-          echo "VERSION=$VER" >> "$GITHUB_ENV"
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload debug APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: app-debug
           path: |
@@ -101,8 +180,9 @@ jobs:
             dist/SHA256SUMS.txt
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v4
-        if: github.event_name != 'pull_request'
+      - name: Upload release APK
+        if: env.RELEASE_SIGNING == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: app-release
           path: |

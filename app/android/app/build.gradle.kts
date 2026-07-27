@@ -6,11 +6,29 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Stable personal signing so install -r upgrades keep app data.
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+val hasReleaseSigning = keystorePropertiesFile.isFile
+if (hasReleaseSigning) {
+    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
+
+    val requiredSigningProperties = listOf("storePassword", "keyPassword", "keyAlias", "storeFile")
+    val missingSigningProperties = requiredSigningProperties.filter {
+        keystoreProperties.getProperty(it).isNullOrBlank()
+    }
+    require(missingSigningProperties.isEmpty()) {
+        "Missing Android signing properties: ${missingSigningProperties.joinToString()}"
+    }
+
+    val configuredKeystore = rootProject.file(keystoreProperties.getProperty("storeFile"))
+    require(configuredKeystore.isFile) {
+        "Android release keystore not found: ${configuredKeystore.absolutePath}"
+    }
+}
+
+val releaseRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+require(!releaseRequested || hasReleaseSigning) {
+    "Release signing is required. Create android/key.properties from key.properties.example."
 }
 
 android {
@@ -35,27 +53,20 @@ android {
     }
 
     signingConfigs {
-        create("stable") {
-            if (keystorePropertiesFile.exists()) {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
+        if (hasReleaseSigning) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
     }
 
     buildTypes {
-        debug {
-            if (keystorePropertiesFile.exists()) {
-                signingConfig = signingConfigs.getByName("stable")
-            }
-        }
         release {
-            if (keystorePropertiesFile.exists()) {
-                signingConfig = signingConfigs.getByName("stable")
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
             }
             isMinifyEnabled = false
             isShrinkResources = false

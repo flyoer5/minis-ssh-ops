@@ -49,12 +49,17 @@ cd app && flutter pub get && flutter build apk --debug --target-platform android
 - 仅监听 `127.0.0.1`
 - `X-Local-Token` 鉴权
 - 主机密钥 / API Key AES 加密入库
-- 高危命令拦截；变更类需 `confirmed: true`
+- 命令按 `read` / `write` / `destructive` / `blocked` 分级
+- 手动执行和计划步骤中的变更类命令需 `confirmed: true`
+- Agent 的「写操作需确认」开关控制写入与破坏性命令的确认门；`blocked` 始终拒绝
 
 
 ## 签名与升级
 
-- 固定 keystore：`app/android/keystore/sshai-upload.jks`（密码见 `app/android/key.properties`）
-- debug/release 共用该签名 → 可覆盖安装不丢本地数据
+- keystore 与密码不得提交到仓库；本地配置参考 `app/android/key.properties.example`
+- CI release 构建需要配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_STORE_PASSWORD`、`ANDROID_KEY_PASSWORD`、`ANDROID_KEY_ALIAS` 四个 Actions Secrets
+- 生成 `ANDROID_KEYSTORE_BASE64`：`base64 -w 0 release.jks`（macOS 使用 `base64 < release.jks | tr -d '\n'`）
+- 未配置 Secrets 时 CI 只发布 debug APK；release 构建不会退回 debug 签名
+- 曾提交过的旧 keystore 必须视为已泄露并轮换；直接分发场景下，新签名通常需要卸载旧包后安装
 - 首次启动：初始配置向导（可跳过）；设置里可重置
 - 变更见 [CHANGELOG.md](CHANGELOG.md)
