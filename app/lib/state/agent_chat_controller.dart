@@ -1041,7 +1041,7 @@ mixin AgentChatController on ChangeNotifier {
               idx < agentMessages.length &&
               agentMessages[idx].kind == ChatKind.plan &&
               ((agentMessages[idx].meta?['outputs'] as Map?)?.isEmpty ?? true);
-          if (canReplace && idx != null) {
+          if (canReplace) {
             agentMessages[idx] = planMsg;
           } else {
             agentMessages.add(planMsg);
