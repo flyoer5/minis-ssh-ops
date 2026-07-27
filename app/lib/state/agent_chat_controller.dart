@@ -1030,19 +1030,19 @@ mixin AgentChatController on ChangeNotifier {
           lastPlan = {'summary': '待确认', 'steps': steps};
           // Replace previous open plan card if still empty, else append.
           final idx = _lastPlanMsgIndex;
-          final canReplace = idx != null &&
-              idx >= 0 &&
-              idx < agentMessages.length &&
-              agentMessages[idx].kind == ChatKind.plan &&
-              ((agentMessages[idx].meta?['outputs'] as Map?)?.isEmpty ?? true);
           final planMsg = ChatMessage(
             role: 'assistant',
             content: '待确认',
             kind: ChatKind.plan,
             meta: {'plan': lastPlan, 'outputs': <String, String>{}},
           );
-          if (canReplace) {
-            agentMessages[idx!] = planMsg;
+          final canReplace = idx != null &&
+              idx >= 0 &&
+              idx < agentMessages.length &&
+              agentMessages[idx].kind == ChatKind.plan &&
+              ((agentMessages[idx].meta?['outputs'] as Map?)?.isEmpty ?? true);
+          if (canReplace && idx != null) {
+            agentMessages[idx] = planMsg;
           } else {
             agentMessages.add(planMsg);
             _lastPlanMsgIndex = agentMessages.length - 1;

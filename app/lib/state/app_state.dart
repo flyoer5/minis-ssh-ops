@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
-import 'package:ssh_ai_agent/models/agent_session.dart';
 import 'package:ssh_ai_agent/models/probe_summary.dart';
 import 'package:ssh_ai_agent/state/agent_chat_controller.dart';
 import 'package:ssh_ai_agent/state/ui_prefs.dart';

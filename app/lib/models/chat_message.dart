@@ -80,10 +80,11 @@ class ChatMessage {
           'output': content,
       };
       // Infer success when missing
-      if (kind == ChatKind.toolResult && meta?['success'] == null && meta?['pendingConfirm'] != true) {
+      final m0 = meta;
+      if (kind == ChatKind.toolResult && m0 != null && m0['success'] == null && m0['pendingConfirm'] != true) {
         final low = content.toLowerCase();
         final failed = low.startsWith('error:') || low.contains('needs_confirm');
-        meta = {...?meta, 'success': !failed};
+        m0['success'] = !failed;
       }
     }
     if (kind == ChatKind.reasoning) {
