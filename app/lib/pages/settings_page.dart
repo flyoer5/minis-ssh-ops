@@ -508,68 +508,6 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 28),
         children: [
-          // —— 关于 ——
-          _section(
-            icon: Icons.info_outline,
-            accent: AppColors.accentSoft,
-            title: '关于',
-            subtitle: '个人向 · arm64 · 固定签名可覆盖升级',
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('机枢', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                        SizedBox(height: 2),
-                        Text('SSH 运维 Agent · 主机枢纽', style: TextStyle(fontSize: 11, color: AppColors.textFaint)),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.accentDeep.withAlpha(0x33),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '1.5.25',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'SSH 运维 Agent · 主机枢纽',
-                style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600),
-              ),
-              if (state.backendFeatures.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final f in state.backendFeatures)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Text(
-                          f,
-                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace'),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-
           // —— 后端 ——
           _section(
             icon: Icons.dns_outlined,
@@ -1429,6 +1367,63 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
               ),
             ],
           ),
+          // —— 关于 ——
+          _section(
+            icon: Icons.info_outline,
+            accent: AppColors.accentSoft,
+            title: '关于',
+            subtitle: '个人向 · arm64 · 固定签名可覆盖升级',
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('机枢', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                        SizedBox(height: 2),
+                        Text('SSH 运维 Agent · 主机枢纽', style: TextStyle(fontSize: 11, color: AppColors.textFaint)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentDeep.withAlpha(0x33),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '…',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
+                    ),
+                  ),
+                ],
+              ),
+              if (state.backendFeatures.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final f in state.backendFeatures)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface2,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Text(
+                          f,
+                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace'),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+
         ],
       ), // ListView
     ); // Scaffold
