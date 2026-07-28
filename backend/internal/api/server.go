@@ -261,6 +261,10 @@ func (s *Server) handleUpdateHost(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "host not found")
 		return
 	}
+	if errors.Is(err, store.ErrHostCredentialRequired) {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

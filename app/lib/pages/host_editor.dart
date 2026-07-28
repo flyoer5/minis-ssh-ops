@@ -89,13 +89,29 @@ class _HostEditorSheetState extends State<_HostEditorSheet> {
     };
     if (authMode == 0) {
       if (password.text.isNotEmpty) body['password'] = password.text;
+      if (isEdit && widget.existing!['hasPrivateKey'] == true) {
+        body['clearPrivateKey'] = true;
+        body['clearPassphrase'] = true;
+      }
     } else {
-      if (privateKey.text.trim().isNotEmpty) {
-        body['privateKeyPem'] = privateKey.text.trim();
+      final newPrivateKey = privateKey.text.trim();
+      if (newPrivateKey.isNotEmpty) {
+        body['privateKeyPem'] = newPrivateKey;
+        if (passphrase.text.isEmpty) body['clearPassphrase'] = true;
       }
       if (passphrase.text.isNotEmpty) body['passphrase'] = passphrase.text;
+      if (isEdit && widget.existing!['hasPassword'] == true) {
+        body['clearPassword'] = true;
+      }
     }
-    if (!isEdit) {
+    if (isEdit) {
+      final keepsPassword = authMode == 0 &&
+          (password.text.isNotEmpty || widget.existing!['hasPassword'] == true);
+      final keepsPrivateKey = authMode == 1 &&
+          (privateKey.text.trim().isNotEmpty ||
+              widget.existing!['hasPrivateKey'] == true);
+      if (!keepsPassword && !keepsPrivateKey) return null;
+    } else {
       final hasPw = (body['password'] as String?)?.isNotEmpty == true;
       final hasKey = (body['privateKeyPem'] as String?)?.isNotEmpty == true;
       if (!hasPw && !hasKey) return null;

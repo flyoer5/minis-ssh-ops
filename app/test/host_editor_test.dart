@@ -11,6 +11,8 @@ Map<String, dynamic> buildHostBody({
   String privateKeyPem = '',
   String passphrase = '',
   bool isEdit = false,
+  bool hasPassword = false,
+  bool hasPrivateKey = false,
 }) {
   final body = <String, dynamic>{
     'name': name.trim(),
@@ -20,9 +22,17 @@ Map<String, dynamic> buildHostBody({
   };
   if (authMode == 0) {
     if (password.isNotEmpty) body['password'] = password;
+    if (isEdit && hasPrivateKey) {
+      body['clearPrivateKey'] = true;
+      body['clearPassphrase'] = true;
+    }
   } else {
-    if (privateKeyPem.trim().isNotEmpty) body['privateKeyPem'] = privateKeyPem.trim();
+    if (privateKeyPem.trim().isNotEmpty) {
+      body['privateKeyPem'] = privateKeyPem.trim();
+      if (passphrase.isEmpty) body['clearPassphrase'] = true;
+    }
     if (passphrase.isNotEmpty) body['passphrase'] = passphrase;
+    if (isEdit && hasPassword) body['clearPassword'] = true;
   }
   return body;
 }
@@ -78,5 +88,35 @@ void main() {
     expect(b.containsKey('password'), isFalse);
     // create would reject; edit may only change name
     expect(hostBodyHasAuth(b), isFalse);
+  });
+
+  test('switching from key to password clears key credentials', () {
+    final b = buildHostBody(
+      name: 'x',
+      host: 'h',
+      port: 22,
+      username: 'u',
+      authMode: 0,
+      password: 'new-password',
+      isEdit: true,
+      hasPrivateKey: true,
+    );
+    expect(b['clearPrivateKey'], isTrue);
+    expect(b['clearPassphrase'], isTrue);
+  });
+
+  test('switching from password to key clears password', () {
+    final b = buildHostBody(
+      name: 'x',
+      host: 'h',
+      port: 22,
+      username: 'u',
+      authMode: 1,
+      privateKeyPem: 'new-key',
+      isEdit: true,
+      hasPassword: true,
+    );
+    expect(b['clearPassword'], isTrue);
+    expect(b['clearPassphrase'], isTrue);
   });
 }
