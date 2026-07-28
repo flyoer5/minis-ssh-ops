@@ -3,7 +3,7 @@ import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:ssh_ai_agent/util/feedback.dart';
 import 'package:ssh_ai_agent/util/time_fmt.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
