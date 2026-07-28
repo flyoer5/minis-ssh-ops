@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/pkg/sftp v1.13.7
+	github.com/pkg/sftp v1.13.11
 	golang.org/x/crypto v0.54.0
 	modernc.org/sqlite v1.34.5
 	mvdan.cc/sh/v3 v3.10.0
