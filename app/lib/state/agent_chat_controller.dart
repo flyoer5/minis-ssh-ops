@@ -7,6 +7,7 @@ import 'package:ssh_ai_agent/models/agent_session.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/agent_session_store.dart';
 import 'package:ssh_ai_agent/state/agent_transcript.dart';
+import 'package:ssh_ai_agent/state/agent_turn_executor.dart';
 
 /// Agent transcript, sessions, SSE coalescing / tool pairing.
 /// Mixed into [AppState]; requires [api], [selectedHostId], [confirmWrites], [agentMaxRounds].
@@ -44,6 +45,7 @@ mixin AgentChatController on ChangeNotifier {
   final Map<String, String> stepOutputs = {};
   final List<ChatMessage> agentMessages = [];
   late final AgentTranscript _transcript = AgentTranscript(agentMessages);
+  final AgentTurnExecutor _turnExecutor = AgentTurnExecutor();
   /// Index of last plan message in agentMessages (for attaching step outputs).
   int? _lastPlanMsgIndex;
   final List<AgentSession> agentSessions = [];
@@ -58,6 +60,7 @@ mixin AgentChatController on ChangeNotifier {
   // ---------- Agent chat ----------
 
   void clearAgentChat() {
+    _supersedeAgentTurn();
     // Archive current transcript if non-empty
     if (agentMessages.isNotEmpty) {
       final title = _sessionTitleFromMessages(agentMessages);
@@ -84,7 +87,6 @@ mixin AgentChatController on ChangeNotifier {
     sessionOvConfirm = null;
     sessionOvPrompt = null;
     _lastPlanMsgIndex = null;
-    _agentCancelRequested = false;
     _runningStepIds.clear();
     agentBusy = false;
     notifyListeners();
@@ -105,6 +107,7 @@ mixin AgentChatController on ChangeNotifier {
   }
 
   void openAgentSession(AgentSession s) {
+    _supersedeAgentTurn();
     // Save current transcript into sessions if needed
     if (agentMessages.isNotEmpty) {
       final curId = agentSessionId ?? '';
@@ -143,7 +146,6 @@ mixin AgentChatController on ChangeNotifier {
     lastPlan = null;
     stepOutputs.clear();
     _lastPlanMsgIndex = null;
-    _agentCancelRequested = false;
     _runningStepIds.clear();
     agentBusy = false;
     notifyListeners();
@@ -159,6 +161,7 @@ mixin AgentChatController on ChangeNotifier {
     int? ovConfirm,
     String? ovPrompt,
   }) {
+    _supersedeAgentTurn();
     // Save current transcript into sessions if needed (as before)
     if (agentMessages.isNotEmpty) {
       final curId = agentSessionId ?? '';
@@ -197,7 +200,6 @@ mixin AgentChatController on ChangeNotifier {
     lastPlan = null;
     stepOutputs.clear();
     _lastPlanMsgIndex = null;
-    _agentCancelRequested = false;
     _runningStepIds.clear();
     agentBusy = false;
     notifyListeners();
@@ -253,6 +255,7 @@ mixin AgentChatController on ChangeNotifier {
     agentSessions.removeWhere((e) => e.id == id);
     // If deleting the open session, clear the live transcript
     if (agentSessionId == id) {
+      _supersedeAgentTurn();
       agentMessages.clear();
       agentSessionId = null;
       agentSessionTitle = '新会话';
@@ -279,18 +282,11 @@ mixin AgentChatController on ChangeNotifier {
     _saveSessionsToPrefs();
   }
 
-  /// Set when user hits stop — stream close must NOT fall back to batch chat.
-  bool _agentCancelRequested = false;
-
-  /// Bumped on each agentChat / cancel so stale SSE events are ignored.
-  int _agentTurnGen = 0;
-
   /// In-flight manual exec-step ids (prevent double-tap).
   final Set<int> _runningStepIds = {};
 
   void cancelAgentChat() {
-    _agentCancelRequested = true;
-    _agentTurnGen++; // invalidate in-flight stream callbacks
+    _turnExecutor.cancel();
     api.cancelAgentStream();
     agentBusy = false;
     _flushStreamNotify();
@@ -501,8 +497,7 @@ mixin AgentChatController on ChangeNotifier {
       return;
     }
     agentBusy = true;
-    _agentCancelRequested = false;
-    final turn = ++_agentTurnGen;
+    final turn = _turnExecutor.beginTurn();
     // Always have a durable server session before the turn (Minis-style).
     if (agentSessionId == null || agentSessionId!.isEmpty) {
       try {
@@ -513,6 +508,7 @@ mixin AgentChatController on ChangeNotifier {
         // Backend will still mint a UUID if sessionId is omitted.
       }
     }
+    if (!_turnExecutor.isCurrent(turn)) return;
     _pushMsg(ChatMessage(role: 'user', content: userText));
     if (agentSessionTitle == '新会话' || agentSessionTitle.isEmpty) {
       final t = userText.trim().replaceAll(RegExp(r'\s+'), ' ');
@@ -520,9 +516,10 @@ mixin AgentChatController on ChangeNotifier {
     }
     notifyListeners();
     try {
-      // Prefer SSE progressive events; fall back to batch chat only on real errors.
-      try {
-        await api.agentChatStream(
+      final result = await _turnExecutor.execute(
+        handle: turn,
+        sessionId: agentSessionId,
+        streamRequest: (onEvent) => api.agentChatStream(
           hostId: id,
           message: userText,
           sessionId: agentSessionId,
@@ -530,74 +527,54 @@ mixin AgentChatController on ChangeNotifier {
           maxRounds: effectiveMaxRounds,
           temperature: effectiveTemperature,
           customPrompt: effectiveCustomPrompt,
-          onEvent: (raw) {
-            if (turn != _agentTurnGen) return;
-            final type = raw['type']?.toString() ?? '';
-            if (type == 'session') {
-              agentSessionId = raw['sessionId'] as String? ?? agentSessionId;
-              return;
-            }
-            if (type == 'done') return;
-            _ingestAgentEvent(raw);
-            // Token deltas: throttle UI rebuilds. Structural events: flush now.
-            if (type == 'assistant_delta' || type == 'reasoning_delta') {
-              _scheduleStreamNotify();
-            } else {
-              _flushStreamNotify();
-              notifyListeners();
-            }
-          },
-        );
-      } catch (e) {
-        // User stop closes the HTTP client — never re-run the whole turn via batch.
-        if (turn != _agentTurnGen || _agentCancelRequested || _isCancelError(e)) {
-          // already tagged by cancelAgentChat / superseded
-        } else {
-          final res = await api.agentChat(
-            hostId: id,
-            message: userText,
-            sessionId: agentSessionId,
-            confirmWrites: effectiveConfirmWrites,
-            maxRounds: effectiveMaxRounds,
-            temperature: effectiveTemperature,
-            customPrompt: effectiveCustomPrompt,
-          );
-          if (turn != _agentTurnGen) return;
-          agentSessionId = res['sessionId'] as String? ?? agentSessionId;
-          for (final raw in (res['events'] as List?) ?? []) {
-            if (raw is Map) _ingestAgentEvent(Map<String, dynamic>.from(raw));
+          onEvent: onEvent,
+        ),
+        batchRequest: (sessionId) => api.agentChat(
+          hostId: id,
+          message: userText,
+          sessionId: sessionId,
+          confirmWrites: effectiveConfirmWrites,
+          maxRounds: effectiveMaxRounds,
+          temperature: effectiveTemperature,
+          customPrompt: effectiveCustomPrompt,
+        ),
+        onSession: (sessionId) => agentSessionId = sessionId,
+        onEvent: (raw) {
+          final type = raw['type']?.toString() ?? '';
+          _ingestAgentEvent(raw);
+          // Token deltas: throttle UI rebuilds. Structural events: flush now.
+          if (type == 'assistant_delta' || type == 'reasoning_delta') {
+            _scheduleStreamNotify();
+          } else {
+            _flushStreamNotify();
+            notifyListeners();
           }
-        }
-      }
-      if (turn == _agentTurnGen) {
+        },
+      );
+      if (result.completed && _turnExecutor.isCurrent(turn)) {
+        agentSessionId = result.sessionId ?? agentSessionId;
         _flushStreamNotify();
         notifyListeners();
       }
     } catch (e) {
-      if (turn != _agentTurnGen || _agentCancelRequested || _isCancelError(e)) {
+      if (!_turnExecutor.isCurrent(turn)) {
         // cancelled / superseded
       } else {
         _pushMsg(ChatMessage(role: 'assistant', content: _friendlyErr(e), kind: ChatKind.error));
       }
     } finally {
-      if (turn == _agentTurnGen) {
+      if (_turnExecutor.isCurrent(turn)) {
+        _turnExecutor.finish(turn);
         agentBusy = false;
-        _agentCancelRequested = false;
         _flushStreamNotify();
         notifyListeners();
       }
     }
   }
 
-  bool _isCancelError(Object e) {
-    final msg = e.toString().toLowerCase();
-    return msg.contains('clientexception') ||
-        msg.contains('connection closed') ||
-        msg.contains('cancel') ||
-        msg.contains('broken pipe') ||
-        msg.contains('connection reset') ||
-        msg.contains('stream closed') ||
-        msg.contains('socketexception');
+  void _supersedeAgentTurn() {
+    _turnExecutor.supersede();
+    api.cancelAgentStream();
   }
 
 
@@ -859,6 +836,7 @@ mixin AgentChatController on ChangeNotifier {
 
 
   void disposeAgentChat() {
+    _supersedeAgentTurn();
     _streamNotifyTimer?.cancel();
     _streamNotifyTimer = null;
   }
