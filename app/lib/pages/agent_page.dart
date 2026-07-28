@@ -1090,7 +1090,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                       ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-                        scrollCacheExtent: const ScrollCacheExtent.pixels(480),
+                        // ignore: deprecated_member_use
+                        cacheExtent: 480,
                         physics: const ClampingScrollPhysics(),
                         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                         itemCount: state.agentMessages.length + (_busy ? 1 : 0),

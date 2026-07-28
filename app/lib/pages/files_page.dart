@@ -851,7 +851,8 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                             itemCount: pane.entries.length,
                             // Fixed row height for smoother scroll on large dirs.
                             itemExtent: 48,
-                            scrollCacheExtent: const ScrollCacheExtent.pixels(400),
+                            // ignore: deprecated_member_use
+                            cacheExtent: 400,
                             itemBuilder: (_, i) {
                               final e = pane.entries[i] as Map;
                               final isDir = e['isDir'] == true;
