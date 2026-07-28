@@ -2,6 +2,8 @@
 /// Stream tokens sometimes lose spaces; final often has proper spacing.
 /// Those must stay ONE thought, not two paragraphs.
 
+library;
+
 String compactReason(String s) => s.replaceAll(RegExp(r'\s+'), '').toLowerCase();
 
 String normReason(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();

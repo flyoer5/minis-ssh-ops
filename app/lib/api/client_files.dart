@@ -1,6 +1,6 @@
 part of 'client.dart';
 
-mixin ApiClientFiles on _ApiTransport {
+mixin _ApiClientFiles on _ApiTransport {
   Future<Map<String, dynamic>> fsList(String hostId, String path) async {
     final r = await _c
         .post(

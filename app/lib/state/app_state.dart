@@ -15,6 +15,7 @@ export 'package:ssh_ai_agent/models/probe_summary.dart';
 class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
   AppState(this.api);
 
+  @override
   final ApiClient api;
 
   bool backendOk = false;
@@ -25,6 +26,7 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
   String? backendNote;
   List<dynamic> hosts = [];
   Map<String, dynamic>? llm;
+  @override
   String? selectedHostId;
 
   String get hostLabel => hostLabelFor(selectedHostId);
