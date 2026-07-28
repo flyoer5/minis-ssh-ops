@@ -8,7 +8,7 @@ require (
 	github.com/pkg/sftp v1.13.7
 	golang.org/x/crypto v0.54.0
 	modernc.org/sqlite v1.34.5
-	mvdan.cc/sh/v3 v3.10.0
+	mvdan.cc/sh/v3 v3.13.1
 )
 
 require (
