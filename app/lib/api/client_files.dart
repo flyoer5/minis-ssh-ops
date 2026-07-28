@@ -1,6 +1,6 @@
 part of 'client.dart';
 
-extension ApiClientFiles on ApiClient {
+mixin ApiClientFiles on _ApiTransport {
   Future<Map<String, dynamic>> fsList(String hostId, String path) async {
     final r = await _c
         .post(
@@ -141,4 +141,3 @@ extension ApiClientFiles on ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 }
-

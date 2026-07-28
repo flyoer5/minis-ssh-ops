@@ -1,6 +1,6 @@
 part of 'client.dart';
 
-extension ApiClientHosts on ApiClient {
+mixin ApiClientHosts on _ApiTransport {
   Future<List<dynamic>> listHosts() async {
     final r = await _c.get(_u('/v1/hosts'), headers: _headers).timeout(const Duration(seconds: 6));
     _ensureOk(r);
@@ -62,4 +62,3 @@ extension ApiClientHosts on ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 }
-

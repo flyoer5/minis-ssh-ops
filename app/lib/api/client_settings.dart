@@ -1,6 +1,6 @@
 part of 'client.dart';
 
-extension ApiClientSettings on ApiClient {
+mixin ApiClientSettings on _ApiTransport {
   Future<Map<String, dynamic>> health() async {
     final r = await _c.get(_u('/v1/health')).timeout(const Duration(milliseconds: 800));
     return jsonDecode(r.body) as Map<String, dynamic>;
@@ -35,4 +35,3 @@ extension ApiClientSettings on ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 }
-

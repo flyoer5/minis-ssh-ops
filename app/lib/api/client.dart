@@ -8,13 +8,34 @@ part 'client_agent.dart';
 part 'client_files.dart';
 part 'client_admin.dart';
 
-class ApiClient {
+abstract class _ApiTransport {
+  String get baseUrl;
+  String get localToken;
+  http.Client get _c;
+  http.Client? get _streamClient;
+  set _streamClient(http.Client? value);
+  Map<String, String> get _headers;
+  Uri _u(String path);
+  void _ensureOk(http.Response response);
+}
+
+class ApiClient extends _ApiTransport
+    with
+        ApiClientSettings,
+        ApiClientHosts,
+        ApiClientAgent,
+        ApiClientFiles,
+        ApiClientAdmin {
   /// Local Go backend (loopback only).
+  @override
   String baseUrl;
+  @override
   String localToken;
 
   /// Shared non-streaming client (connection reuse for health/probe/fs).
+  @override
   final http.Client _c = http.Client();
+  @override
   http.Client? _streamClient;
 
   ApiClient({
@@ -30,13 +51,16 @@ class ApiClient {
     _c.close();
   }
 
+  @override
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         if (localToken.isNotEmpty) 'X-Local-Token': localToken,
       };
 
+  @override
   Uri _u(String path) => Uri.parse('$baseUrl$path');
 
+  @override
   void _ensureOk(http.Response r) {
     if (r.statusCode >= 200 && r.statusCode < 300) return;
     String msg = r.body;

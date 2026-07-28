@@ -1,6 +1,6 @@
 part of 'client.dart';
 
-extension ApiClientAdmin on ApiClient {
+mixin ApiClientAdmin on _ApiTransport {
   Future<List<dynamic>> listAudit({int limit = 100}) async {
     final r = await _c
         .get(_u('/v1/audit?limit=$limit'), headers: _headers)
@@ -55,4 +55,3 @@ extension ApiClientAdmin on ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 }
-

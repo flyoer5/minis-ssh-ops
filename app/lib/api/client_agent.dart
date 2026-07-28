@@ -1,6 +1,6 @@
 part of 'client.dart';
 
-extension ApiClientAgent on ApiClient {
+mixin ApiClientAgent on _ApiTransport {
   Future<Map<String, dynamic>> agentPlan({
     required String hostId,
     required String goal,
@@ -296,4 +296,3 @@ extension ApiClientAgent on ApiClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 }
-
