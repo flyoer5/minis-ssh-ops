@@ -103,9 +103,6 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 			return
 		}
 		tok := r.Header.Get("X-Local-Token")
-		if tok == "" {
-			tok = r.URL.Query().Get("token")
-		}
 		if s.LocalToken != "" && tok != s.LocalToken {
 			writeErr(w, http.StatusUnauthorized, "invalid or missing X-Local-Token")
 			return

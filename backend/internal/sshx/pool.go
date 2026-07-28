@@ -1,6 +1,8 @@
 package sshx
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"sync"
@@ -34,8 +36,15 @@ func poolKey(p ConnectParams) string {
 	if port <= 0 {
 		port = 22
 	}
-	// auth material fingerprint-ish: user+host+port+len(secret)
-	return fmt.Sprintf("%s@%s:%d|p%d|k%d", p.Username, p.Host, port, len(p.Password), len(p.PrivateKeyPEM))
+	// Include a one-way digest of every authentication secret. Length-only keys
+	// can collide after credential changes and incorrectly reuse an old session.
+	auth := sha256.New()
+	_, _ = auth.Write([]byte(p.Password))
+	_, _ = auth.Write([]byte{0})
+	_, _ = auth.Write([]byte(p.PrivateKeyPEM))
+	_, _ = auth.Write([]byte{0})
+	_, _ = auth.Write([]byte(p.Passphrase))
+	return fmt.Sprintf("%s@%s:%d|%s", p.Username, p.Host, port, hex.EncodeToString(auth.Sum(nil)))
 }
 
 func (p *Pool) get(key string) *ssh.Client {
