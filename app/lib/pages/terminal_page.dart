@@ -573,7 +573,7 @@ class _TerminalPageState extends State<TerminalPage>
                             ),
                             if (_status.isNotEmpty)
                               TextSpan(
-                                text: '  ${_status}',
+                                text: '  $_status',
                                 style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w400),
                               ),
                           ],

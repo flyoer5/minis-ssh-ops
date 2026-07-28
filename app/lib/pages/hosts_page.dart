@@ -701,10 +701,13 @@ class _StatusCard extends StatelessWidget {
         if (m2 == null) return null;
         var n = double.tryParse(m2.group(1)!) ?? 0;
         final u = m2.group(2) ?? '';
-        if (u.startsWith('T')) n *= 1024 * 1024;
-        else if (u.startsWith('G')) n *= 1024;
-        else if (u.startsWith('M')) n *= 1;
-        else if (u.startsWith('K')) n /= 1024;
+        if (u.startsWith('T')) {
+          n *= 1024 * 1024;
+        } else if (u.startsWith('G')) {
+          n *= 1024;
+        } else if (u.startsWith('K')) {
+          n /= 1024;
+        }
         return n;
       }
       final a = parse(parts[0]);
