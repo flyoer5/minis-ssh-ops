@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +6,7 @@ import 'package:ssh_ai_agent/agent/reasoning_merge.dart';
 import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/models/agent_session.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
+import 'package:ssh_ai_agent/state/agent_session_store.dart';
 
 /// Agent transcript, sessions, SSE coalescing / tool pairing.
 /// Mixed into [AppState]; requires [api], [selectedHostId], [confirmWrites], [agentMaxRounds].
@@ -345,78 +345,14 @@ mixin AgentChatController on ChangeNotifier {
 
 
   void loadAgentSessionsFromPrefs(SharedPreferences prefs) {
-    final raw = prefs.getString('agentSessionsJson');
-    if (raw == null || raw.isEmpty) return;
-    try {
-      final list = jsonDecode(raw);
-      if (list is! List) return;
-      agentSessions.clear();
-      for (final e in list) {
-        if (e is! Map) continue;
-        final msgs = <ChatMessage>[];
-        final ml = e['messages'];
-        if (ml is List) {
-          for (final m in ml) {
-            if (m is! Map) continue;
-            final kindStr = m['kind']?.toString() ?? 'text';
-            var kind = ChatKind.text;
-            for (final k in ChatKind.values) {
-              if (k.name == kindStr) kind = k;
-            }
-            Map<String, dynamic>? meta;
-            final rawMeta = m['meta'];
-            if (rawMeta is Map) meta = Map<String, dynamic>.from(rawMeta);
-            // migrate legacy meta.part → first-class kind
-            final part = meta?['part']?.toString();
-            if (part == 'toolUse' && kind != ChatKind.toolUse) kind = ChatKind.toolUse;
-            if ((part == 'toolResult' || kind == ChatKind.stepResult) &&
-                kind != ChatKind.toolResult &&
-                kind != ChatKind.plan) {
-              if (kind == ChatKind.stepResult || part == 'toolResult') kind = ChatKind.toolResult;
-            }
-            msgs.add(ChatMessage(
-              role: m['role']?.toString() ?? 'assistant',
-              content: m['content']?.toString() ?? '',
-              kind: kind,
-              meta: meta,
-            ));
-          }
-        }
-        agentSessions.add(AgentSession(
-          id: e['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
-          title: e['title']?.toString() ?? '会话',
-          hostId: e['hostId']?.toString(),
-          messages: msgs,
-        ));
-      }
-    } catch (_) {}
+    final loaded = AgentSessionStore.load(prefs);
+    if (loaded.isEmpty) return;
+    agentSessions
+      ..clear()
+      ..addAll(loaded);
   }
 
-  Future<void> _saveSessionsToPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = <Map<String, dynamic>>[];
-    // Keep SharedPreferences payload bounded (20 sessions × 80 msgs × ~12k chars).
-    const maxContent = 12000;
-    for (final s in agentSessions.take(20)) {
-      list.add({
-        'id': s.id,
-        'title': s.title,
-        'hostId': s.hostId,
-        'messages': [
-          for (final m in s.messages.take(80))
-            {
-              'role': m.role,
-              'content': m.content.length > maxContent
-                  ? '${m.content.substring(0, maxContent)}…'
-                  : m.content,
-              'kind': m.kind.name,
-              if (m.meta != null) 'meta': m.meta,
-            },
-        ],
-      });
-    }
-    await prefs.setString('agentSessionsJson', jsonEncode(list));
-  }
+  Future<void> _saveSessionsToPrefs() => AgentSessionStore.save(agentSessions);
 
 
   // exportConfigJson / importConfigJson live on AppState (hosts/llm/uiPrefs).
