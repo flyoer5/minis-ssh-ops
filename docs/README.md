@@ -1,10 +1,7 @@
-# 文档索引
+# Documentation
 
-| 文档 | 说明 |
-|------|------|
-| [PRODUCT_AND_ARCHITECTURE.md](./PRODUCT_AND_ARCHITECTURE.md) | **正式**产品定位、Flutter+Go 架构、版本切分、安全与出包约束 |
+- [Architecture](ARCHITECTURE.md): current Flutter, Android and Go structure, data flow, storage and build model.
+- [Security](../SECURITY.md): trust boundaries, credential handling, command controls and signing requirements.
+- [Changelog](../CHANGELOG.md): version history.
 
-历史原型（非最终架构）：
-
-- `../ssh-agent-cli/` — 命令行巡检 + LLM 验证  
-- `../ssh-agent-android/` — Kotlin MVP 真机验证  
+The repository root [README](../README.md) is the development and build entry point.
