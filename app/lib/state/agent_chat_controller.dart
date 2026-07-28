@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ssh_ai_agent/agent/reasoning_merge.dart';
 import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/models/agent_session.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/agent_session_store.dart';
+import 'package:ssh_ai_agent/state/agent_transcript.dart';
 
 /// Agent transcript, sessions, SSE coalescing / tool pairing.
 /// Mixed into [AppState]; requires [api], [selectedHostId], [confirmWrites], [agentMaxRounds].
@@ -43,6 +43,7 @@ mixin AgentChatController on ChangeNotifier {
   String? sessionOvPrompt;
   final Map<String, String> stepOutputs = {};
   final List<ChatMessage> agentMessages = [];
+  late final AgentTranscript _transcript = AgentTranscript(agentMessages);
   /// Index of last plan message in agentMessages (for attaching step outputs).
   int? _lastPlanMsgIndex;
   final List<AgentSession> agentSessions = [];
@@ -418,246 +419,30 @@ mixin AgentChatController on ChangeNotifier {
   }
 
   void _pushMsg(ChatMessage m) {
-    agentMessages.add(m);
-    _trimLiveMessages();
+    _transcript.add(m);
     notifyListeners();
   }
 
-  /// Keep the open transcript from growing without bound (memory / jank).
-  void _trimLiveMessages() {
-    const maxLive = 200;
-    if (agentMessages.length <= maxLive) return;
-    // Keep the earliest user message of the tail window if possible.
-    agentMessages.removeRange(0, agentMessages.length - maxLive);
-  }
+  int _lastReasoningIndexInTurn() => _transcript.lastReasoningIndexInTurn;
 
-  /// Index of the latest reasoning bubble in the *current turn* (after last user msg).
-  /// Returns -1 if none. Used so final/reasoning never spawns a second block under the answer.
-  int _lastReasoningIndexInTurn() {
-    for (var i = agentMessages.length - 1; i >= 0; i--) {
-      final m = agentMessages[i];
-      if (m.role == 'user') break;
-      if (m.kind == ChatKind.reasoning) return i;
-    }
-    return -1;
-  }
+  bool _turnHasAssistantText() => _transcript.turnHasAssistantText;
 
-  /// Whether this turn already has assistant answer text (after last user).
-  bool _turnHasAssistantText() {
-    for (var i = agentMessages.length - 1; i >= 0; i--) {
-      final m = agentMessages[i];
-      if (m.role == 'user') break;
-      if (m.role == 'assistant' && m.kind == ChatKind.text) return true;
-    }
-    return false;
-  }
+  void _pushReasoning(String reasoning) => _transcript.pushReasoning(reasoning);
 
-  /// Minis-like: reasoning is a foldable block *above* the answer for this turn.
-  /// Never append a new thinking card after assistant text (final often re-sends full reasoning).
-  void _pushReasoning(String reasoning) {
-    final r = reasoning.trim();
-    if (r.isEmpty) return;
-    final idx = _lastReasoningIndexInTurn();
-    if (idx >= 0) {
-      final last = agentMessages[idx];
-      // Stream (maybe glued) + final (spaced) → ONE card via pure merge helper
-      final merged = mergeReasoningForTurn(last.content, r);
-      agentMessages[idx] = ChatMessage(
-        role: 'assistant',
-        content: merged,
-        kind: ChatKind.reasoning,
-        meta: {'part': 'reasoning'},
-        at: last.at,
-      );
-      return;
-    }
-    // No reasoning yet this turn.
-    // If answer text already exists, do NOT put thinking under the reply —
-    // insert just before the first assistant text of this turn, or skip if empty utility.
-    if (_turnHasAssistantText()) {
-      // Find first assistant text after last user; insert reasoning before it
-      var insertAt = agentMessages.length;
-      for (var i = agentMessages.length - 1; i >= 0; i--) {
-        final m = agentMessages[i];
-        if (m.role == 'user') break;
-        if (m.role == 'assistant' && m.kind == ChatKind.text) insertAt = i;
-      }
-      agentMessages.insert(
-        insertAt,
-        ChatMessage(
-          role: 'assistant',
-          content: r,
-          kind: ChatKind.reasoning,
-          meta: {'part': 'reasoning'},
-        ),
-      );
-      return;
-    }
-    agentMessages.add(ChatMessage(
-      role: 'assistant',
-      content: r,
-      kind: ChatKind.reasoning,
-      meta: {'part': 'reasoning'},
-    ));
-  }
+  void _appendAssistantDelta(String piece) => _transcript.appendAssistantDelta(piece);
 
-  /// Stable id for pairing toolUse → toolResult across SSE events.
-  String _newToolId() => 't${DateTime.now().microsecondsSinceEpoch}';
+  void _appendReasoningDelta(String piece) => _transcript.appendReasoningDelta(piece);
 
-  /// Stream token: append to last assistant text bubble (or create one).
-  void _appendAssistantDelta(String piece) {
-    if (piece.isEmpty) return;
-    if (agentMessages.isNotEmpty) {
-      final last = agentMessages.last;
-      final lastPart = last.meta?['part']?.toString();
-      final isText = last.role == 'assistant' &&
-          last.kind == ChatKind.text &&
-          (lastPart == null || lastPart == 'text' || lastPart == 'text_delta');
-      if (isText) {
-        agentMessages[agentMessages.length - 1] = ChatMessage(
-          role: 'assistant',
-          content: last.content + piece,
-          kind: ChatKind.text,
-          meta: {'part': 'text_delta'},
-          at: last.at,
-        );
-        return;
-      }
-    }
-    agentMessages.add(ChatMessage(
-      role: 'assistant',
-      content: piece,
-      kind: ChatKind.text,
-      meta: {'part': 'text_delta'},
-    ));
-    _trimLiveMessages();
-  }
-
-  /// Stream token: append into current-turn reasoning bubble (never after answer text).
-  void _appendReasoningDelta(String piece) {
-    if (piece.isEmpty) return;
-    final idx = _lastReasoningIndexInTurn();
-    if (idx >= 0) {
-      final last = agentMessages[idx];
-      agentMessages[idx] = ChatMessage(
-        role: 'assistant',
-        content: last.content + piece,
-        kind: ChatKind.reasoning,
-        meta: {'part': 'reasoning'},
-        at: last.at,
-      );
-      return;
-    }
-    // If answer already started, open/update a reasoning card *above* it
-    if (_turnHasAssistantText()) {
-      var insertAt = agentMessages.length;
-      for (var i = agentMessages.length - 1; i >= 0; i--) {
-        final m = agentMessages[i];
-        if (m.role == 'user') break;
-        if (m.role == 'assistant' && m.kind == ChatKind.text) insertAt = i;
-      }
-      agentMessages.insert(
-        insertAt,
-        ChatMessage(
-          role: 'assistant',
-          content: piece,
-          kind: ChatKind.reasoning,
-          meta: {'part': 'reasoning'},
-        ),
-      );
-      return;
-    }
-    agentMessages.add(ChatMessage(
-      role: 'assistant',
-      content: piece,
-      kind: ChatKind.reasoning,
-      meta: {'part': 'reasoning'},
-    ));
-  }
-
-  /// Normalize for duplicate detection (stream final vs deltas often differ by WS/newlines).
-  String _normText(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-  /// Find the latest assistant text bubble (skip trailing status if any).
-  int _lastAssistantTextIndex() {
-    for (var i = agentMessages.length - 1; i >= 0; i--) {
-      final m = agentMessages[i];
-      if (m.role == 'assistant' && m.kind == ChatKind.text) return i;
-      // stop if we hit user message — different turn
-      if (m.role == 'user') break;
-      // skip status/reasoning after text (e.g. stop status shouldn't block coalesce)
-      if (m.kind == ChatKind.status || m.kind == ChatKind.reasoning) continue;
-      break;
-    }
-    return -1;
-  }
-
-  /// After token stream, full assistant/final must REPLACE the draft bubble, not create a second one.
-  /// Also seals part from `text_delta` → `text` so UI switches from plain to Markdown once.
   void _coalesceAssistantFull(String content, {String part = 'text'}) {
-    final t = content.trimRight();
-    if (t.isEmpty) return;
-    final idx = _lastAssistantTextIndex();
-    if (idx >= 0) {
-      final last = agentMessages[idx];
-      final a = _normText(last.content);
-      final b = _normText(t);
-      String body = t;
-      // identical / prefix / either contains the other → one bubble
-      if (a == b || b.startsWith(a) || a.startsWith(b) || a.contains(b) || b.contains(a)) {
-        body = t.length >= last.content.length ? t : last.content;
-      }
-      agentMessages[idx] = ChatMessage(
-        role: 'assistant',
-        content: body,
-        kind: ChatKind.text,
-        meta: {'part': 'text'}, // seal: leave streaming plain-text mode
-        at: last.at,
-      );
-      return;
-    }
-    agentMessages.add(ChatMessage(
-      role: 'assistant',
-      content: t,
-      kind: ChatKind.text,
-      meta: {'part': 'text'},
-    ));
+    _transcript.coalesceAssistantFull(content);
   }
 
-  /// Minis-like: consecutive assistant/final text chunks merge into one bubble.
   void _pushOrMergeAssistantText(String content, {String part = 'text'}) {
-    // Full-frame events (assistant / final) always coalesce into one bubble.
-    _coalesceAssistantFull(content, part: part);
+    _transcript.coalesceAssistantFull(content);
   }
 
-  bool _isOpenToolUse(ChatMessage m) {
-    // Waiting for user confirm is not "running" — don't pair later tool_results onto it.
-    if (m.meta?['pendingConfirm'] == true) return false;
-    if (m.kind == ChatKind.toolUse) return m.meta?['success'] == null;
-    // legacy: meta.part toolUse with status kind
-    return m.meta?['part']?.toString() == 'toolUse' && m.meta?['success'] == null;
-  }
-
-  /// Find last open toolUse to complete (same name, prefer same command).
   int _findOpenToolUse({required String name, required String command}) {
-    for (var i = agentMessages.length - 1; i >= 0; i--) {
-      final m = agentMessages[i];
-      if (!_isOpenToolUse(m)) continue;
-      final n = (m.meta?['name'] ?? '').toString();
-      if (name.isNotEmpty && n.isNotEmpty && n != name) continue;
-      final c = (m.meta?['command'] ?? '').toString();
-      if (command.isNotEmpty && c.isNotEmpty && c != command) {
-        if (c.trim() != command.trim()) continue;
-      }
-      return i;
-    }
-    for (var i = agentMessages.length - 1; i >= 0; i--) {
-      final m = agentMessages[i];
-      if (!_isOpenToolUse(m)) continue;
-      final n = (m.meta?['name'] ?? '').toString();
-      if (name.isEmpty || n == name) return i;
-    }
-    return -1;
+    return _transcript.findOpenToolUse(name: name, command: command);
   }
 
   void _pushToolUse({
@@ -665,23 +450,9 @@ mixin AgentChatController on ChangeNotifier {
     required String command,
     required String description,
   }) {
-    final id = _newToolId();
-    agentMessages.add(ChatMessage(
-      role: 'tool',
-      content: description,
-      kind: ChatKind.toolUse,
-      meta: {
-        'part': 'toolUse',
-        'id': id,
-        'name': name,
-        'command': command,
-        'description': description,
-        'success': null,
-      },
-    ));
+    _transcript.pushToolUse(name: name, command: command, description: description);
   }
 
-  /// Merge tool_result into the matching toolUse card (Minis stream pairing).
   void _completeToolResult({
     required String name,
     required String command,
@@ -689,44 +460,13 @@ mixin AgentChatController on ChangeNotifier {
     required bool success,
     required String description,
   }) {
-    final idx = _findOpenToolUse(name: name, command: command);
-    final id = idx >= 0
-        ? (agentMessages[idx].meta?['id']?.toString() ?? _newToolId())
-        : _newToolId();
-    final prev = idx >= 0 ? agentMessages[idx] : null;
-    final desc = description.isNotEmpty
-        ? description
-        : (prev?.meta?['description']?.toString() ??
-            (command.isNotEmpty ? command.trim().split('\n').first : name));
-    final cmd = command.isNotEmpty ? command : (prev?.meta?['command']?.toString() ?? '');
-    final toolName = name.isNotEmpty ? name : (prev?.meta?['name']?.toString() ?? 'tool');
-    var out = output;
-    final low = out.toLowerCase();
-    if (low.contains('context deadline exceeded') ||
-        (low.contains('deadline exceeded') && low.contains('error'))) {
-      out = '远程命令超时（主机忙或命令过慢）。可拆短命令后重试。\n原始错误: $out';
-      success = false;
-    }
-    final msg = ChatMessage(
-      role: 'tool',
-      content: out,
-      kind: ChatKind.toolResult,
-      meta: {
-        'part': 'toolResult',
-        'id': id,
-        'name': toolName,
-        'command': cmd,
-        'description': desc,
-        'success': success,
-        'output': out,
-      },
-      at: prev?.at,
+    _transcript.completeToolResult(
+      name: name,
+      command: command,
+      output: output,
+      success: success,
+      description: description,
     );
-    if (idx >= 0) {
-      agentMessages[idx] = msg;
-    } else {
-      agentMessages.add(msg);
-    }
   }
 
   void _scheduleStreamNotify() {
@@ -1113,28 +853,7 @@ mixin AgentChatController on ChangeNotifier {
 
   /// After user confirms exec, close matching pending toolUse cards.
   void _sealPendingToolUse(String command, {required bool success, required String output}) {
-    final cmd = command.trim();
-    for (var i = agentMessages.length - 1; i >= 0; i--) {
-      final m = agentMessages[i];
-      if (m.kind != ChatKind.toolUse) continue;
-      if (m.meta?['pendingConfirm'] != true && m.meta?['success'] != null) continue;
-      final c = (m.meta?['command'] ?? '').toString().trim();
-      if (cmd.isNotEmpty && c.isNotEmpty && c != cmd) continue;
-      agentMessages[i] = ChatMessage(
-        role: m.role,
-        content: success ? (output.isEmpty ? '完成' : output) : output,
-        kind: ChatKind.toolUse,
-        meta: {
-          ...?m.meta,
-          'pendingConfirm': false,
-          'success': success,
-          'output': output,
-          'interrupted': false,
-        },
-        at: m.at,
-      );
-      if (cmd.isNotEmpty) break;
-    }
+    _transcript.sealPendingToolUse(command, success: success, output: output);
   }
 
 
