@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 )
+
+var ErrHostCredentialRequired = errors.New("password or private key required")
 
 type Store struct {
 	db  *sql.DB
@@ -26,12 +29,15 @@ type Host struct {
 	HasPassword   bool   `json:"hasPassword"`
 	HasPrivateKey bool   `json:"hasPrivateKey"`
 	// Write-only fields (accepted on create/update, never returned plaintext)
-	Password       string `json:"password,omitempty"`
-	PrivateKeyPEM  string `json:"privateKeyPem,omitempty"`
-	Passphrase     string `json:"passphrase,omitempty"`
-	SortOrder      int    `json:"sortOrder,omitempty"`
-	CreatedAt      string `json:"createdAt,omitempty"`
-	UpdatedAt      string `json:"updatedAt,omitempty"`
+	Password        string `json:"password,omitempty"`
+	PrivateKeyPEM   string `json:"privateKeyPem,omitempty"`
+	Passphrase      string `json:"passphrase,omitempty"`
+	ClearPassword   bool   `json:"clearPassword,omitempty"`
+	ClearPrivateKey bool   `json:"clearPrivateKey,omitempty"`
+	ClearPassphrase bool   `json:"clearPassphrase,omitempty"`
+	SortOrder       int    `json:"sortOrder,omitempty"`
+	CreatedAt       string `json:"createdAt,omitempty"`
+	UpdatedAt       string `json:"updatedAt,omitempty"`
 }
 
 type LLMSettings struct {
@@ -858,6 +864,15 @@ func (s *Store) UpdateHost(id string, h Host) (Host, error) {
 		return h, err
 	}
 	pwIn, pkIn, ppIn := sec.Password, sec.PrivateKeyPEM, sec.Passphrase
+	if h.ClearPassword {
+		pwIn = ""
+	}
+	if h.ClearPrivateKey {
+		pkIn = ""
+	}
+	if h.ClearPassphrase {
+		ppIn = ""
+	}
 	if h.Password != "" {
 		pwIn = h.Password
 	}
@@ -867,7 +882,12 @@ func (s *Store) UpdateHost(id string, h Host) (Host, error) {
 	if h.Passphrase != "" {
 		ppIn = h.Passphrase
 	}
-	// allow clearing password with explicit empty via sentinel? skip for v0.1
+	if pkIn == "" {
+		ppIn = ""
+	}
+	if pwIn == "" && pkIn == "" {
+		return h, ErrHostCredentialRequired
+	}
 	pw, pk, pp, err := s.sealSecrets(pwIn, pkIn, ppIn)
 	if err != nil {
 		return h, err
