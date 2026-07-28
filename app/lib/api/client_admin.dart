@@ -1,6 +1,6 @@
 part of 'client.dart';
 
-mixin ApiClientAdmin on _ApiTransport {
+mixin _ApiClientAdmin on _ApiTransport {
   Future<List<dynamic>> listAudit({int limit = 100}) async {
     final r = await _c
         .get(_u('/v1/audit?limit=$limit'), headers: _headers)

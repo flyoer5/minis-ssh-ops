@@ -21,11 +21,11 @@ abstract class _ApiTransport {
 
 class ApiClient extends _ApiTransport
     with
-        ApiClientSettings,
-        ApiClientHosts,
-        ApiClientAgent,
-        ApiClientFiles,
-        ApiClientAdmin {
+        _ApiClientSettings,
+        _ApiClientHosts,
+        _ApiClientAgent,
+        _ApiClientFiles,
+        _ApiClientAdmin {
   /// Local Go backend (loopback only).
   @override
   String baseUrl;

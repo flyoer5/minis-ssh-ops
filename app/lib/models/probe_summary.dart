@@ -154,9 +154,13 @@ class ProbeSummary {
           if (m == null) return null;
           var n = double.tryParse(m.group(1)!) ?? 0;
           final u = (m.group(2) ?? '').toUpperCase();
-          if (u == 'T') n *= 1024 * 1024;
-          else if (u == 'G') n *= 1024;
-          else if (u == 'K') n /= 1024;
+          if (u == 'T') {
+            n *= 1024 * 1024;
+          } else if (u == 'G') {
+            n *= 1024;
+          } else if (u == 'K') {
+            n /= 1024;
+          }
           // M or bare: Mi already
           return n;
         }

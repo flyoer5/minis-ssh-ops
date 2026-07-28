@@ -1,6 +1,6 @@
 part of 'client.dart';
 
-mixin ApiClientHosts on _ApiTransport {
+mixin _ApiClientHosts on _ApiTransport {
   Future<List<dynamic>> listHosts() async {
     final r = await _c.get(_u('/v1/hosts'), headers: _headers).timeout(const Duration(seconds: 6));
     _ensureOk(r);

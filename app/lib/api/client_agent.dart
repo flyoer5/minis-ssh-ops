@@ -1,6 +1,6 @@
 part of 'client.dart';
 
-mixin ApiClientAgent on _ApiTransport {
+mixin _ApiClientAgent on _ApiTransport {
   Future<Map<String, dynamic>> agentPlan({
     required String hostId,
     required String goal,
