@@ -11,8 +11,8 @@ void main() {
   });
 
   test('AppColors tokens are stable', () {
-    expect(AppColors.bg.value, 0xFF0D1117);
-    expect(AppColors.danger.value, 0xFFF85149);
-    expect(AppColors.success.value, 0xFF3FB950);
+    expect(AppColors.bg.toARGB32(), 0xFF0D1117);
+    expect(AppColors.danger.toARGB32(), 0xFFF85149);
+    expect(AppColors.success.toARGB32(), 0xFF3FB950);
   });
 }

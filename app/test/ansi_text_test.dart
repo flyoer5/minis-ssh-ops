@@ -4,7 +4,7 @@ import 'package:ssh_ai_agent/pages/ansi_text.dart';
 
 void main() {
   test('strips bracketed paste mode ESC[?2004h', () {
-    final raw = '\x1B[?2004hroot@host:~# \n\x1B[?2004l';
+    const raw = '\x1B[?2004hroot@host:~# \n\x1B[?2004l';
     final plain = stripAnsi(raw);
     expect(plain.contains('2004'), isFalse);
     expect(plain.contains('?'), isFalse);
@@ -12,14 +12,14 @@ void main() {
   });
 
   test('strips alt-screen and application keypad noise', () {
-    final raw = '\x1B[?1049h\x1B=hello\x1B>\x1B[?1049l';
+    const raw = '\x1B[?1049h\x1B=hello\x1B>\x1B[?1049l';
     final plain = stripAnsi(raw);
     expect(plain.contains('1049'), isFalse);
     expect(plain.contains('hello'), isTrue);
   });
 
   test('AnsiPainter does not leak private mode text', () {
-    final raw = '\x1B[?2004hroot@iZ4b7992okxrztZ:~# ';
+    const raw = '\x1B[?2004hroot@iZ4b7992okxrztZ:~# ';
     final span = AnsiPainter().build(raw);
     final buf = StringBuffer();
     void walk(InlineSpan s) {
