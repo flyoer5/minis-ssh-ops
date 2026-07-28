@@ -5,7 +5,6 @@ import 'package:ssh_ai_agent/util/time_fmt.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
-import 'package:ssh_ai_agent/models/agent_session.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:ssh_ai_agent/widgets/ime_inset.dart';
@@ -1091,6 +1090,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                       ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                        // ignore: deprecated_member_use
                         cacheExtent: 480,
                         physics: const ClampingScrollPhysics(),
                         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,

@@ -81,7 +81,7 @@ class AnsiPainter {
       var color = fg ?? defaultFg;
       if (dim) {
         // Portable dim without Color.red/green/blue (deprecated / channel scale differs).
-        final v = color.value;
+        final v = color.toARGB32();
         final a = (v >> 24) & 0xff;
         final r = (v >> 16) & 0xff;
         final g = (v >> 8) & 0xff;

@@ -851,6 +851,7 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
                             itemCount: pane.entries.length,
                             // Fixed row height for smoother scroll on large dirs.
                             itemExtent: 48,
+                            // ignore: deprecated_member_use
                             cacheExtent: 400,
                             itemBuilder: (_, i) {
                               final e = pane.entries[i] as Map;
@@ -973,7 +974,10 @@ class _FilesPageState extends State<FilesPage> with AutomaticKeepAliveClientMixi
     // Rebuild chips/star when this host's favorites change.
     context.select((AppState s) {
       final hid = s.selectedHostId;
-      return Object.hash(hid, s.pathFavoritesFor(hid).join('\0'));
+      return Object.hash(
+        hid,
+        s.pathFavoritesFor(hid).join(String.fromCharCode(0)),
+      );
     });
     final state = context.read<AppState>();
     if (selectedId != null && selectedId != hostId && backendOk) {

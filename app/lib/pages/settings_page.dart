@@ -465,6 +465,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     }
   }
 
+  @override
   Widget build(BuildContext context) {
     super.build(context);
     // Avoid full rebuild on Agent stream: select fields that settings UI shows.
@@ -659,7 +660,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                             ),
                           )
                         : DropdownButtonFormField<String>(
-                            value: _modelIds.contains(llmModel.text) ? llmModel.text : null,
+                            initialValue: _modelIds.contains(llmModel.text) ? llmModel.text : null,
                             isExpanded: true,
                             decoration: const InputDecoration(labelText: '模型', isDense: true),
                             items: [
@@ -689,7 +690,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
                   child: Text('共 ${_modelIds.length} 个模型', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
                 ),
               DropdownButtonFormField<String>(
-                value: const ['none', 'auto', 'low', 'medium', 'high', 'xhigh'].contains(thinkingLevel)
+                initialValue: const ['none', 'auto', 'low', 'medium', 'high', 'xhigh'].contains(thinkingLevel)
                     ? thinkingLevel
                     : 'auto',
                 decoration: const InputDecoration(
