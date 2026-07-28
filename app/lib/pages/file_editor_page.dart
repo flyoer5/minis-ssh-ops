@@ -419,7 +419,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
       canPop: !dirty,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        if (await _confirmLeave() && mounted) Navigator.of(context).pop();
+        if (await _confirmLeave() && context.mounted) Navigator.of(context).pop();
       },
       child: Shortcuts(
         shortcuts: const <ShortcutActivator, Intent>{
@@ -454,7 +454,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, size: 20),
             onPressed: () async {
-              if (await _confirmLeave() && mounted) Navigator.of(context).pop();
+              if (await _confirmLeave() && context.mounted) Navigator.of(context).pop();
             },
           ),
           titleSpacing: 0,
@@ -540,7 +540,7 @@ class _FileEditorPageState extends State<FileEditorPage> {
                     break;
                   case 'copy':
                     await Clipboard.setData(ClipboardData(text: _ctrl.text));
-                    if (mounted) {
+                    if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('已复制全文'), duration: Duration(seconds: 1)),
                       );

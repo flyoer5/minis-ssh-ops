@@ -430,6 +430,7 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
         }
       }
     }
+    if (!context.mounted) return;
 
     final msg = shared
         ? '已打开系统分享（${list.length} 条），并复制到剪贴板'
