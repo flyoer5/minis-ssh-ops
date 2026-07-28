@@ -345,7 +345,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
                                         child: child,
                                       );
                                     },
-                                    onReorder: (oldIndex, newIndex) {
+                                    onReorderItem: (oldIndex, newIndex) {
                                       // When filtering is off, list mirrors state.hosts order.
                                       state.reorderHosts(oldIndex, newIndex);
                                     },
