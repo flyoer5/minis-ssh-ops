@@ -180,7 +180,7 @@ class AppState extends ChangeNotifier
     // minimal: ensure LLM configured and do a 1-token style agent chat requires host
     final id = selectedHostId;
     if (id == null) throw StateError('先选主机再测模型');
-    final res = await api.agentChat(hostId: id, message: '只回复ok两个字母', sessionId: 'ping-' + DateTime.now().millisecondsSinceEpoch.toString());
+    final res = await api.agentChat(hostId: id, message: '只回复ok两个字母', sessionId: 'ping-${DateTime.now().millisecondsSinceEpoch}');
     return res.toString().length > 20 ? '模型可达' : res.toString();
   }
 
