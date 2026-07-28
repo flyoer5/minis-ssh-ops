@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ssh_ai_agent/api/backend_url.dart';
 import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
 import 'package:ssh_ai_agent/models/probe_summary.dart';
@@ -160,10 +161,11 @@ class AppState extends ChangeNotifier with UiPrefs, AgentChatController {
   }
 
   Future<void> saveConnection({required String baseUrl, required String token}) async {
+    final validatedBaseUrl = validateBackendBaseUrl(baseUrl).toString();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('baseUrl', baseUrl);
+    await prefs.setString('baseUrl', validatedBaseUrl);
     await prefs.setString('localToken', token);
-    api.baseUrl = baseUrl;
+    api.baseUrl = validatedBaseUrl;
     api.localToken = token;
     await refreshHealth();
     if (backendOk) {
