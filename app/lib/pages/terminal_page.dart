@@ -627,7 +627,7 @@ class _TerminalPageState extends State<TerminalPage>
                           case 'copy_plain':
                             final plain = stripAnsi(_buf.toString());
                             await Clipboard.setData(ClipboardData(text: plain));
-                            if (mounted) {
+                            if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('已复制纯文本'), duration: Duration(seconds: 1)),
                               );
@@ -635,7 +635,7 @@ class _TerminalPageState extends State<TerminalPage>
                             break;
                           case 'copy_raw':
                             await Clipboard.setData(ClipboardData(text: _buf.toString()));
-                            if (mounted) {
+                            if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('已复制原始输出'), duration: Duration(seconds: 1)),
                               );

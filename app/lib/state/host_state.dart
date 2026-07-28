@@ -65,12 +65,10 @@ mixin HostState on ChangeNotifier {
   /// Persist user drag order (ids in display order).
   Future<void> reorderHosts(int oldIndex, int newIndex) async {
     if (oldIndex < 0 || oldIndex >= hosts.length) return;
-    var ni = newIndex;
-    if (ni > oldIndex) ni -= 1;
-    if (ni < 0 || ni >= hosts.length) return;
+    if (newIndex < 0 || newIndex >= hosts.length) return;
     final list = List<dynamic>.from(hosts);
     final item = list.removeAt(oldIndex);
-    list.insert(ni, item);
+    list.insert(newIndex, item);
     hosts = list;
     notifyListeners();
     final ids = <String>[

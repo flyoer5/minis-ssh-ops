@@ -925,7 +925,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                   state.setAgentSessionMeta(sid, '新会话');
                 }
               } catch (_) {}
-              if (mounted) {
+              if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('已开新会话'), duration: Duration(seconds: 1)),
                 );
