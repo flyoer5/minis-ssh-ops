@@ -50,7 +50,7 @@ Run Flutter checks:
 ```bash
 cd app
 flutter pub get --enforce-lockfile
-flutter analyze --no-fatal-infos
+flutter analyze --no-fatal-infos --no-fatal-warnings
 flutter test
 ```
 

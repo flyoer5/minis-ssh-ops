@@ -1,5 +1,5 @@
 name: ssh_ai_agent
-description: 机枢 — SSH 运维 Agent
+description: 机枢 - SSH 运维 Agent
 publish_to: "none"
 version: 1.5.38+122
 
