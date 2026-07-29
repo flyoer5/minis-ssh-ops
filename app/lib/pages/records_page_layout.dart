@@ -1,4 +1,4 @@
-﻿part of 'records_page.dart';
+part of 'records_page.dart';
 
 extension RecordsPageLayout on _RecordsPageState {
   Widget _buildFilters(BuildContext context, AppState state, double fs, List<Map> list, Set<String> hostIds) {
@@ -229,9 +229,7 @@ extension RecordsPageLayout on _RecordsPageState {
     );
   }
 
-  @override
   Widget build(BuildContext context) {
-    super.build(context);
     context.select((AppState s) => s.audit.length);
     context.select((AppState s) => s.hosts.length);
     final fs = context.select((AppState s) => s.recordsFontSize);

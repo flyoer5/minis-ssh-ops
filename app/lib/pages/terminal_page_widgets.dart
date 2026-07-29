@@ -97,7 +97,7 @@ extension _TerminalPageWidgets on _TerminalPageState {
               icon: Icon(
                 _focus.hasFocus ? Icons.keyboard_hide : Icons.keyboard,
                 size: 18,
-                color: _focus.hasFocus ? _green : AppColors.textMuted,
+                color: _focus.hasFocus ? _TerminalPageState._green : AppColors.textMuted,
               ),
               onPressed: _toggleKb,
             ),
@@ -293,7 +293,7 @@ extension _TerminalPageWidgets on _TerminalPageState {
                 behavior: HitTestBehavior.opaque,
                 onTap: _openKb,
                 child: Container(
-                  color: _bg,
+                  color: _TerminalPageState._bg,
                   padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
                   child: SingleChildScrollView(
                     controller: _scroll,
