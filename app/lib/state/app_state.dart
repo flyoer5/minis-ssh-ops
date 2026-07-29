@@ -10,6 +10,7 @@ import 'package:ssh_ai_agent/state/host_state.dart';
 import 'package:ssh_ai_agent/state/probe_state.dart';
 import 'package:ssh_ai_agent/state/ui_prefs.dart';
 
+export 'package:ssh_ai_agent/state/ui_prefs.dart';
 export 'package:ssh_ai_agent/state/agent_chat_controller.dart';
 export 'package:ssh_ai_agent/models/agent_session.dart';
 export 'package:ssh_ai_agent/models/probe_summary.dart';
@@ -65,23 +66,23 @@ class AppState extends ChangeNotifier
             // Persist off critical path.
             unawaited(prefs.setString('baseUrl', api.baseUrl));
             unawaited(prefs.setString('localToken', api.localToken));
-            backendNote = info['alreadyRunning'] == true ? '鏈満 Go 宸插湪杩愯' : '宸插惎鍔ㄥ唴缃?Go 鍚庣';
+            backendNote = info['alreadyRunning'] == true ? 'Backend already running' : 'Started bundled backend';
             lastErr = null;
             break;
           }
         } catch (e) {
           lastErr = e;
-          backendNote = '鍚姩鍚庣閲嶈瘯 ${i + 1}/2鈥?;
+          backendNote = 'Starting backend retry ${i + 1}/2';
           notifyListeners();
           await Future<void>.delayed(Duration(milliseconds: 120 * (i + 1)));
         }
       }
       if (lastErr != null) {
-        backendError = '鍚姩鍐呯疆鍚庣澶辫触: $lastErr';
+        backendError = '启动内置后端失败: $lastErr';
       }
     }
 
-    // Kotlin ensureStarted already blocks until /v1/health is 200 鈥?one check is enough.
+    // Kotlin ensureStarted already blocks until /v1/health is 200 — one check is enough.
     await refreshHealth();
     if (!backendOk) {
       await Future<void>.delayed(const Duration(milliseconds: 80));
@@ -92,12 +93,12 @@ class AppState extends ChangeNotifier
     bootstrapped = true;
     notifyListeners(); // paint HomeShell immediately
 
-    // Hosts/LLM/battery after first frame 鈥?do not block RootGate.
+    // Hosts/LLM/battery after first frame — do not block RootGate.
     if (backendOk) {
       try {
         await Future.wait<void>([refreshHosts(), refreshLlm()]);
       } catch (e) {
-        backendError = '鍔犺浇鏁版嵁澶辫触: $e';
+        backendError = '加载数据失败: $e';
         notifyListeners();
       }
     }
@@ -180,9 +181,9 @@ class AppState extends ChangeNotifier
   Future<String> testLlmReachable() async {
     // minimal: ensure LLM configured and do a 1-token style agent chat requires host
     final id = selectedHostId;
-    if (id == null) throw StateError('鍏堥€変富鏈哄啀娴嬫ā鍨?);
-    final res = await api.agentChat(hostId: id, message: '鍙洖澶峯k涓や釜瀛楁瘝', sessionId: 'ping-${DateTime.now().millisecondsSinceEpoch}');
-    return res.toString().length > 20 ? '妯″瀷鍙揪' : res.toString();
+    if (id == null) throw StateError('Select a host first');
+    final res = await api.agentChat(hostId: id, message: '只回复ok两个字母', sessionId: 'ping-${DateTime.now().millisecondsSinceEpoch}');
+    return res.toString().length > 20 ? '模型可达' : res.toString();
   }
 
 
@@ -259,7 +260,7 @@ class AppState extends ChangeNotifier
     }
     await refreshHosts();
     await refreshLlm();
-    return '瀵煎叆涓绘満 +$added';
+    return '导入主机 +$added';
   }
 
   Future<List<String>> fetchModels() async {

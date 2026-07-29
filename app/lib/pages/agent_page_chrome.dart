@@ -1,7 +1,7 @@
 part of 'agent_page.dart';
 
 extension _AgentPageChrome on _AgentPageState {
-  Widget _buildAppBar(BuildContext context, AppState state) {
+  PreferredSizeWidget _buildAppBar(BuildContext context, AppState state) {
     return AppBar(
       toolbarHeight: 44,
       leading: NavMenuButton.leadingOf(context),
