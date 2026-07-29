@@ -5,14 +5,14 @@ extension _SettingsPageBehaviorSection on _SettingsPageState {
     return _section(
       icon: Icons.rule_folder_outlined,
       accent: AppColors.warning,
-      title: 'Behavior',
-      subtitle: 'Agent interaction settings',
+      title: '交互行为',
+      subtitle: 'Agent 对话与操作偏好',
       children: [
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text('Confirm writes', style: TextStyle(fontSize: 13.5)),
-          subtitle: const Text('Require confirmation for destructive commands', style: TextStyle(fontSize: 11.5)),
+          title: const Text('写入操作需确认', style: TextStyle(fontSize: 13.5)),
+          subtitle: const Text('执行破坏性命令前要求手动确认', style: TextStyle(fontSize: 11.5)),
           value: state.confirmWrites,
           onChanged: (v) => state.setConfirmWrites(v),
         ),
@@ -20,7 +20,7 @@ extension _SettingsPageBehaviorSection on _SettingsPageState {
         Row(
           children: [
             const Expanded(
-              child: Text('Max rounds', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+              child: Text('最大执行轮数', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -63,7 +63,7 @@ extension _SettingsPageBehaviorSection on _SettingsPageState {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Lower values keep the loop shorter.',
+          '数值越小，单次任务的执行链路越短。',
           style: TextStyle(fontSize: 11, color: AppColors.textFaint),
         ),
         const SizedBox(height: 6),
@@ -75,7 +75,7 @@ extension _SettingsPageBehaviorSection on _SettingsPageState {
             Text(
               (() {
                 final x = _draftTemp ?? state.agentTemperature;
-                return x == 0 ? 'default' : x.toStringAsFixed(1);
+                return x == 0 ? '默认' : x.toStringAsFixed(1);
               })(),
               style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: AppColors.chipBlue, fontWeight: FontWeight.w700),
             ),
@@ -88,7 +88,7 @@ extension _SettingsPageBehaviorSection on _SettingsPageState {
           divisions: 20,
           label: (() {
             final x = _draftTemp ?? state.agentTemperature;
-            return x == 0 ? 'default' : x.toStringAsFixed(1);
+            return x == 0 ? '默认' : x.toStringAsFixed(1);
           })(),
           onChanged: (v) => setState(() => _draftTemp = v),
           onChangeEnd: (v) {
@@ -96,14 +96,14 @@ extension _SettingsPageBehaviorSection on _SettingsPageState {
             setState(() => _draftTemp = null);
           },
         ),
-        const Text('0 uses the provider default.', style: TextStyle(fontSize: 11, color: AppColors.textFaint)),
+        const Text('设为 0 时使用模型服务商的默认值。', style: TextStyle(fontSize: 11, color: AppColors.textFaint)),
         const SizedBox(height: 8),
-        const Text('Custom prompt', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+        const Text('自定义提示词', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         TextField(
           controller: customPrompt,
           decoration: const InputDecoration(
-            hintText: 'Optional prompt prefix for the agent',
+            hintText: '可选：添加到 Agent 提示词前的内容',
             isDense: true,
             contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             border: OutlineInputBorder(),
@@ -118,48 +118,48 @@ extension _SettingsPageBehaviorSection on _SettingsPageState {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text('Show reasoning', style: TextStyle(fontSize: 13.5)),
-          subtitle: const Text('Display reasoning when available', style: TextStyle(fontSize: 11.5)),
+          title: const Text('显示思考过程', style: TextStyle(fontSize: 13.5)),
+          subtitle: const Text('模型返回推理内容时一并显示', style: TextStyle(fontSize: 11.5)),
           value: state.agentShowReasoning,
           onChanged: (v) => state.setAgentShowReasoning(v),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text('Collapse tools', style: TextStyle(fontSize: 13.5)),
-          subtitle: const Text('Compact completed tool results', style: TextStyle(fontSize: 11.5)),
+          title: const Text('折叠工具结果', style: TextStyle(fontSize: 13.5)),
+          subtitle: const Text('完成后以紧凑形式显示工具调用结果', style: TextStyle(fontSize: 11.5)),
           value: state.agentCollapseTools,
           onChanged: (v) => state.setAgentCollapseTools(v),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text('Auto scroll', style: TextStyle(fontSize: 13.5)),
-          subtitle: const Text('Follow the conversation while streaming', style: TextStyle(fontSize: 11.5)),
+          title: const Text('自动滚动', style: TextStyle(fontSize: 13.5)),
+          subtitle: const Text('流式回复时自动跟随最新内容', style: TextStyle(fontSize: 11.5)),
           value: state.agentAutoScroll,
           onChanged: (v) => state.setAgentAutoScroll(v),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text('Enter to send', style: TextStyle(fontSize: 13.5)),
-          subtitle: const Text('Press Enter to submit a message', style: TextStyle(fontSize: 11.5)),
+          title: const Text('回车发送', style: TextStyle(fontSize: 13.5)),
+          subtitle: const Text('按下回车键直接发送消息', style: TextStyle(fontSize: 11.5)),
           value: state.agentEnterToSend,
           onChanged: (v) => state.setAgentEnterToSend(v),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text('Keep keyboard open', style: TextStyle(fontSize: 13.5)),
-          subtitle: const Text('Do not hide the keyboard after send', style: TextStyle(fontSize: 11.5)),
+          title: const Text('发送后保留键盘', style: TextStyle(fontSize: 13.5)),
+          subtitle: const Text('发送消息后不自动收起键盘', style: TextStyle(fontSize: 11.5)),
           value: state.agentKeepKeyboard,
           onChanged: (v) => state.setAgentKeepKeyboard(v),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text('Haptic feedback', style: TextStyle(fontSize: 13.5)),
-          subtitle: const Text('Subtle vibration on actions', style: TextStyle(fontSize: 11.5)),
+          title: const Text('触感反馈', style: TextStyle(fontSize: 13.5)),
+          subtitle: const Text('执行操作时提供轻微振动反馈', style: TextStyle(fontSize: 11.5)),
           value: state.hapticFeedback,
           onChanged: (v) => state.setHapticFeedback(v),
         ),

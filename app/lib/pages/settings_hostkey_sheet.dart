@@ -164,7 +164,7 @@ extension _SettingsHostKeySheet on _SettingsPageState {
         },
       );
     } catch (e) {
-      _toast('$e');
+      _toast('读取可信主机记录失败：${cleanError(e)}');
     }
   }
 }

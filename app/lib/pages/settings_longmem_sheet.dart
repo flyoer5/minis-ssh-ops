@@ -157,7 +157,7 @@ extension _SettingsLongMemSheet on _SettingsPageState {
         },
       );
     } catch (e) {
-      _toast('$e');
+      _toast('读取长期记忆失败：${cleanError(e)}');
     }
   }
 }
