@@ -66,7 +66,7 @@ extension _SettingsPageConnectivitySection on _SettingsPageState {
         if (state.selectedHostId == null)
           const Padding(
             padding: EdgeInsets.only(top: 6),
-            child: Text('Select a host first.', style: TextStyle(fontSize: 11, color: AppColors.warning)),
+            child: Text('请先选择主机。', style: TextStyle(fontSize: 11, color: AppColors.warning)),
           ),
         if (pingMsg != null) ...[
           const SizedBox(height: 8),

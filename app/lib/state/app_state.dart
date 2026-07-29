@@ -181,7 +181,7 @@ class AppState extends ChangeNotifier
   Future<String> testLlmReachable() async {
     // minimal: ensure LLM configured and do a 1-token style agent chat requires host
     final id = selectedHostId;
-    if (id == null) throw StateError('Select a host first');
+    if (id == null) throw StateError('请先选择主机');
     final res = await api.agentChat(hostId: id, message: '只回复ok两个字母', sessionId: 'ping-${DateTime.now().millisecondsSinceEpoch}');
     return res.toString().length > 20 ? '模型可达' : res.toString();
   }

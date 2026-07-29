@@ -71,10 +71,10 @@ extension _FilesPageLayout on _FilesPageState {
             children: [
               const Icon(Icons.folder_open, size: 40, color: AppColors.textFaint),
               const SizedBox(height: 12),
-              const Text('Select a host first', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+              const Text('请先选择主机', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
               const SizedBox(height: 6),
               const Text(
-                'Dual-pane SFTP browsing, editing, upload, and download require a bound host.',
+                '选择主机后，可浏览和编辑远程文件，并进行上传、下载和双栏操作。',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12.5, color: AppColors.textFaint, height: 1.4),
               ),
@@ -96,18 +96,18 @@ extension _FilesPageLayout on _FilesPageState {
       return [
             IconButton(
               visualDensity: VisualDensity.compact,
-              tooltip: 'Copy to other pane',
+              tooltip: '复制到另一栏',
               onPressed: active.selected.isEmpty ? null : () => _copyToOther(),
               icon: const Icon(Icons.copy_all, size: 20),
             ),
             IconButton(
               visualDensity: VisualDensity.compact,
-              tooltip: 'Move to other pane',
+              tooltip: '移动到另一栏',
               onPressed: active.selected.isEmpty ? null : _moveToOther,
               icon: const Icon(Icons.drive_file_move_outline, size: 20),
             ),
             PopupMenuButton<String>(
-              tooltip: 'More',
+              tooltip: '更多',
               padding: EdgeInsets.zero,
               icon: const Icon(Icons.more_vert, size: 20),
               color: AppColors.darkBar,
@@ -152,12 +152,12 @@ extension _FilesPageLayout on _FilesPageState {
                 PopupMenuItem(
                   value: 'all',
                   enabled: active.entries.isNotEmpty,
-                  child: Text('Select all (${active.entries.length})'),
+                  child: Text('全选（${active.entries.length} 项）'),
                 ),
                 PopupMenuItem(
                   value: 'invert',
                   enabled: active.entries.isNotEmpty,
-                  child: const Text('Invert selection'),
+                  child: const Text('反选'),
                 ),
                 PopupMenuItem(
                   value: 'delete',
@@ -171,7 +171,7 @@ extension _FilesPageLayout on _FilesPageState {
     }
     return [
             IconButton(
-              tooltip: 'New',
+              tooltip: '新建',
               onPressed: () async {
                 final a = await showModalBottomSheet<String>(
                   context: context,
@@ -182,12 +182,12 @@ extension _FilesPageLayout on _FilesPageState {
                       children: [
                         ListTile(
                           leading: const Icon(Icons.create_new_folder_outlined),
-                          title: const Text('Create folder'),
+                          title: const Text('新建文件夹'),
                           onTap: () => Navigator.pop(c, 'dir'),
                         ),
                         ListTile(
                           leading: const Icon(Icons.note_add_outlined),
-                          title: const Text('Create file'),
+                          title: const Text('新建文件'),
                           onTap: () => Navigator.pop(c, 'file'),
                         ),
                       ],
@@ -200,12 +200,12 @@ extension _FilesPageLayout on _FilesPageState {
               icon: const Icon(Icons.add, size: 22),
             ),
             IconButton(
-              tooltip: 'Select mode',
+              tooltip: '多选',
               onPressed: () => setState(() => active.selecting = true),
               icon: const Icon(Icons.checklist, size: 20),
             ),
             IconButton(
-              tooltip: dualPane ? 'Single pane' : 'Dual pane',
+              tooltip: dualPane ? '切换为单栏' : '切换为双栏',
               onPressed: () => setState(() => dualPane = !dualPane),
               icon: Icon(dualPane ? Icons.view_agenda_outlined : Icons.view_column_outlined, size: 20),
             ),
@@ -215,7 +215,7 @@ extension _FilesPageLayout on _FilesPageState {
               icon: const Icon(Icons.refresh, size: 20),
             ),
             PopupMenuButton<String>(
-              tooltip: 'More',
+              tooltip: '更多',
               icon: const Icon(Icons.more_vert, size: 20),
               color: AppColors.darkBar,
               onSelected: (v) {
@@ -237,11 +237,11 @@ extension _FilesPageLayout on _FilesPageState {
               itemBuilder: (_) => [
                 PopupMenuItem(
                   value: 'sort',
-                  child: Text('Sort by ${sortBy == 'name' ? 'name' : sortBy == 'size' ? 'size' : 'time'}${sortAsc ? ' ↑' : ' ↓'}'),
+                  child: Text('排序：${sortBy == 'name' ? '名称' : sortBy == 'size' ? '大小' : '修改时间'}（${sortAsc ? '升序' : '降序'}）'),
                 ),
-                if (dualPane) const PopupMenuItem(value: 'focus', child: Text('Switch focus')),
-                if (dualPane) const PopupMenuItem(value: 'swap', child: Text('Swap panes')),
-                const PopupMenuItem(value: 'root', child: Text('Go to /')),
+                if (dualPane) const PopupMenuItem(value: 'focus', child: Text('切换当前栏')),
+                if (dualPane) const PopupMenuItem(value: 'swap', child: Text('交换左右栏')),
+                const PopupMenuItem(value: 'root', child: Text('返回根目录 /')),
               ],
             ),
     ];
@@ -306,7 +306,7 @@ extension _FilesPageLayout on _FilesPageState {
           : null,
       title: Text(
         active.selecting
-            ? 'Selected ${active.selected.length}'
+            ? '已选 ${active.selected.length} 项'
             : (dualPane ? '文件 - ${focus == 0 ? "左栏" : "右栏"}' : '文件'),
         style: TextStyle(fontSize: fs + 1, fontWeight: FontWeight.w600),
       ),

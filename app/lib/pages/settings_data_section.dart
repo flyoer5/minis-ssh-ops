@@ -37,7 +37,7 @@ extension _SettingsPageDataSection on _SettingsPageState {
                                 },
                                 child: const Text('Copy'),
                               ),
-                              TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close')),
+                              TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
                             ],
                           ),
                         );
@@ -107,7 +107,7 @@ extension _SettingsPageDataSection on _SettingsPageState {
                         },
                         child: const Text('Copy'),
                       ),
-                      TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close')),
+                      TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
                     ],
                   ),
                 );

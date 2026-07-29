@@ -22,9 +22,9 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                 child: Row(children: [
-                  const Expanded(child: Text('Sessions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
+                  const Expanded(child: Text('历史会话', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
                   IconButton(onPressed: () => setSheetState(() => sessionsFuture = load()), icon: const Icon(Icons.refresh), tooltip: '刷新'),
-                  IconButton(onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close), tooltip: 'Close'),
+                  IconButton(onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close), tooltip: '关闭'),
                 ]),
               ),
               Expanded(
@@ -39,7 +39,7 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
                     }
                     final sessions = snapshot.data ?? const <AgentSession>[];
                     if (sessions.isEmpty) {
-                      return const Center(child: Text('No sessions yet', style: TextStyle(color: AppColors.textMuted)));
+                      return const Center(child: Text('暂无历史会话', style: TextStyle(color: AppColors.textMuted)));
                     }
                     return ListView.separated(
                         itemCount: sessions.length,
@@ -48,7 +48,7 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
                           final session = sessions[index];
                           return ListTile(
                             leading: const Icon(Icons.chat_bubble_outline),
-                            title: Text(session.title.isEmpty ? 'Untitled session' : session.title),
+                            title: Text(session.title.isEmpty ? '未命名会话' : session.title),
                             subtitle: Text(session.hostId ?? '未关联主机'),
                             onTap: () async {
                               Navigator.pop(sheetContext);
@@ -56,7 +56,7 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
                             },
                             trailing: IconButton(
                               icon: const Icon(Icons.delete_outline),
-                              tooltip: 'Delete session',
+                              tooltip: '删除会话',
                               onPressed: () async {
                                 state.deleteAgentSession(session.id);
                                 setSheetState(() => sessionsFuture = load());
@@ -125,7 +125,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                     ],
                   ),
                   Text(
-                    'Only affects the current session: ${state.agentSessionTitle}. Leave blank to use global settings.',
+                    '仅影响当前会话“${state.agentSessionTitle}”，留空则使用全局设置。',
                     style: const TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.35),
                   ),
                   const SizedBox(height: 12),
@@ -152,7 +152,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                       Text(
                         temp == null
                             ? (state.agentTemperature == 0 ? '全局 默认' : '全局 ${state.agentTemperature.toStringAsFixed(1)}')
-                            : (temp == 0 ? 'Default' : temp!.toStringAsFixed(1)),
+                            : (temp == 0 ? '默认' : temp!.toStringAsFixed(1)),
                         style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
                       ),
                     ],
@@ -194,7 +194,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                     maxLines: 3,
                     minLines: 1,
                     decoration: const InputDecoration(
-                      hintText: 'Appended to the global custom prompt',
+                      hintText: '追加到全局自定义提示词之后',
                       isDense: true,
                       border: OutlineInputBorder(),
                     ),
@@ -302,10 +302,10 @@ Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) a
                             context: context,
                             builder: (d) => AlertDialog(
                               title: const Text('清除本会话记忆？'),
-                              content: const Text('This clears the summary and facts, but keeps the chat history.'),
+                              content: const Text('将清除会话摘要和事实记忆，但保留聊天记录。'),
                               actions: [
                                 TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('取消')),
-                                FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Delete')),
+                                FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('清除')),
                               ],
                             ),
                           );
@@ -322,7 +322,7 @@ Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) a
               ],
             ),
             Text(
-              'Current session: ${state.agentSessionTitle}',
+              '当前会话：${state.agentSessionTitle}',
               style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
             ),
             const SizedBox(height: 12),
@@ -331,7 +331,7 @@ Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) a
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: Text(
-                    'No summary or facts yet\nThey will populate after the conversation gets long enough',
+                    '暂无摘要或事实记忆\n会话内容较多后将自动生成',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppColors.textFaint, height: 1.4),
                   ),

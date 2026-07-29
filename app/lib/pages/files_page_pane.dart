@@ -20,16 +20,16 @@ extension _FilesPagePaneHelpers on _FilesPageState {
           trailing: pane.selecting
               ? Icon(selected ? Icons.check_circle : Icons.radio_button_unchecked, color: selected ? AppColors.cyan : AppColors.textFaint)
               : PopupMenuButton<String>(
-                  tooltip: 'More',
+                  tooltip: '更多',
                   onSelected: (action) {
                     if (action == 'rename') _rename(path, name);
                     if (action == 'delete') _deletePaths([path], ask: true);
                     if (action == 'copy') _copyToOther(singlePath: path);
                   },
                   itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'rename', child: Text('Rename')),
-                    PopupMenuItem(value: 'copy', child: Text('Copy to other pane')),
-                    PopupMenuItem(value: 'delete', child: Text('Delete')),
+                    PopupMenuItem(value: 'rename', child: Text('重命名')),
+                    PopupMenuItem(value: 'copy', child: Text('复制到另一栏')),
+                    PopupMenuItem(value: 'delete', child: Text('删除')),
                   ],
                 ),
           onTap: () {
@@ -83,7 +83,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                       child: Row(
                         children: [
                           Text(
-                            idx == 0 ? 'Left' : 'Right',
+                            idx == 0 ? '左栏' : '右栏',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
@@ -126,7 +126,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                            tooltip: 'Favorite path',
+                            tooltip: '收藏当前路径',
                             icon: Builder(
                               builder: (ctx) {
                                 final s = ctx.watch<AppState>();
@@ -156,7 +156,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                            tooltip: 'Up',
+                            tooltip: '返回上级目录',
                             icon: const Icon(Icons.arrow_upward, size: 18),
                             onPressed: () {
                               setState(() => focus = idx);
@@ -234,7 +234,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                               children: [
                                 const Icon(Icons.folder_open, size: 36, color: Colors.white24),
                                 const SizedBox(height: 8),
-                                const Text('This folder is empty.', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                                const Text('此文件夹为空', style: TextStyle(color: Colors.white38, fontSize: 13)),
                                 const SizedBox(height: 4),
                                 Text(
                                   pane.path.isEmpty ? '/' : pane.path,

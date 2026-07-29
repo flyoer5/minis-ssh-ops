@@ -58,7 +58,7 @@ extension AgentChatControllerTurns on AgentChatController {
   Future<void> agentChat(String userText) async {
     final id = selectedHostId;
     if (id == null) {
-      _pushMsg(ChatMessage(role: 'assistant', content: 'Select a host first', kind: ChatKind.error));
+      _pushMsg(ChatMessage(role: 'assistant', content: '请先选择主机', kind: ChatKind.error));
       return;
     }
     if (agentBusy) {

@@ -7,7 +7,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
     if (id == null) return;
     setState(() {
       _transferring = true;
-      _transferLabel = 'Downloading $name...';
+      _transferLabel = '正在下载 $name...';
       _transferProgress = null;
     });
     try {
@@ -17,7 +17,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
       final size = r['size'] ?? 0;
       if (mounted) {
         setState(() {
-          _transferLabel = 'Downloaded - ${_fmtSize(size)}';
+          _transferLabel = '下载完成 · ${_fmtSize(size)}';
           _transferProgress = 0.7;
         });
       }
@@ -33,7 +33,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
       if (mounted) {
         String msg = cleanError(e);
         if (msg.toLowerCase().contains('too large') || msg.contains('file too large')) {
-          msg = 'File too large for download; use scp/rsync instead.';
+          msg = '文件过大，建议使用 scp 或 rsync 下载。';
         }
         showSnack(context, msg);
       }
@@ -56,10 +56,11 @@ extension _FilesPageTransferHelpers on _FilesPageState {
       final ok = await showDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
-          title: Text('Delete ${paths.length} item(s)?'),
+          title: Text('删除 ${paths.length} 项？'),
+          content: const Text('删除后无法在应用内恢复，请确认所选文件或文件夹不再需要。'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('删除')),
           ],
         ),
       );
@@ -81,7 +82,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
     if (id == null) return;
     final srcs = singlePath != null ? {singlePath} : Set<String>.from(active.selected);
     if (srcs.isEmpty) {
-      showSnack(context, 'Select at least one item first.');
+      showSnack(context, '请至少选择一项。');
       return;
     }
     final destDir = inactive.path.isEmpty ? '/' : inactive.path;
@@ -92,7 +93,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
     var dirs = 0;
     setState(() {
       _transferring = true;
-      _transferLabel = 'Copying 0/${items.length}...';
+      _transferLabel = '正在复制 0/${items.length}...';
       _transferProgress = 0;
     });
     for (var i = 0; i < items.length; i++) {
@@ -101,7 +102,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
       final dest = destDir.endsWith('/') ? '$destDir$name' : '$destDir/$name';
       if (mounted) {
         setState(() {
-          _transferLabel = 'Copying ${i + 1}/${items.length} - $name';
+          _transferLabel = '正在复制 ${i + 1}/${items.length} · $name';
           _transferProgress = i / items.length;
         });
       }
@@ -123,7 +124,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
     }
     await _load(inactive);
     if (mounted) {
-      final detail = files + dirs > 0 ? '(${files} files${dirs > 0 ? ', $dirs dirs' : ''})' : '';
+      final detail = files + dirs > 0 ? '（$files 个文件${dirs > 0 ? '，$dirs 个文件夹' : ''}）' : '';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(failN == 0 ? '已复制 $okN 项$detail' : '复制完成：成功 $okN 项，失败 $failN 项$detail'),
       ));
@@ -136,7 +137,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
     if (id == null) return;
     final srcs = Set<String>.from(active.selected);
     if (srcs.isEmpty) {
-      showSnack(context, 'Select at least one item first.');
+      showSnack(context, '请至少选择一项。');
       return;
     }
     final destDir = inactive.path.isEmpty ? '/' : inactive.path;
@@ -145,7 +146,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
     var failN = 0;
     setState(() {
       _transferring = true;
-      _transferLabel = 'Moving 0/${items.length}...';
+      _transferLabel = '正在移动 0/${items.length}...';
       _transferProgress = 0;
     });
     for (var i = 0; i < items.length; i++) {
@@ -154,7 +155,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
       final dest = destDir.endsWith('/') ? '$destDir$name' : '$destDir/$name';
       if (mounted) {
         setState(() {
-          _transferLabel = 'Moving ${i + 1}/${items.length} - $name';
+          _transferLabel = '正在移动 ${i + 1}/${items.length} · $name';
           _transferProgress = i / items.length;
         });
       }
@@ -178,7 +179,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
     await _load(inactive);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(failN == 0 ? 'Moved $okN item(s)' : 'Moved $okN item(s), failed $failN'),
+        content: Text(failN == 0 ? '已移动 $okN 项' : '移动完成：成功 $okN 项，失败 $failN 项'),
       ));
     }
   }
@@ -198,7 +199,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
             if (!isDir)
               ListTile(
                 leading: const Icon(Icons.edit_note),
-                title: const Text('Open / edit'),
+                title: const Text('打开或编辑'),
                 onTap: () {
                   Navigator.pop(c);
                   _openFile(p);
@@ -207,7 +208,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
             if (isDir)
               ListTile(
                 leading: const Icon(Icons.folder_open),
-                title: const Text('Open folder'),
+                title: const Text('打开文件夹'),
                 onTap: () {
                   Navigator.pop(c);
                   _go(active, p);
@@ -215,7 +216,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
               ),
             ListTile(
               leading: const Icon(Icons.drive_file_rename_outline),
-              title: const Text('Rename'),
+              title: const Text('重命名'),
               onTap: () {
                 Navigator.pop(c);
                 _rename(p, name);
@@ -224,7 +225,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
             if (!isDir)
               ListTile(
                 leading: const Icon(Icons.download),
-                title: const Text('Download'),
+                title: const Text('下载'),
                 onTap: () {
                   Navigator.pop(c);
                   _download(p, name);
@@ -232,7 +233,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
               ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: AppColors.danger),
-              title: const Text('Delete', style: TextStyle(color: AppColors.danger)),
+              title: const Text('删除', style: TextStyle(color: AppColors.danger)),
               onTap: () {
                 Navigator.pop(c);
                 active.selected
