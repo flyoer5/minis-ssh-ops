@@ -81,7 +81,13 @@ class ProbeSummary {
     final cpuRaw = pick('cpu');
 
     final hasErr = [uname, uptime, disk, memory, load].any((s) => s.startsWith('错误:'));
-    final unameAvailable = uname != '-' && uname.trim().isNotEmpty;
+    final unameResult = res['uname'];
+    final unameExitCode = unameResult is Map
+        ? int.tryParse((unameResult['exitCode'] ?? 0).toString())
+        : 0;
+    final unameAvailable = uname != '-' &&
+        uname.trim().isNotEmpty &&
+        unameExitCode == 0;
     final ok = !hasErr && unameAvailable;
 
     String loadHint = firstLine(load);
@@ -261,6 +267,6 @@ class ProbeSummary {
             .where((s) => s.isNotEmpty)
             .join(' | ');
 
-    return ProbeSummary(ok: ok, oneLine: oneLine.isEmpty ? (ok ? sys : '离线') : oneLine, lines: lines, detail: detail.toString());
+    return ProbeSummary(ok: ok, oneLine: oneLine.isEmpty ? (ok ? sys : '\u79bb\u7ebf') : oneLine, lines: lines, detail: detail.toString());
   }
 }
