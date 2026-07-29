@@ -5,8 +5,8 @@ extension _SettingsPageConnectivitySection on _SettingsPageState {
     return _section(
       icon: Icons.network_check,
       accent: AppColors.accentMint,
-      title: 'Connectivity',
-      subtitle: 'Quick backend reachability checks',
+      title: '连接检测',
+      subtitle: '快速检查 SSH 与模型服务连通性',
       children: [
         Wrap(
           spacing: 8,
@@ -23,7 +23,7 @@ extension _SettingsPageConnectivitySection on _SettingsPageState {
                       try {
                         final o = await state.testHostSsh();
                         if (!mounted) return;
-                        setState(() => pingMsg = 'SSH OK: $o');
+                        setState(() => pingMsg = 'SSH 连接正常：$o');
                       } catch (e) {
                         if (!mounted) return;
                         setState(() => pingMsg = 'SSH 检测失败：${cleanError(e)}');
@@ -32,7 +32,7 @@ extension _SettingsPageConnectivitySection on _SettingsPageState {
                       }
                     },
               icon: const Icon(Icons.terminal, size: 16),
-              label: const Text('Test SSH'),
+              label: const Text('检测 SSH'),
             ),
             FilledButton.tonalIcon(
               onPressed: !state.backendOk || state.selectedHostId == null || pinging
@@ -54,7 +54,7 @@ extension _SettingsPageConnectivitySection on _SettingsPageState {
                       }
                     },
               icon: const Icon(Icons.psychology_outlined, size: 16),
-              label: const Text('Test model'),
+              label: const Text('检测模型服务'),
             ),
             if (pinging)
               const Padding(

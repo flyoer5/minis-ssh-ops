@@ -5,8 +5,8 @@ extension _SettingsPageAboutSection on _SettingsPageState {
     return _section(
       icon: Icons.info_outline,
       accent: AppColors.accentSoft,
-      title: 'About',
-      subtitle: 'Build and backend summary',
+      title: '关于',
+      subtitle: '应用版本与后端能力概览',
       children: [
         Row(
           children: [
@@ -16,7 +16,7 @@ extension _SettingsPageAboutSection on _SettingsPageState {
                 children: [
                   Text('minis SSH ops', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                   SizedBox(height: 2),
-                  Text('SSH agent and remote operations', style: TextStyle(fontSize: 11, color: AppColors.textFaint)),
+                  Text('SSH 智能助手与远程运维工具', style: TextStyle(fontSize: 11, color: AppColors.textFaint)),
                 ],
               ),
             ),
@@ -27,7 +27,7 @@ extension _SettingsPageAboutSection on _SettingsPageState {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                state.backendVersion?.isNotEmpty == true ? state.backendVersion! : 'unknown',
+                state.backendVersion?.isNotEmpty == true ? state.backendVersion! : '未知',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.chipBlue),
               ),
             ),
