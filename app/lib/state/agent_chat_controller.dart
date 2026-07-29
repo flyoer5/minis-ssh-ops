@@ -26,7 +26,7 @@ mixin AgentChatController on ChangeNotifier {
   bool _streamNotifyPending = false;
   Map<String, dynamic>? lastPlan;
   String? agentSessionId;
-  String agentSessionTitle = 'New session';
+  String agentSessionTitle = '新会话';
   int? sessionOvMaxRounds;
   double? sessionOvTemperature;
   int? sessionOvConfirm;

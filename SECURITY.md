@@ -42,7 +42,7 @@ CI release signing requires all four repository Secrets:
 - `ANDROID_KEY_PASSWORD`
 - `ANDROID_KEY_ALIAS`
 
-If none are configured, CI skips the release APK and publishes only debug artifacts. A partially configured set fails the build.
+The `Android Release` workflow requires all four secrets and fails before building if any are missing. The regular CI workflow may still skip its optional release APK when no signing secrets are configured.
 
 Any keystore previously committed to public history must be treated as compromised. This repository does not rewrite public history as part of normal maintenance.
 

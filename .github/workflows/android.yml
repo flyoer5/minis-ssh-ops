@@ -9,12 +9,14 @@ on:
       - "backend/**"
       - "scripts/**"
       - ".github/workflows/android.yml"
+      - ".github/workflows/release.yml"
   pull_request:
     paths:
       - "app/**"
       - "backend/**"
       - "scripts/**"
       - ".github/workflows/android.yml"
+      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 permissions:

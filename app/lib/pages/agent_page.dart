@@ -41,7 +41,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   bool _showJumpBottom = false;
   bool _sessionsLoading = false;
   String _sessionsQuery = '';
-  String _busyHint = 'Working...';
+  String _busyHint = '处理中...';
   List<AgentSession> _cachedSessions = [];
 
   int _lastMsgCount = 0;
@@ -118,23 +118,23 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     if (text.isEmpty || _busy) return;
     if (!state.backendOk) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Local backend is not connected.'), duration: Duration(seconds: 2)),
+        const SnackBar(content: Text('本地后端未连接'), duration: Duration(seconds: 2)),
       );
       return;
     }
     if (state.selectedHostId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please select a host first.'),
+          content: const Text('先选主机'),
           duration: const Duration(seconds: 3),
-          action: SnackBarAction(label: 'Go to hosts', onPressed: () => NavScope.maybeOf(context)?.go(0)),
+          action: SnackBarAction(label: '去主机', onPressed: () => NavScope.maybeOf(context)?.go(0)),
         ),
       );
       return;
     }
     if (_busy || state.agentBusy) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('The previous turn is still running. Tap stop.'), duration: Duration(seconds: 2)),
+        const SnackBar(content: Text('上一轮还在进行，可点停止'), duration: Duration(seconds: 2)),
       );
       return;
     }
@@ -147,7 +147,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     }
     setState(() {
       _busy = true;
-      _busyHint = 'Thinking / orchestrating tools. Tap stop to cancel.';
+      _busyHint = '思考 / 调工具... 可点停止';
     });
     try {
       await state.agentChat(text);
@@ -205,7 +205,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Retry: ${_lastUserText(state) ?? ""}',
+                        '可重试：${_lastUserText(state) ?? ""}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
@@ -217,7 +217,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
                         foregroundColor: AppColors.accentSoft,
                       ),
                       onPressed: () => _retryLast(state),
-                      child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w700)),
+                      child: const Text('重试', style: TextStyle(fontWeight: FontWeight.w700)),
                     ),
                   ],
                 ),

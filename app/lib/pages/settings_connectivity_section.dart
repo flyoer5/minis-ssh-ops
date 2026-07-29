@@ -26,7 +26,7 @@ extension _SettingsPageConnectivitySection on _SettingsPageState {
                         setState(() => pingMsg = 'SSH OK: $o');
                       } catch (e) {
                         if (!mounted) return;
-                        setState(() => pingMsg = 'SSH failed: ${cleanError(e)}');
+                        setState(() => pingMsg = 'SSH 检测失败：${cleanError(e)}');
                       } finally {
                         if (mounted) setState(() => pinging = false);
                       }
@@ -48,7 +48,7 @@ extension _SettingsPageConnectivitySection on _SettingsPageState {
                         setState(() => pingMsg = o);
                       } catch (e) {
                         if (!mounted) return;
-                        setState(() => pingMsg = 'Model check failed: ${cleanError(e)}');
+                        setState(() => pingMsg = '模型检测失败：${cleanError(e)}');
                       } finally {
                         if (mounted) setState(() => pinging = false);
                       }

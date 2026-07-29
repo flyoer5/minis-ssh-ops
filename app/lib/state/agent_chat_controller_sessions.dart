@@ -22,7 +22,7 @@ extension AgentChatControllerSessions on AgentChatController {
     lastPlan = null;
     stepResults.clear();
     agentSessionId = null;
-    agentSessionTitle = 'New session';
+    agentSessionTitle = '新会话';
     sessionOvMaxRounds = null;
     sessionOvTemperature = null;
     sessionOvConfirm = null;
@@ -195,7 +195,7 @@ extension AgentChatControllerSessions on AgentChatController {
       _supersedeAgentTurn();
       agentMessages.clear();
       agentSessionId = null;
-      agentSessionTitle = 'New session';
+      agentSessionTitle = '新会话';
       sessionOvMaxRounds = null;
       sessionOvTemperature = null;
       sessionOvConfirm = null;

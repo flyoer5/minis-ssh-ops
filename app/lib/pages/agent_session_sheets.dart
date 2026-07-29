@@ -23,7 +23,7 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
                 padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                 child: Row(children: [
                   const Expanded(child: Text('Sessions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
-                  IconButton(onPressed: () => setSheetState(() => sessionsFuture = load()), icon: const Icon(Icons.refresh), tooltip: 'Refresh'),
+                  IconButton(onPressed: () => setSheetState(() => sessionsFuture = load()), icon: const Icon(Icons.refresh), tooltip: '刷新'),
                   IconButton(onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close), tooltip: 'Close'),
                 ]),
               ),
@@ -35,7 +35,7 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
                       return const Center(child: CircularProgressIndicator());
                     }
                     if (snapshot.hasError) {
-                      return Center(child: Text('Failed to load sessions: ${cleanError(snapshot.error!)}'));
+                      return Center(child: Text('加载会话失败：${cleanError(snapshot.error!)}'));
                     }
                     final sessions = snapshot.data ?? const <AgentSession>[];
                     if (sessions.isEmpty) {
@@ -49,7 +49,7 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
                           return ListTile(
                             leading: const Icon(Icons.chat_bubble_outline),
                             title: Text(session.title.isEmpty ? 'Untitled session' : session.title),
-                            subtitle: Text(session.hostId ?? 'No host'),
+                            subtitle: Text(session.hostId ?? '未关联主机'),
                             onTap: () async {
                               Navigator.pop(sheetContext);
                               await page._openSession(state, session.id, title: session.title);
@@ -79,7 +79,7 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
 Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state) async {
   final id = state.agentSessionId;
   if (id == null) {
-    showSnack(context, 'Please open a session first.');
+    showSnack(context, '请先开启或打开一个会话');
     return;
   }
 
@@ -108,7 +108,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                   Row(
                     children: [
                       const Expanded(
-                        child: Text('Session settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                        child: Text('本会话设置', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                       ),
                       TextButton(
                         onPressed: () {
@@ -119,7 +119,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                             promptCtrl.clear();
                           });
                         },
-                        child: const Text('Reset defaults'),
+                        child: const Text('恢复全局'),
                       ),
                       IconButton(onPressed: () => Navigator.pop(c, false), icon: const Icon(Icons.close)),
                     ],
@@ -131,9 +131,9 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Expanded(child: Text('Rounds', style: TextStyle(fontWeight: FontWeight.w600))),
+                      const Expanded(child: Text('工具轮数', style: TextStyle(fontWeight: FontWeight.w600))),
                       Text(
-                        rounds == null ? 'Global ${state.agentMaxRounds}' : '${rounds!.round()}',
+                        rounds == null ? '全局 ${state.agentMaxRounds}' : '${rounds!.round()}',
                         style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
                       ),
                     ],
@@ -143,15 +143,15 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                     min: 1,
                     max: 99,
                     divisions: 98,
-                    label: rounds == null ? 'Global' : '${rounds!.round()}',
+                    label: rounds == null ? '全局' : '${rounds!.round()}',
                     onChanged: (v) => setM(() => rounds = v),
                   ),
                   Row(
                     children: [
-                      const Expanded(child: Text('Temperature', style: TextStyle(fontWeight: FontWeight.w600))),
+                      const Expanded(child: Text('温度', style: TextStyle(fontWeight: FontWeight.w600))),
                       Text(
                         temp == null
-                            ? (state.agentTemperature == 0 ? 'Global default' : 'Global ${state.agentTemperature.toStringAsFixed(1)}')
+                            ? (state.agentTemperature == 0 ? '全局 默认' : '全局 ${state.agentTemperature.toStringAsFixed(1)}')
                             : (temp == 0 ? 'Default' : temp!.toStringAsFixed(1)),
                         style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
                       ),
@@ -164,30 +164,30 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                     divisions: 20,
                     onChanged: (v) => setM(() => temp = v),
                   ),
-                  const Text('Confirmation policy', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text('写操作确认', style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 8,
                     children: [
                       ChoiceChip(
-                        label: const Text('Follow global'),
+                        label: const Text('跟随全局'),
                         selected: confirm == null,
                         onSelected: (_) => setM(() => confirm = null),
                       ),
                       ChoiceChip(
-                        label: const Text('Force on'),
+                        label: const Text('强制确认'),
                         selected: confirm == 1,
                         onSelected: (_) => setM(() => confirm = 1),
                       ),
                       ChoiceChip(
-                        label: const Text('Force off'),
+                        label: const Text('强制关闭'),
                         selected: confirm == 0,
                         onSelected: (_) => setM(() => confirm = 0),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Text('Extra prompt', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text('本会话附加提示词', style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: promptCtrl,
@@ -203,7 +203,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: () => Navigator.pop(c, true),
-                    child: const Text('Save settings'),
+                    child: const Text('保存本会话设置'),
                   ),
                 ],
               ),
@@ -244,14 +244,14 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(clearAll ? 'Session reset to defaults' : 'Session settings saved'),
+          content: Text(clearAll ? '已恢复全局设置' : '本会话设置已保存'),
           duration: const Duration(seconds: 1),
         ),
       );
     }
   } catch (e) {
     if (context.mounted) {
-      showSnack(context, 'Save failed: ${cleanError(e)}');
+      showSnack(context, '保存失败：${cleanError(e)}');
     }
   }
   promptCtrl.dispose();
@@ -260,7 +260,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
 Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) async {
   final id = state.agentSessionId;
   if (id == null) {
-    showSnack(context, 'Please open a session first.');
+    showSnack(context, '请先开启或打开一个会话');
     return;
   }
 
@@ -269,7 +269,7 @@ Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) a
     mem = await state.api.getAgentSessionMemory(id);
   } catch (e) {
     if (context.mounted) {
-      showSnack(context, 'Failed to load memory: ${cleanError(e)}');
+      showSnack(context, '读取记忆失败：${cleanError(e)}');
     }
     return;
   }
@@ -292,7 +292,7 @@ Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) a
             Row(
               children: [
                 const Expanded(
-                  child: Text('Session memory', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  child: Text('本会话记忆', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
                 TextButton(
                   onPressed: summary.isEmpty && facts.isEmpty
@@ -301,10 +301,10 @@ Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) a
                           final ok = await showDialog<bool>(
                             context: context,
                             builder: (d) => AlertDialog(
-                              title: const Text('Delete memory?'),
+                              title: const Text('清除本会话记忆？'),
                               content: const Text('This clears the summary and facts, but keeps the chat history.'),
                               actions: [
-                                TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+                                TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('取消')),
                                 FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Delete')),
                               ],
                             ),
@@ -316,7 +316,7 @@ Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) a
                             if (c.mounted) Navigator.pop(c);
                           }
                         },
-                  child: const Text('Delete memory'),
+                  child: const Text('清除记忆'),
                 ),
                 IconButton(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.close)),
               ],
@@ -339,13 +339,13 @@ Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) a
               )
             else ...[
               if (summary.isNotEmpty) ...[
-                const Text('Summary', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                const Text('摘要', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 const SizedBox(height: 6),
                 SelectableText(summary, style: const TextStyle(fontSize: 13, height: 1.4)),
                 const SizedBox(height: 14),
               ],
               if (facts.isNotEmpty) ...[
-                const Text('Facts', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                const Text('事实', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 const SizedBox(height: 6),
                 SelectableText(facts, style: const TextStyle(fontSize: 13, height: 1.4, fontFamily: 'monospace')),
               ],

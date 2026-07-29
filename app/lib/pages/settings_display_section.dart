@@ -123,7 +123,7 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
         const SizedBox(height: 8),
         _fontSlider(
           context: context,
-          label: 'Terminal font',
+          label: '终端字号',
           value: _draftTermFont ?? state.termFontSize,
           min: 10,
           max: 20,
@@ -151,7 +151,7 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
         const SizedBox(height: 6),
         _fontSlider(
           context: context,
-          label: 'Records font',
+          label: '记录字号',
           value: _draftRecordsFont ?? state.recordsFontSize,
           min: 11,
           max: 18,

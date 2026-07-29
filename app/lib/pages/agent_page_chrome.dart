@@ -15,17 +15,17 @@ extension _AgentPageChrome on _AgentPageState {
                 final name = await showDialog<String>(
                   context: context,
                   builder: (d) => AlertDialog(
-                    title: const Text('Session title'),
+                    title: const Text('会话标题'),
                     content: TextField(
                       controller: ctrl,
                       autofocus: true,
                       maxLength: 48,
-                      decoration: const InputDecoration(labelText: 'Title'),
+                      decoration: const InputDecoration(labelText: '标题'),
                       onSubmitted: (x) => Navigator.pop(d, x),
                     ),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
-                      FilledButton(onPressed: () => Navigator.pop(d, ctrl.text), child: const Text('Save')),
+                      TextButton(onPressed: () => Navigator.pop(d), child: const Text('取消')),
+                      FilledButton(onPressed: () => Navigator.pop(d, ctrl.text), child: const Text('保存')),
                     ],
                   ),
                 );
@@ -56,7 +56,7 @@ extension _AgentPageChrome on _AgentPageState {
               ],
             ),
             Text(
-              state.selectedHostId == null ? 'No host selected' : state.hostLabel,
+              state.selectedHostId == null ? '未选主机' : state.hostLabel,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
@@ -75,11 +75,11 @@ extension _AgentPageChrome on _AgentPageState {
               ),
               onPressed: () => _stopGeneration(state),
               icon: const Icon(Icons.stop_circle_outlined, size: 18),
-              label: const Text('Stop', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              label: const Text('停止', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
             ),
           ),
         PopupMenuButton<String>(
-          tooltip: 'Session',
+          tooltip: '会话',
           icon: const Icon(Icons.tune, size: 20),
           color: AppColors.surface,
           onSelected: (v) {
@@ -90,17 +90,17 @@ extension _AgentPageChrome on _AgentPageState {
               showDialog<String>(
                 context: context,
                 builder: (d) => AlertDialog(
-                  title: const Text('Session title'),
+                  title: const Text('会话标题'),
                   content: TextField(
                     controller: ctrl,
                     autofocus: true,
                     maxLength: 48,
-                    decoration: const InputDecoration(labelText: 'Title'),
+                    decoration: const InputDecoration(labelText: '标题'),
                     onSubmitted: (x) => Navigator.pop(d, x),
                   ),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
-                    FilledButton(onPressed: () => Navigator.pop(d, ctrl.text), child: const Text('Save')),
+                    TextButton(onPressed: () => Navigator.pop(d), child: const Text('取消')),
+                    FilledButton(onPressed: () => Navigator.pop(d, ctrl.text), child: const Text('保存')),
                   ],
                 ),
               ).then((name) {
@@ -111,20 +111,20 @@ extension _AgentPageChrome on _AgentPageState {
             }
           },
           itemBuilder: (_) => [
-            const PopupMenuItem(value: 'settings', child: Text('Session settings')),
-            const PopupMenuItem(value: 'memory', child: Text('Session memory')),
-            const PopupMenuItem(value: 'rename', child: Text('Rename')),
+            const PopupMenuItem(value: 'settings', child: Text('本会话设置')),
+            const PopupMenuItem(value: 'memory', child: Text('本会话记忆')),
+            const PopupMenuItem(value: 'rename', child: Text('重命名')),
           ],
         ),
         IconButton(
           visualDensity: VisualDensity.compact,
-          tooltip: 'History',
+          tooltip: '历史会话',
           onPressed: () => _showSessions(state),
           icon: const Icon(Icons.history, size: 20),
         ),
         IconButton(
           visualDensity: VisualDensity.compact,
-          tooltip: 'New session',
+          tooltip: '新会话',
           onPressed: () async {
             if (_busy || state.agentBusy) {
               _stopGeneration(state);
@@ -134,12 +134,12 @@ extension _AgentPageChrome on _AgentPageState {
               final r = await state.api.createAgentSession(hostId: state.selectedHostId);
               final sid = r['sessionId'] ?? r['id'] ?? '';
               if (sid is String && sid.isNotEmpty) {
-                state.setAgentSessionMeta(sid, 'New session');
+                state.setAgentSessionMeta(sid, '新会话');
               }
             } catch (_) {}
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('New session created'), duration: Duration(seconds: 1)),
+                const SnackBar(content: Text('已开新会话'), duration: Duration(seconds: 1)),
               );
             }
           },
@@ -170,8 +170,8 @@ extension _AgentPageChrome on _AgentPageState {
             Expanded(
               child: Text(
                 !state.backendOk
-                    ? 'Local backend disconnected'
-                    : (state.selectedHostId == null ? 'No host selected' : state.hostLabel),
+                    ? '本地后端未连接'
+                    : (state.selectedHostId == null ? '尚未选择主机' : state.hostLabel),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
@@ -184,7 +184,7 @@ extension _AgentPageChrome on _AgentPageState {
                   foregroundColor: AppColors.accentSoft,
                 ),
                 onPressed: () => NavScope.maybeOf(context)?.go(0),
-                child: const Text('Pick host', style: TextStyle(fontWeight: FontWeight.w700)),
+                child: const Text('选主机', style: TextStyle(fontWeight: FontWeight.w700)),
               ),
           ],
         ),
@@ -209,20 +209,20 @@ extension _AgentPageChrome on _AgentPageState {
           runSpacing: 4,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            if (state.sessionOvMaxRounds != null) _OvChip(label: 'Rounds ${state.sessionOvMaxRounds}'),
+            if (state.sessionOvMaxRounds != null) _OvChip(label: '轮数 ${state.sessionOvMaxRounds}'),
             if (state.sessionOvTemperature != null)
               _OvChip(
                 label: state.sessionOvTemperature == 0
-                    ? 'Temp default'
-                    : 'Temp ${state.sessionOvTemperature!.toStringAsFixed(1)}',
+                    ? '温度 默认'
+                    : '温度 ${state.sessionOvTemperature!.toStringAsFixed(1)}',
               ),
-            if (state.sessionOvConfirm != null) _OvChip(label: state.sessionOvConfirm == 1 ? 'Force confirm' : 'Confirm off'),
+            if (state.sessionOvConfirm != null) _OvChip(label: state.sessionOvConfirm == 1 ? '强制确认' : '确认关'),
             if (state.sessionOvPrompt != null && state.sessionOvPrompt!.trim().isNotEmpty)
-              const _OvChip(label: 'Extra prompt'),
+              const _OvChip(label: '附加提示词'),
             GestureDetector(
               onTap: () => _showSessionSettings(state),
               child: const Text(
-                'Edit',
+                '编辑',
                 style: TextStyle(fontSize: 11, color: AppColors.accentSoft, fontWeight: FontWeight.w600),
               ),
             ),
