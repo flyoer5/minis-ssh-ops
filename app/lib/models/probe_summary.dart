@@ -81,7 +81,8 @@ class ProbeSummary {
     final cpuRaw = pick('cpu');
 
     final hasErr = [uname, uptime, disk, memory, load].any((s) => s.startsWith('错误:'));
-    final ok = !hasErr && uname != '-';
+    final unameAvailable = uname != '-' && uname.trim().isNotEmpty;
+    final ok = !hasErr && unameAvailable;
 
     String loadHint = firstLine(load);
     final loadParts = loadHint.split(RegExp(r'\s+'));
@@ -254,12 +255,12 @@ class ProbeSummary {
     ];
 
     final oneLine = ok
-        ? [sys, if (upHint != '-') 'up $upHint', if (cpuHint != '-') 'CPU $cpuHint', if (memHint != '-') 'MEM $memHint']
+        ? [sys, if (upHint != '-') 'up $upHint', if (cpuHint != '-') 'cpu $cpuHint', if (memHint != '-') 'mem $memHint']
             .join(' · ')
         : [if (errish(uname)) uname else '', if (errish(uptime)) uptime else '', if (errish(memory)) memory else '']
             .where((s) => s.isNotEmpty)
             .join(' | ');
 
-    return ProbeSummary(ok: ok, oneLine: oneLine.isEmpty ? (ok ? sys : '-') : oneLine, lines: lines, detail: detail.toString());
+    return ProbeSummary(ok: ok, oneLine: oneLine.isEmpty ? (ok ? sys : '离线') : oneLine, lines: lines, detail: detail.toString());
   }
 }
