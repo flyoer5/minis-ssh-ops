@@ -71,4 +71,35 @@ void main() {
       }
     }
   });
+
+  test('设置页高频区域不包含已知英文文案或原始错误', () {
+    const files = [
+      'lib/pages/settings_backend_section.dart',
+      'lib/pages/settings_display_section.dart',
+      'lib/pages/settings_data_section.dart',
+    ];
+    const forbidden = [
+      "title: 'Backend'",
+      "title: 'Display'",
+      'Data & Diagnostics',
+      'Local Go service and token',
+      'Navigation mode',
+      'Compact host cards',
+      'Stream markdown',
+      'Probe concurrency',
+      'Auto probe interval',
+      'Export config',
+      'Import config',
+      'Backend log',
+      'Host keys',
+      r"_toast('$e')",
+    ];
+
+    for (final path in files) {
+      final source = File(path).readAsStringSync();
+      for (final text in forbidden) {
+        expect(source, isNot(contains(text)), reason: '$path 仍包含英文界面文案或原始错误：$text');
+      }
+    }
+  });
 }
