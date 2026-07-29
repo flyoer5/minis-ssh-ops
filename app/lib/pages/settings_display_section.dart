@@ -5,15 +5,15 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
     return _section(
       icon: Icons.text_fields,
       accent: AppColors.chipBlue,
-      title: 'Display',
-      subtitle: 'Navigation, markdown, probe, and font sizes',
+      title: '显示设置',
+      subtitle: '导航、流式渲染、探测与字号',
       children: [
-        const Text('Navigation mode', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.text)),
+        const Text('导航方式', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.text)),
         const SizedBox(height: 6),
         SegmentedButton<String>(
           segments: const [
-            ButtonSegment(value: 'bottom', label: Text('Bottom'), icon: Icon(Icons.space_dashboard_outlined, size: 16)),
-            ButtonSegment(value: 'menu', label: Text('Menu'), icon: Icon(Icons.menu, size: 16)),
+            ButtonSegment(value: 'bottom', label: Text('底部导航'), icon: Icon(Icons.space_dashboard_outlined, size: 16)),
+            ButtonSegment(value: 'menu', label: Text('侧边菜单'), icon: Icon(Icons.menu, size: 16)),
           ],
           selected: {state.navMode},
           onSelectionChanged: (s) {
@@ -24,23 +24,23 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
         ),
         const SizedBox(height: 4),
         Text(
-          state.navIsMenu ? 'Menu navigation is enabled.' : 'Bottom navigation is enabled.',
+          state.navIsMenu ? '当前使用侧边菜单导航。' : '当前使用底部导航栏。',
           style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
         ),
         const SizedBox(height: 12),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text('Compact host cards', style: TextStyle(fontSize: 13.5)),
-          subtitle: const Text('Show a denser card layout', style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+          title: const Text('紧凑主机卡片', style: TextStyle(fontSize: 13.5)),
+          subtitle: const Text('使用信息更紧凑的卡片布局', style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
           value: state.hostCardCompact,
           onChanged: (v) => state.setHostCardCompact(v),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text('Stream markdown', style: TextStyle(fontSize: 13.5)),
-          subtitle: const Text('Render assistant markdown while streaming', style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+          title: const Text('流式渲染 Markdown', style: TextStyle(fontSize: 13.5)),
+          subtitle: const Text('接收回复时同步渲染 Markdown', style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
           value: state.streamMarkdown,
           onChanged: (v) => state.setStreamMarkdown(v),
         ),
@@ -48,7 +48,7 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
         Row(
           children: [
             const Expanded(
-              child: Text('Probe concurrency', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+              child: Text('主机探测并发数', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
             ),
             Text('${(_draftProbeConc ?? state.probeConcurrency.toDouble()).round()}',
                 style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue)),
@@ -81,19 +81,19 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Higher values increase parallel host probing.',
+          '数值越高，同时探测的主机越多。',
           style: TextStyle(fontSize: 11, color: AppColors.textFaint),
         ),
         const SizedBox(height: 10),
         Row(
           children: [
             const Expanded(
-              child: Text('Auto probe interval', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+              child: Text('自动探测间隔', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
             ),
             Text(
               (() {
                 final n = (_draftAutoProbe ?? state.hostAutoProbeSec.toDouble()).round();
-                return n == 0 ? 'off' : '${n}s';
+                return n == 0 ? '关闭' : '$n 秒';
               })(),
               style: const TextStyle(fontFamily: 'monospace', color: AppColors.chipBlue),
             ),
@@ -106,7 +106,7 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
           divisions: 30,
           label: (() {
             final n = (_draftAutoProbe ?? state.hostAutoProbeSec.toDouble()).round();
-            return n == 0 ? 'off' : '${n}s';
+            return n == 0 ? '关闭' : '$n 秒';
           })(),
           onChanged: (v) => setState(() => _draftAutoProbe = v),
           onChangeEnd: (v) {
@@ -117,7 +117,7 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
           },
         ),
         const Text(
-          '0 disables auto probing.',
+          '设为 0 可关闭自动探测。',
           style: TextStyle(fontSize: 11, color: AppColors.textFaint),
         ),
         const SizedBox(height: 8),
@@ -132,12 +132,12 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
             state.setTermFontSize(v);
             setState(() => _draftTermFont = null);
           },
-          hint: 'Used by the terminal page.',
+          hint: '用于终端页面。',
         ),
         const SizedBox(height: 6),
         _fontSlider(
           context: context,
-          label: 'Agent font',
+          label: 'Agent 字号',
           value: _draftAgentFont ?? state.agentFontSize,
           min: 12,
           max: 20,
@@ -146,7 +146,7 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
             state.setAgentFontSize(v);
             setState(() => _draftAgentFont = null);
           },
-          hint: 'Used by the agent page.',
+          hint: '用于 Agent 对话页面。',
         ),
         const SizedBox(height: 6),
         _fontSlider(
@@ -160,12 +160,12 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
             state.setRecordsFontSize(v);
             setState(() => _draftRecordsFont = null);
           },
-          hint: 'Used by records list rows.',
+          hint: '用于记录列表。',
         ),
         const SizedBox(height: 6),
         _fontSlider(
           context: context,
-          label: 'UI font',
+          label: '界面字号',
           value: _draftUiFont ?? state.uiFontSize,
           min: 11,
           max: 20,
@@ -174,12 +174,12 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
             state.setUiFontSize(v);
             setState(() => _draftUiFont = null);
           },
-          hint: 'Used across cards and lists.',
+          hint: '用于卡片、列表等通用界面。',
         ),
         const SizedBox(height: 6),
         _fontSlider(
           context: context,
-          label: 'Editor font',
+          label: '编辑器字号',
           value: _draftEditorFont ?? state.editorFontSize,
           min: 10,
           max: 24,
@@ -188,7 +188,7 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
             state.setEditorFontSize(v);
             setState(() => _draftEditorFont = null);
           },
-          hint: 'Used by the file editor.',
+          hint: '用于文件编辑器。',
         ),
         const SizedBox(height: 8),
         Container(
@@ -202,10 +202,10 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Preview: Agent', style: TextStyle(fontSize: state.agentFontSize, color: AppColors.text)),
+              Text('预览：Agent 对话', style: TextStyle(fontSize: state.agentFontSize, color: AppColors.text)),
               const SizedBox(height: 4),
               Text(
-                'Preview: record line with monospace text',
+                '预览：等宽字体记录内容',
                 style: TextStyle(
                   fontSize: state.recordsFontSize,
                   fontFamily: 'monospace',
@@ -214,12 +214,12 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
               ),
               const SizedBox(height: 4),
               Text(
-                'Preview: UI label',
+                '预览：界面标签',
                 style: TextStyle(fontSize: state.uiFontSize, color: AppColors.textCode),
               ),
               const SizedBox(height: 4),
               Text(
-                'preview terminal',
+                '预览：终端文本',
                 style: TextStyle(
                   fontSize: state.termFontSize,
                   fontFamily: 'monospace',
@@ -228,7 +228,7 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
               ),
               const SizedBox(height: 4),
               Text(
-                'editor preview',
+                '预览：编辑器文本',
                 style: TextStyle(
                   fontSize: state.editorFontSize,
                   fontFamily: 'monospace',

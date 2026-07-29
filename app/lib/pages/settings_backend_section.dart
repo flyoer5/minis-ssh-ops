@@ -5,15 +5,15 @@ extension _SettingsPageBackendSection on _SettingsPageState {
     return _section(
       icon: Icons.dns_outlined,
       accent: AppColors.success,
-      title: 'Backend',
-      subtitle: 'Local Go service and token',
+      title: '本地后端',
+      subtitle: '本机 Go 服务与访问令牌',
       children: [
         Wrap(
           spacing: 8,
           runSpacing: 6,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            _statusChip(state.backendOk, state.backendOk ? 'connected' : 'disconnected'),
+            _statusChip(state.backendOk, state.backendOk ? '已连接' : '未连接'),
             _portChip(state.api.baseUrl),
             Text(
               state.api.baseUrl,
@@ -23,19 +23,19 @@ extension _SettingsPageBackendSection on _SettingsPageState {
         ),
         const SizedBox(height: 6),
         const Text(
-          'The backend URL is used for all local API calls.',
+          '后端地址用于应用内的所有本地 API 请求。',
           style: TextStyle(fontSize: 11, color: AppColors.textFaint, height: 1.35),
         ),
         if (state.backendVersion != null) ...[
           const SizedBox(height: 6),
           Text(
-            'Version ${state.backendVersion}',
+            '版本 ${state.backendVersion}',
             style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace'),
           ),
         ],
         if (state.backendFeatures.isNotEmpty) ...[
           const SizedBox(height: 8),
-          const Text('Features', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+          const Text('支持能力', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -75,7 +75,7 @@ extension _SettingsPageBackendSection on _SettingsPageState {
           controller: baseUrl,
           style: const TextStyle(fontSize: 13.5),
           decoration: const InputDecoration(
-            labelText: 'Go Base URL',
+            labelText: 'Go 服务地址',
             isDense: true,
             prefixIcon: Icon(Icons.link, size: 18),
           ),
@@ -95,9 +95,9 @@ extension _SettingsPageBackendSection on _SettingsPageState {
           onPressed: () async {
             try {
               await state.saveConnection(baseUrl: baseUrl.text.trim(), token: token.text.trim());
-              _toast(state.backendOk ? '已保存' : '保存失败：${state.backendError}');
+              _toast(state.backendOk ? '连接配置已保存' : '保存失败：${cleanError(state.backendError ?? '无法连接本地后端')}');
             } catch (e) {
-              _toast('$e');
+              _toast('保存失败：${cleanError(e)}');
             }
           },
           icon: const Icon(Icons.save_outlined, size: 18),
