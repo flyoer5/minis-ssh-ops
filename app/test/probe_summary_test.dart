@@ -25,7 +25,7 @@ void main() {
       expect(s.oneLine.contains('cpu'), isTrue);
       final cpu = s.lines.where((l) => l.label == 'CPU%' || l.label == 'CPU').map((l) => l.value).toList();
       expect(cpu.any((v) => v.contains('12')), isTrue);
-      final disk = s.lines.where((l) => l.label == '磁盘%').map((l) => l.value).toList();
+      final disk = s.lines.where((l) => l.label == 'Disk%').map((l) => l.value).toList();
       expect(disk.any((v) => v.contains('51')), isTrue);
     });
 
