@@ -1,5 +1,81 @@
 ﻿part of 'agent_page.dart';
 
+Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, AppState state) async {
+  Future<List<AgentSession>> load() async {
+    final raw = await state.api.listAgentSessions(
+      hostId: page._onlyCurrentHost ? state.selectedHostId : null,
+      q: page._sessionsQuery.isNotEmpty ? page._sessionsQuery : null,
+    );
+    return [for (final item in raw) AgentSession.fromJson(item)];
+  }
+  var sessionsFuture = load();
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: AppColors.surface,
+    builder: (sheetContext) => SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(sheetContext).height * 0.78,
+        child: StatefulBuilder(
+          builder: (context, setSheetState) => Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                child: Row(children: [
+                  const Expanded(child: Text('Sessions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
+                  IconButton(onPressed: () => setSheetState(() => sessionsFuture = load()), icon: const Icon(Icons.refresh), tooltip: 'Refresh'),
+                  IconButton(onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close), tooltip: 'Close'),
+                ]),
+              ),
+              Expanded(
+                child: FutureBuilder<List<AgentSession>>(
+                  future: sessionsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Failed to load sessions: ${cleanError(snapshot.error!)}'));
+                    }
+                    final sessions = snapshot.data ?? const <AgentSession>[];
+                    if (sessions.isEmpty) {
+                      return const Center(child: Text('No sessions yet', style: TextStyle(color: AppColors.textMuted)));
+                    }
+                    return ListView.separated(
+                        itemCount: sessions.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final session = sessions[index];
+                          return ListTile(
+                            leading: const Icon(Icons.chat_bubble_outline),
+                            title: Text(session.title.isEmpty ? 'Untitled session' : session.title),
+                            subtitle: Text(session.hostId ?? 'No host'),
+                            onTap: () async {
+                              Navigator.pop(sheetContext);
+                              await page._openSession(state, session.id, title: session.title);
+                            },
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              tooltip: 'Delete session',
+                              onPressed: () async {
+                                state.deleteAgentSession(session.id);
+                                setSheetState(() => sessionsFuture = load());
+                              },
+                            ),
+                          );
+                        },
+                      );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state) async {
   final id = state.agentSessionId;
   if (id == null) {

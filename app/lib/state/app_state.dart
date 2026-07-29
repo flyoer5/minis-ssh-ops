@@ -10,6 +10,7 @@ import 'package:ssh_ai_agent/state/host_state.dart';
 import 'package:ssh_ai_agent/state/probe_state.dart';
 import 'package:ssh_ai_agent/state/ui_prefs.dart';
 
+export 'package:ssh_ai_agent/state/ui_prefs.dart';
 export 'package:ssh_ai_agent/state/agent_chat_controller.dart';
 export 'package:ssh_ai_agent/models/agent_session.dart';
 export 'package:ssh_ai_agent/models/probe_summary.dart';
@@ -65,13 +66,13 @@ class AppState extends ChangeNotifier
             // Persist off critical path.
             unawaited(prefs.setString('baseUrl', api.baseUrl));
             unawaited(prefs.setString('localToken', api.localToken));
-            backendNote = info['alreadyRunning'] == true ? '本机 Go 已在运行' : '已启动内置 Go 后端';
+            backendNote = info['alreadyRunning'] == true ? 'Backend already running' : 'Started bundled backend';
             lastErr = null;
             break;
           }
         } catch (e) {
           lastErr = e;
-          backendNote = '启动后端重试 ${i + 1}/2…';
+          backendNote = 'Starting backend retry ${i + 1}/2';
           notifyListeners();
           await Future<void>.delayed(Duration(milliseconds: 120 * (i + 1)));
         }
@@ -180,7 +181,7 @@ class AppState extends ChangeNotifier
   Future<String> testLlmReachable() async {
     // minimal: ensure LLM configured and do a 1-token style agent chat requires host
     final id = selectedHostId;
-    if (id == null) throw StateError('先选主机再测模型');
+    if (id == null) throw StateError('Select a host first');
     final res = await api.agentChat(hostId: id, message: '只回复ok两个字母', sessionId: 'ping-${DateTime.now().millisecondsSinceEpoch}');
     return res.toString().length > 20 ? '模型可达' : res.toString();
   }

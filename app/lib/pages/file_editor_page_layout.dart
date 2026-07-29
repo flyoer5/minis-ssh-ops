@@ -358,11 +358,3 @@ extension _FileEditorPageLayout on _FileEditorPageState {
     );
   }
 }
-
-class _SaveIntent extends Intent {
-  const _SaveIntent();
-}
-
-class _FindIntent extends Intent {
-  const _FindIntent();
-}

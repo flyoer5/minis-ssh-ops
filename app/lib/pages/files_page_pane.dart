@@ -1,6 +1,57 @@
 part of 'files_page.dart';
 
 extension _FilesPagePaneHelpers on _FilesPageState {
+  Widget _buildPaneList(_Pane pane, int idx, double fs) {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      itemCount: pane.entries.length,
+      itemBuilder: (context, index) {
+        final raw = pane.entries[index];
+        if (raw is! Map) return const SizedBox.shrink();
+        final name = raw['name']?.toString() ?? raw['path']?.toString() ?? '';
+        final path = raw['path']?.toString() ?? (pane.path.endsWith('/') || pane.path.isEmpty ? '${pane.path}$name' : '${pane.path}/$name');
+        final isDir = raw['isDir'] == true || raw['directory'] == true || raw['type']?.toString() == 'dir';
+        final selected = pane.selected.contains(path);
+        return ListTile(
+          dense: true,
+          selected: selected,
+          leading: Icon(isDir ? Icons.folder_outlined : Icons.insert_drive_file_outlined, color: isDir ? AppColors.warnBright : AppColors.textMuted),
+          title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: fs, fontFamily: isDir ? null : 'monospace')),
+          trailing: pane.selecting
+              ? Icon(selected ? Icons.check_circle : Icons.radio_button_unchecked, color: selected ? AppColors.cyan : AppColors.textFaint)
+              : PopupMenuButton<String>(
+                  tooltip: 'More',
+                  onSelected: (action) {
+                    if (action == 'rename') _rename(path, name);
+                    if (action == 'delete') _deletePaths([path], ask: true);
+                    if (action == 'copy') _copyToOther(singlePath: path);
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'rename', child: Text('Rename')),
+                    PopupMenuItem(value: 'copy', child: Text('Copy to other pane')),
+                    PopupMenuItem(value: 'delete', child: Text('Delete')),
+                  ],
+                ),
+          onTap: () {
+            setState(() => focus = idx);
+            if (pane.selecting) {
+              setState(() => selected ? pane.selected.remove(path) : pane.selected.add(path));
+            } else if (isDir) {
+              _go(pane, path);
+            } else {
+              _openFile(path);
+            }
+          },
+          onLongPress: () => setState(() {
+            focus = idx;
+            pane.selecting = true;
+            selected ? pane.selected.remove(path) : pane.selected.add(path);
+          }),
+        );
+      },
+    );
+  }
+
   String _fmtSize(dynamic s) {
     final n = s is int ? s : int.tryParse('$s') ?? 0;
     if (n < 1024) return '$n B';
