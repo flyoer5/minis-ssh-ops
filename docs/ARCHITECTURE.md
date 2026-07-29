@@ -6,18 +6,18 @@ Minis SSH Ops is split into a Flutter app and a local Go backend that runs on th
 
 ```text
 Android application
-├─ Flutter UI
-│  ├─ hosts and credentials
-│  ├─ terminal and files
-│  ├─ AI Agent sessions
-│  ├─ audit records
-│  └─ settings
-└─ Go backend process
-   ├─ loopback HTTP API
-   ├─ SSH / PTY / SFTP
-   ├─ command risk analysis
-   ├─ LLM orchestration
-   └─ encrypted SQLite storage
+|- Flutter UI
+|  |- hosts and credentials
+|  |- terminal and files
+|  |- AI Agent sessions
+|  |- audit records
+|  `- settings
+`- Go backend process
+   |- loopback HTTP API
+   |- SSH / PTY / SFTP
+   |- command risk analysis
+   |- LLM orchestration
+   `- encrypted SQLite storage
 ```
 
 The Android host starts the bundled Go executable as a local process. Flutter talks to it over an authenticated HTTP service bound to `127.0.0.1`.
