@@ -1,4 +1,4 @@
-﻿part of 'ui_prefs.dart';
+part of 'ui_prefs.dart';
 
 extension UiPrefsSetters on UiPrefs {
   void loadUiPrefs(SharedPreferences prefs) {
@@ -28,8 +28,8 @@ extension UiPrefsSetters on UiPrefs {
       } catch (_) {}
     }
     final legacy = prefs.getStringList('pathFavorites');
-    if (legacy != null && legacy.isNotEmpty && !pathFavoritesByHost.containsKey(kPathFavShared) && pathFavoritesByHost.isEmpty) {
-      pathFavoritesByHost[kPathFavShared] = List<String>.from(legacy);
+    if (legacy != null && legacy.isNotEmpty && !pathFavoritesByHost.containsKey(UiPrefs.kPathFavShared) && pathFavoritesByHost.isEmpty) {
+      pathFavoritesByHost[UiPrefs.kPathFavShared] = List<String>.from(legacy);
     }
     streamMarkdown = prefs.getBool('streamMarkdown') ?? false;
     final pc = prefs.getInt('probeConcurrency') ?? 4;
@@ -90,7 +90,7 @@ extension UiPrefsSetters on UiPrefs {
       await prefs.setString('pathFavoritesByHost', jsonEncode(pathFavoritesByHost));
       notifyListeners();
     } else if (pr['pathFavorites'] is List) {
-      await setPathFavoritesFor(kPathFavShared, [for (final e in pr['pathFavorites'] as List) if (e != null && e.toString().trim().isNotEmpty) e.toString().trim()]);
+      await setPathFavoritesFor(UiPrefs.kPathFavShared, [for (final e in pr['pathFavorites'] as List) if (e != null && e.toString().trim().isNotEmpty) e.toString().trim()]);
     }
     if (pr['streamMarkdown'] is bool) await setStreamMarkdown(pr['streamMarkdown'] as bool);
     if (pr['probeConcurrency'] is num) await setProbeConcurrency((pr['probeConcurrency'] as num).toInt());

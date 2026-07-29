@@ -1,11 +1,11 @@
-﻿part of 'ui_prefs.dart';
+part of 'ui_prefs.dart';
 
 extension UiPrefsPaths on UiPrefs {
   List<String> pathFavoritesFor(String? hostId) {
     if (hostId == null || hostId.isEmpty) return const [];
     final own = pathFavoritesByHost[hostId];
     if (own != null) return List<String>.from(own);
-    final shared = pathFavoritesByHost[kPathFavShared];
+    final shared = pathFavoritesByHost[UiPrefs.kPathFavShared];
     if (shared != null) return List<String>.from(shared);
     return const [];
   }
