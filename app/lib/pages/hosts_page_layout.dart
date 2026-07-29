@@ -137,9 +137,7 @@ extension HostsPageLayout on _HostsPageState {
     );
   }
 
-  @override
   Widget build(BuildContext context) {
-    super.build(context);
     final hostCount = context.select((AppState s) => s.hosts.length);
     context.select((AppState s) => s.selectedHostId);
     context.select((AppState s) => s.probeGen);
