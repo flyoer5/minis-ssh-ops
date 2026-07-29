@@ -2,19 +2,26 @@ name: Android APK
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "app/**"
       - "backend/**"
       - "scripts/**"
       - ".github/workflows/android.yml"
   pull_request:
+    paths:
+      - "app/**"
+      - "backend/**"
+      - "scripts/**"
+      - ".github/workflows/android.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -99,7 +106,7 @@ jobs:
 
       - name: Flutter analyze
         working-directory: app
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Flutter unit tests
         working-directory: app

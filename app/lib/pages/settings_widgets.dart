@@ -1,5 +1,6 @@
 part of 'settings_page.dart';
 
+extension _SettingsPageWidgetHelpers on _SettingsPageState {
   Widget _section({
     required IconData icon,
     required Color accent,
@@ -12,7 +13,7 @@ part of 'settings_page.dart';
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -113,13 +114,13 @@ part of 'settings_page.dart';
   }
 
   Widget _portChip(String baseUrl) {
-    var label = '端口 ?';
+    var label = 'port ?';
     try {
       final u = Uri.tryParse(baseUrl);
       if (u != null && u.hasPort) {
-        label = '端口 ${u.port}';
+        label = 'port ${u.port}';
       } else if (u != null && u.host.isNotEmpty) {
-        label = u.scheme == 'https' ? '端口 443' : '端口 80';
+        label = u.scheme == 'https' ? 'port 443' : 'port 80';
       }
     } catch (_) {}
     return Container(
@@ -152,3 +153,4 @@ part of 'settings_page.dart';
       ),
     );
   }
+}
