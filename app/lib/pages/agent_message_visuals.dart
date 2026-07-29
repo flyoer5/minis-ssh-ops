@@ -121,8 +121,15 @@ class _MinisToolBlock extends StatefulWidget {
   final String part;
   final double fontSize;
   final bool collapseSuccess;
+  final VoidCallback? onCopy;
 
-  const _MinisToolBlock({required this.msg, required this.part, this.fontSize = 15, this.collapseSuccess = true});
+  const _MinisToolBlock({
+    required this.msg,
+    required this.part,
+    this.fontSize = 15,
+    this.collapseSuccess = true,
+    this.onCopy,
+  });
 
   @override
   State<_MinisToolBlock> createState() => _MinisToolBlockState();

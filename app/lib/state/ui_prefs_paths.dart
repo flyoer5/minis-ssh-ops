@@ -5,7 +5,7 @@ extension UiPrefsPaths on UiPrefs {
     if (hostId == null || hostId.isEmpty) return const [];
     final own = pathFavoritesByHost[hostId];
     if (own != null) return List<String>.from(own);
-    final shared = pathFavoritesByHost[kPathFavShared];
+    final shared = pathFavoritesByHost[UiPrefs.kPathFavShared];
     if (shared != null) return List<String>.from(shared);
     return const [];
   }

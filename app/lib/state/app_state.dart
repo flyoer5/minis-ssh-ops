@@ -10,6 +10,7 @@ import 'package:ssh_ai_agent/state/host_state.dart';
 import 'package:ssh_ai_agent/state/probe_state.dart';
 import 'package:ssh_ai_agent/state/ui_prefs.dart';
 
+export 'package:ssh_ai_agent/state/agent_chat_controller.dart';
 export 'package:ssh_ai_agent/models/agent_session.dart';
 export 'package:ssh_ai_agent/models/probe_summary.dart';
 

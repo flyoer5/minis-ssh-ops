@@ -17,6 +17,7 @@ part 'agent_page_layout.dart';
 part 'agent_page_chrome.dart';
 part 'agent_page_composer.dart';
 part 'agent_session_sheets.dart';
+part 'agent_page_actions.dart';
 part 'agent_message_visuals.dart';
 part 'agent_message_reasoning.dart';
 part 'agent_message_blocks.dart';
