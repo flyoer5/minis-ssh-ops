@@ -339,7 +339,7 @@ extension _FileEditorPageLayout on _FileEditorPageState {
           const SizedBox(width: 10),
           Tooltip(
             message: '编辑器按 UTF-8 保存；其他编码请在服务端转换',
-            child: Text(_encoding, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
+            child: Text(_FileEditorPageState._encoding, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace')),
           ),
           const SizedBox(width: 10),
           if (widget.remoteMode != null && widget.remoteMode!.isNotEmpty) ...[

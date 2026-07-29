@@ -122,3 +122,4 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     await state.refreshHosts();
     await _probeMany(state, force: true);
   }
+}

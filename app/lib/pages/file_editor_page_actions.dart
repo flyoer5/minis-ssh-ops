@@ -5,7 +5,7 @@ extension _FileEditorPageActions on _FileEditorPageState {
     if (_applyingHistory) return;
     if (_undo.isEmpty || _undo.last != before) {
       _undo.add(before);
-      if (_undo.length > _undoMax) _undo.removeAt(0);
+      if (_undo.length > _FileEditorPageState._undoMax) _undo.removeAt(0);
       _redo.clear();
     }
   }
