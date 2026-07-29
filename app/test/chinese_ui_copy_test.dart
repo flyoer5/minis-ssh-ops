@@ -12,6 +12,8 @@ void main() {
       'lib/pages/files_page_transfers.dart',
       'lib/pages/settings_connectivity_section.dart',
       'lib/pages/settings_data_section.dart',
+      'lib/pages/settings_llm_section.dart',
+      'lib/pages/settings_page.dart',
       'lib/state/agent_chat_controller_turns.dart',
       'lib/state/app_state.dart',
     ];
@@ -26,6 +28,24 @@ void main() {
       'Move to other pane',
       'Select at least one item first',
       "Text('Close')",
+      "title: 'Model'",
+      'OpenAI-compatible endpoint',
+      'LLM Base URL',
+      'Usually ends with /v1',
+      'Stored locally',
+      "'Show' : 'Hide'",
+      "labelText: 'Model'",
+      r'Loaded ${_modelIds.length} models',
+      'Optional provider hint',
+      "child: Text('none')",
+      "child: Text('auto')",
+      "child: Text('low')",
+      "child: Text('medium')",
+      "child: Text('high')",
+      "child: Text('xhigh')",
+      'LLM saved',
+      r"_toast('$e')",
+      r'拉取模型列表失败: $e',
     ];
 
     for (final path in files) {

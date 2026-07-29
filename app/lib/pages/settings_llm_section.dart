@@ -5,15 +5,15 @@ extension _SettingsPageLlmSection on _SettingsPageState {
     return _section(
       icon: Icons.smart_toy_outlined,
       accent: AppColors.purple,
-      title: 'Model',
-      subtitle: 'OpenAI-compatible endpoint',
+      title: '模型服务',
+      subtitle: 'OpenAI 兼容接口',
       children: [
         TextField(
           controller: llmBase,
           style: const TextStyle(fontSize: 13.5),
           decoration: const InputDecoration(
-            labelText: 'LLM Base URL',
-            helperText: 'Usually ends with /v1',
+            labelText: 'LLM 服务地址',
+            helperText: '通常以 /v1 结尾',
             isDense: true,
           ),
         ),
@@ -26,10 +26,10 @@ extension _SettingsPageLlmSection on _SettingsPageState {
           style: const TextStyle(fontSize: 13.5, fontFamily: 'monospace'),
           decoration: InputDecoration(
             labelText: 'API Key',
-            helperText: 'Stored locally',
+            helperText: '仅保存在本机',
             isDense: true,
             suffixIcon: IconButton(
-              tooltip: _obscureKey ? 'Show' : 'Hide',
+              tooltip: _obscureKey ? '显示' : '隐藏',
               icon: Icon(_obscureKey ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
               onPressed: () => setState(() => _obscureKey = !_obscureKey),
             ),
@@ -44,7 +44,7 @@ extension _SettingsPageLlmSection on _SettingsPageState {
                       controller: llmModel,
                       style: const TextStyle(fontSize: 13.5),
                       decoration: const InputDecoration(
-                        labelText: 'Model',
+                        labelText: '模型',
                         helperText: '刷新以加载模型列表',
                         isDense: true,
                       ),
@@ -52,7 +52,7 @@ extension _SettingsPageLlmSection on _SettingsPageState {
                   : DropdownButtonFormField<String>(
                       initialValue: _modelIds.contains(llmModel.text) ? llmModel.text : null,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Model', isDense: true),
+                      decoration: const InputDecoration(labelText: '模型', isDense: true),
                       items: [
                         for (final id in _modelIds)
                           DropdownMenuItem(
@@ -67,7 +67,9 @@ extension _SettingsPageLlmSection on _SettingsPageState {
             ),
             IconButton(
               tooltip: '拉取模型列表',
-              onPressed: !state.backendOk || _loadingModels ? null : () => _refreshModels(state),
+              onPressed: !state.backendOk || _loadingModels
+                  ? null
+                  : () => _refreshModels(state, notifyIfUnconfigured: true),
               icon: _loadingModels
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.refresh, size: 20),
@@ -77,22 +79,22 @@ extension _SettingsPageLlmSection on _SettingsPageState {
         if (_modelIds.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 2, bottom: 6),
-            child: Text('Loaded ${_modelIds.length} models', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+            child: Text('已加载 ${_modelIds.length} 个模型', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
           ),
         DropdownButtonFormField<String>(
           initialValue: const ['none', 'auto', 'low', 'medium', 'high', 'xhigh'].contains(thinkingLevel) ? thinkingLevel : 'auto',
           decoration: const InputDecoration(
             labelText: '思考级别',
-            helperText: 'Optional provider hint',
+            helperText: '可选的服务商推理强度',
             isDense: true,
           ),
           items: const [
-            DropdownMenuItem(value: 'none', child: Text('none')),
-            DropdownMenuItem(value: 'auto', child: Text('auto')),
-            DropdownMenuItem(value: 'low', child: Text('low')),
-            DropdownMenuItem(value: 'medium', child: Text('medium')),
-            DropdownMenuItem(value: 'high', child: Text('high')),
-            DropdownMenuItem(value: 'xhigh', child: Text('xhigh')),
+            DropdownMenuItem(value: 'none', child: Text('关闭')),
+            DropdownMenuItem(value: 'auto', child: Text('自动')),
+            DropdownMenuItem(value: 'low', child: Text('低')),
+            DropdownMenuItem(value: 'medium', child: Text('中')),
+            DropdownMenuItem(value: 'high', child: Text('高')),
+            DropdownMenuItem(value: 'xhigh', child: Text('极高')),
           ],
           onChanged: (v) {
             if (v != null) setState(() => thinkingLevel = v);
@@ -110,14 +112,16 @@ extension _SettingsPageLlmSection on _SettingsPageState {
                       apiKey: llmKey.text,
                       thinkingLevel: thinkingLevel,
                     );
-                    await _refreshModels(state);
-                    _toast('LLM saved');
+                    if (llmBase.text.trim().isNotEmpty) {
+                      await _refreshModels(state, notifyOnError: false);
+                    }
+                    _toast('LLM 配置已保存');
                   } catch (e) {
-                    _toast('$e');
+                    _toast('保存失败：${cleanError(e)}');
                   }
                 },
           icon: const Icon(Icons.save_outlined, size: 18),
-          label: const Text('保存模型'),
+          label: const Text('保存模型配置'),
         ),
       ],
     );

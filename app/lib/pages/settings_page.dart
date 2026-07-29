@@ -74,7 +74,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       final k = llm['apiKey']?.toString();
       if (k != null && k.isNotEmpty) llmKey.text = k;
     }
-    if (s.backendOk) {
+    if (s.backendOk && llmBase.text.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _refreshModels(s));
     }
   }
@@ -90,8 +90,18 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     super.dispose();
   }
 
-  Future<void> _refreshModels(AppState state) async {
+  Future<void> _refreshModels(
+    AppState state, {
+    bool notifyIfUnconfigured = false,
+    bool notifyOnError = true,
+  }) async {
     if (!state.backendOk || _loadingModels) return;
+    if (llmBase.text.trim().isEmpty) {
+      if (notifyIfUnconfigured) {
+        _toast('尚未配置 LLM 服务地址，请先填写并保存。');
+      }
+      return;
+    }
     setState(() => _loadingModels = true);
     try {
       final ids = await state.fetchModels();
@@ -101,7 +111,13 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
         if (llmModel.text.isEmpty && ids.isNotEmpty) llmModel.text = ids.first;
       });
     } catch (e) {
-      if (mounted) _toast('拉取模型列表失败: $e');
+      if (!mounted || !notifyOnError) return;
+      final message = cleanError(e);
+      if (message.contains('configure LLM baseUrl first')) {
+        _toast('尚未配置 LLM 服务地址，请先填写并保存。');
+      } else {
+        _toast('拉取模型列表失败：$message');
+      }
     } finally {
       if (mounted) setState(() => _loadingModels = false);
     }
