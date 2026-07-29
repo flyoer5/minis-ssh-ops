@@ -42,7 +42,7 @@ extension _TerminalPageWidgets on _TerminalPageState {
 
   Widget _buildTopBar(BuildContext context, AppState state, String hostLabel, double fontSize) {
     return Material(
-      color: _bar,
+      color: _TerminalPageState._bar,
       child: Container(
         height: 36,
         padding: const EdgeInsets.only(left: 0, right: 2),
