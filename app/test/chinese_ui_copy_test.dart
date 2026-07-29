@@ -44,6 +44,22 @@ void main() {
       "child: Text('high')",
       "child: Text('xhigh')",
       'LLM saved',
+    ];
+
+    for (final path in files) {
+      final source = File(path).readAsStringSync();
+      for (final text in forbidden) {
+        expect(source, isNot(contains(text)), reason: '$path 仍包含英文界面文案：$text');
+      }
+    }
+  });
+
+  test('LLM 设置不包含英文文案或原始错误提示', () {
+    const files = [
+      'lib/pages/settings_llm_section.dart',
+      'lib/pages/settings_page.dart',
+    ];
+    const forbidden = [
       r"_toast('$e')",
       r'拉取模型列表失败: $e',
     ];
@@ -51,7 +67,7 @@ void main() {
     for (final path in files) {
       final source = File(path).readAsStringSync();
       for (final text in forbidden) {
-        expect(source, isNot(contains(text)), reason: '$path 仍包含英文界面文案：$text');
+        expect(source, isNot(contains(text)), reason: '$path 仍包含未清洗的错误提示：$text');
       }
     }
   });
