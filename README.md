@@ -82,7 +82,7 @@ GitHub Actions builds and tests the project on push, pull request, and manual di
 - Debug APK build and SHA-256 packaging
 - Release APK signing and GitHub Release publishing from `v*` tags
 
-See [docs/RELEASING.md](docs/RELEASING.md) for signing setup and release steps. Release tags must match the version in `app/pubspec.yaml`; signing material is provided only through GitHub Actions Secrets.
+签名配置和发布步骤见 [docs/RELEASING.md](docs/RELEASING.md)。Release Tag 必须与 `app/pubspec.yaml` 中的版本一致，签名材料只通过 GitHub Actions Secrets 提供。
 
 ## Changelog
 

@@ -55,7 +55,7 @@ extension _AgentPageActions on _AgentPageState {
         if (mounted) setState(() => _sessionsLoading = false);
       }
     } catch (e) {
-      if (mounted) showSnack(context, 'Failed to load session: ${cleanError(e)}', seconds: 3);
+      if (mounted) showSnack(context, '加载会话失败：${cleanError(e)}', seconds: 3);
     }
   }
 
@@ -70,7 +70,7 @@ extension _AgentPageActions on _AgentPageState {
     if (mounted) {
       setState(() {
         _busy = false;
-        _busyHint = 'Stopped';
+        _busyHint = '已停止';
       });
     }
   }
@@ -109,7 +109,7 @@ extension _AgentPageActions on _AgentPageState {
     if (text == null || _busy) return;
     setState(() {
       _busy = true;
-      _busyHint = 'Retrying...';
+      _busyHint = '重试中...';
     });
     try {
       await state.agentChat(text);
@@ -129,20 +129,20 @@ extension _AgentPageActions on _AgentPageState {
     final go = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Host key changed'),
+        title: const Text('主机密钥已变化'),
         content: const Text(
-          'The SSH host key on the server does not match the local record. This can happen after a reinstall, or it may indicate a man-in-the-middle risk. If the environment is trusted, clear the old record and trust the new key on the next connection.',
+          '服务器 SSH 主机密钥与本地记录不一致。可能是服务器重装，也可能存在中间人风险。确认环境可信后，可清除旧记录，并在下次连接时信任新密钥。',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Clear and trust')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('清除并重新信任')),
         ],
       ),
     );
     if (go == true) {
       try {
         await state.resetHostKeyForSelected();
-        if (mounted) showSnack(context, 'Cleared, please retry');
+        if (mounted) showSnack(context, '已清除，请重试');
       } catch (e) {
         if (mounted) showSnack(context, cleanError(e));
       }

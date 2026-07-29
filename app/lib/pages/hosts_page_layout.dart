@@ -137,7 +137,7 @@ extension HostsPageLayout on _HostsPageState {
     );
   }
 
-  Widget build(BuildContext context) {
+  Widget _buildHostsPage(BuildContext context) {
     final hostCount = context.select((AppState s) => s.hosts.length);
     context.select((AppState s) => s.selectedHostId);
     context.select((AppState s) => s.probeGen);

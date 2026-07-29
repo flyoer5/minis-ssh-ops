@@ -70,7 +70,7 @@ extension _SettingsPageBehaviorSection on _SettingsPageState {
         Row(
           children: [
             const Expanded(
-              child: Text('Temperature', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+              child: Text('模型温度', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
             ),
             Text(
               (() {

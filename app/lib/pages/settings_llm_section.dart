@@ -45,7 +45,7 @@ extension _SettingsPageLlmSection on _SettingsPageState {
                       style: const TextStyle(fontSize: 13.5),
                       decoration: const InputDecoration(
                         labelText: 'Model',
-                        helperText: 'Refresh to load model list',
+                        helperText: '刷新以加载模型列表',
                         isDense: true,
                       ),
                     )
@@ -66,7 +66,7 @@ extension _SettingsPageLlmSection on _SettingsPageState {
                     ),
             ),
             IconButton(
-              tooltip: 'Refresh models',
+              tooltip: '拉取模型列表',
               onPressed: !state.backendOk || _loadingModels ? null : () => _refreshModels(state),
               icon: _loadingModels
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
@@ -82,7 +82,7 @@ extension _SettingsPageLlmSection on _SettingsPageState {
         DropdownButtonFormField<String>(
           initialValue: const ['none', 'auto', 'low', 'medium', 'high', 'xhigh'].contains(thinkingLevel) ? thinkingLevel : 'auto',
           decoration: const InputDecoration(
-            labelText: 'Thinking level',
+            labelText: '思考级别',
             helperText: 'Optional provider hint',
             isDense: true,
           ),
@@ -117,7 +117,7 @@ extension _SettingsPageLlmSection on _SettingsPageState {
                   }
                 },
           icon: const Icon(Icons.save_outlined, size: 18),
-          label: const Text('Save model'),
+          label: const Text('保存模型'),
         ),
       ],
     );

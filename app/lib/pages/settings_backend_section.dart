@@ -95,13 +95,13 @@ extension _SettingsPageBackendSection on _SettingsPageState {
           onPressed: () async {
             try {
               await state.saveConnection(baseUrl: baseUrl.text.trim(), token: token.text.trim());
-              _toast(state.backendOk ? 'saved' : 'save failed: ${state.backendError}');
+              _toast(state.backendOk ? '已保存' : '保存失败：${state.backendError}');
             } catch (e) {
               _toast('$e');
             }
           },
           icon: const Icon(Icons.save_outlined, size: 18),
-          label: const Text('Save & Connect'),
+          label: const Text('保存并连接'),
         ),
       ],
     );

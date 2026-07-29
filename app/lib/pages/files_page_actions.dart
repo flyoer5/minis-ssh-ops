@@ -18,7 +18,7 @@ extension _FilesPageActionHelpers on _FilesPageState {
           onSubmitted: (v) => Navigator.pop(c, v),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
           FilledButton(onPressed: () => Navigator.pop(c, ctrl.text), child: const Text('Open')),
         ],
       ),
@@ -129,9 +129,9 @@ extension _FilesPageActionHelpers on _FilesPageState {
           context: context,
           builder: (c) => AlertDialog(
             title: const Text('File too large'),
-            content: Text('${r['error'] ?? 'This file is too large to preview.'}\nForce open anyway?'),
+            content: Text('${r['error'] ?? '文件过大，无法预览。'}\n仍要强制打开？'),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
               FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Open')),
             ],
           ),
@@ -149,7 +149,7 @@ extension _FilesPageActionHelpers on _FilesPageState {
             title: const Text('Binary file'),
             content: const Text('This looks like a binary file. Open it anyway?'),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
               FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Open')),
             ],
           ),
@@ -205,7 +205,7 @@ extension _FilesPageActionHelpers on _FilesPageState {
         title: const Text('Create folder'),
         content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'new-folder')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
           FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('Create')),
         ],
       ),
@@ -243,7 +243,7 @@ extension _FilesPageActionHelpers on _FilesPageState {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
           FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Create')),
         ],
       ),
@@ -272,8 +272,8 @@ extension _FilesPageActionHelpers on _FilesPageState {
         title: const Text('Rename'),
         content: TextField(controller: ctrl),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('Save')),
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('保存')),
         ],
       ),
     );

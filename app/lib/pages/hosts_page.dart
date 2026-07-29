@@ -62,6 +62,12 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
     // context.select/watch only legal in build(); side effects moved to build.
   }
 
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return _buildHostsPage(context);
+  }
+
   Future<void> _probeMany(AppState state, {required bool force}) async {
     final ids = <String>[
       for (final h in state.hosts)

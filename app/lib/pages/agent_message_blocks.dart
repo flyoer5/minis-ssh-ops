@@ -11,7 +11,7 @@ class _Bubble extends StatelessWidget {
     await Clipboard.setData(ClipboardData(text: text));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Copied'), duration: Duration(seconds: 1)),
+        const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
       );
     }
   }
@@ -161,7 +161,7 @@ class _Bubble extends StatelessWidget {
                 const Icon(Icons.error_outline, size: 14, color: AppColors.dangerSoft),
                 const SizedBox(width: 6),
                 Text(
-                  'Error',
+                  '错误',
                   style: TextStyle(fontSize: fs - 3, fontWeight: FontWeight.w700, color: AppColors.dangerSoft),
                 ),
                 const Spacer(),
@@ -192,7 +192,7 @@ class _Bubble extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
-                'Interrupted',
+                '已中断',
                 style: TextStyle(fontSize: fs - 4, color: AppColors.warning, fontWeight: FontWeight.w700),
               ),
             ),

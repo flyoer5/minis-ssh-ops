@@ -66,7 +66,7 @@ class AppState extends ChangeNotifier
             // Persist off critical path.
             unawaited(prefs.setString('baseUrl', api.baseUrl));
             unawaited(prefs.setString('localToken', api.localToken));
-            backendNote = info['alreadyRunning'] == true ? 'Backend already running' : 'Started bundled backend';
+            backendNote = info['alreadyRunning'] == true ? '后端已在运行' : '已启动内置后端';
             lastErr = null;
             break;
           }

@@ -64,7 +64,7 @@ extension _SettingsPageDataSection on _SettingsPageState {
                               style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
                             ),
                             actions: [
-                              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
                               FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Import')),
                             ],
                           ),
@@ -123,7 +123,7 @@ extension _SettingsPageDataSection on _SettingsPageState {
             FilledButton.tonalIcon(
               onPressed: !state.backendOk ? null : () => _openLongMemSheet(state),
               icon: const Icon(Icons.psychology_outlined, size: 16),
-              label: const Text('Session memory'),
+              label: const Text('长期记忆'),
             ),
           ],
         ),

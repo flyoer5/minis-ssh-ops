@@ -47,7 +47,7 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Thinking',
+                              '思考中',
                               style: TextStyle(
                                 fontSize: widget.fontSize - 3,
                                 fontWeight: FontWeight.w700,
@@ -57,7 +57,7 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
                             if (widget.interrupted) ...[
                               const SizedBox(width: 8),
                               Text(
-                                'Interrupted',
+                                '已中断',
                                 style: TextStyle(
                                   fontSize: widget.fontSize - 4,
                                   color: AppColors.warning,

@@ -104,7 +104,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                                 await Clipboard.setData(ClipboardData(text: path));
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Copied path $path'), duration: const Duration(seconds: 1)),
+                                    SnackBar(content: Text('已复制路径：$path'), duration: const Duration(seconds: 1)),
                                   );
                                 }
                               },
@@ -167,7 +167,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                            tooltip: 'Refresh',
+                            tooltip: '刷新',
                             icon: const Icon(Icons.refresh, size: 18),
                             onPressed: pane.loading
                                 ? null
@@ -246,7 +246,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                                 TextButton.icon(
                                   onPressed: () => _load(pane),
                                   icon: const Icon(Icons.refresh, size: 16),
-                                  label: const Text('Refresh'),
+                                  label: const Text('刷新'),
                                 ),
                               ],
                             ),

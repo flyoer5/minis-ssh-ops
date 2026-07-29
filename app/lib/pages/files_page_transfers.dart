@@ -27,7 +27,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
       } catch (_) {}
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(saved != null && saved.isNotEmpty ? 'Saved $n' : 'Download finished')),
+        SnackBar(content: Text(saved != null && saved.isNotEmpty ? '已保存 $n' : '下载完成')),
       );
     } catch (e) {
       if (mounted) {
@@ -58,7 +58,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
         builder: (c) => AlertDialog(
           title: Text('Delete ${paths.length} item(s)?'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
             FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
           ],
         ),
@@ -125,7 +125,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
     if (mounted) {
       final detail = files + dirs > 0 ? '(${files} files${dirs > 0 ? ', $dirs dirs' : ''})' : '';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(failN == 0 ? 'Copied $okN item(s) $detail' : 'Copied $okN item(s), failed $failN $detail'),
+        content: Text(failN == 0 ? '已复制 $okN 项$detail' : '复制完成：成功 $okN 项，失败 $failN 项$detail'),
       ));
     }
   }

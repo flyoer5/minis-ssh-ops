@@ -82,7 +82,7 @@ extension _FilesPageLayout on _FilesPageState {
               FilledButton.tonalIcon(
                 onPressed: () => NavScope.maybeOf(context)?.go(0),
                 icon: const Icon(Icons.dns_outlined, size: 18),
-                label: const Text('Go to hosts'),
+                label: const Text('去选主机'),
               ),
             ],
           ),
@@ -162,9 +162,9 @@ extension _FilesPageLayout on _FilesPageState {
                 PopupMenuItem(
                   value: 'delete',
                   enabled: active.selected.isNotEmpty,
-                  child: const Text('Delete selected', style: TextStyle(color: AppColors.danger)),
+                  child: const Text('删除选中', style: TextStyle(color: AppColors.danger)),
                 ),
-                const PopupMenuItem(value: 'cancel', child: Text('Cancel selection')),
+                const PopupMenuItem(value: 'cancel', child: Text('取消多选')),
               ],
             ),
       ];
@@ -210,7 +210,7 @@ extension _FilesPageLayout on _FilesPageState {
               icon: Icon(dualPane ? Icons.view_agenda_outlined : Icons.view_column_outlined, size: 20),
             ),
             IconButton(
-              tooltip: 'Refresh',
+              tooltip: '刷新',
               onPressed: active.loading ? null : () => _load(active),
               icon: const Icon(Icons.refresh, size: 20),
             ),
@@ -307,7 +307,7 @@ extension _FilesPageLayout on _FilesPageState {
       title: Text(
         active.selecting
             ? 'Selected ${active.selected.length}'
-            : (dualPane ? 'Files - ${focus == 0 ? "Left" : "Right"}' : 'Files'),
+            : (dualPane ? '文件 - ${focus == 0 ? "左栏" : "右栏"}' : '文件'),
         style: TextStyle(fontSize: fs + 1, fontWeight: FontWeight.w600),
       ),
       actions: actions,

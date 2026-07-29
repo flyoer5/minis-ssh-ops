@@ -1,33 +1,33 @@
-# Releasing
+# 发布说明
 
-正式 Android releases are built by the GitHub Actions `Android Release` workflow. The workflow uses the repository's existing Android signing material; it does not generate or rotate a signing key.
+正式 Android 版本由 GitHub Actions 的 `Android Release` 工作流构建。工作流使用仓库现有的 Android 签名材料，不会生成或轮换签名密钥。
 
-## Configure signing secrets
+## 配置签名 Secrets
 
-In **Settings -> Secrets and variables -> Actions**, configure these four repository secrets:
+在仓库的 **Settings -> Secrets and variables -> Actions** 中配置以下四个 Repository secrets：
 
-- `ANDROID_KEYSTORE_BASE64`: Base64 content of the existing `release.jks`
-- `ANDROID_STORE_PASSWORD`: keystore password
-- `ANDROID_KEY_PASSWORD`: signing key password
-- `ANDROID_KEY_ALIAS`: signing key alias
+- `ANDROID_KEYSTORE_BASE64`：现有 `release.jks` 的 Base64 内容
+- `ANDROID_STORE_PASSWORD`：keystore 密码
+- `ANDROID_KEY_PASSWORD`：签名密钥密码
+- `ANDROID_KEY_ALIAS`：签名密钥别名
 
-Keep signing material in GitHub Secrets. Do not commit `key.properties`, `.jks`, or `.keystore` files. A release fails before building if any secret is missing.
+签名材料只能保存在 GitHub Secrets 中。不要提交 `key.properties`、`.jks` 或 `.keystore` 文件。缺少任一 Secret 时，正式发布会在构建前失败。
 
-## Publish a release
+## 发布步骤
 
-1. Update `version` in `app/pubspec.yaml`, for example `1.5.39+123`.
-2. Merge the version change into `main`.
-3. Create and push a tag from that `main` commit:
+1. 更新 `app/pubspec.yaml` 中的 `version`，例如 `1.5.39+123`。
+2. 将版本变更合并到 `main`。
+3. 从对应的 `main` 提交创建并推送 Tag：
 
    ```bash
    git tag v1.5.39
    git push origin v1.5.39
    ```
 
-4. Monitor the `Android Release` workflow. On success, the GitHub Release contains the versioned APK, a `latest` APK, and `SHA256SUMS.txt`.
+4. 查看 `Android Release` 工作流。成功后，GitHub Release 会包含带版本号的 APK、`latest` APK 和 `SHA256SUMS.txt`。
 
-Tags must use the exact `vMAJOR.MINOR.PATCH` format. The version without `v` must match the part of `app/pubspec.yaml` before `+`. The workflow can also be run manually with an existing `v*` tag.
+Tag 必须严格使用 `vMAJOR.MINOR.PATCH` 格式。去掉 `v` 后的版本必须与 `app/pubspec.yaml` 中 `+` 之前的版本一致。也可以手动运行工作流并输入一个已经存在的 `v*` Tag。
 
-## Key rotation
+## 密钥轮换
 
-This workflow does not rotate signing keys automatically. If the key is exposed, follow the Android app release policy and update all four secrets. Never commit either the old or new keystore to the repository or its public history.
+工作流不会自动轮换签名密钥。若密钥泄露，应按照 Android 应用发布策略处理并更新四个 Secrets。无论新旧 keystore，都不能提交到仓库或公开历史。
