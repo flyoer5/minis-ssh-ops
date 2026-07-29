@@ -62,7 +62,7 @@ extension _SettingsLongMemSheet on _SettingsPageState {
                                   ),
                                 );
                                 if (ok != true) return;
-                                await state.api.clearSessionMemory();
+                                await state.api.deleteSessionMemory(all: true);
                                 setLocal(() => entries = []);
                                 if (mounted) _toast('已清空长期记忆');
                               },

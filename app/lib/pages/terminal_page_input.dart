@@ -124,7 +124,7 @@ extension _TerminalPageInput on _TerminalPageState {
         child: SizedBox(
           height: 36,
           child: Material(
-            color: on ? AppColors.border : _keyBg,
+            color: on ? AppColors.border : _TerminalPageState._keyBg,
             borderRadius: BorderRadius.circular(6),
             child: InkWell(
               borderRadius: BorderRadius.circular(6),
@@ -133,7 +133,7 @@ extension _TerminalPageInput on _TerminalPageState {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: on ? _green : AppColors.text,
+                    color: on ? _TerminalPageState._green : AppColors.text,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -150,9 +150,9 @@ extension _TerminalPageInput on _TerminalPageState {
     return ImeInset(
       usePadding: false,
       reservedBottom: kBottomNavigationBarHeight,
-      fillColor: _bar,
+      fillColor: _TerminalPageState._bar,
       child: Container(
-        color: _bar,
+        color: _TerminalPageState._bar,
         padding: const EdgeInsets.only(left: 4, right: 4, top: 4, bottom: 6),
         child: Column(
           children: [
