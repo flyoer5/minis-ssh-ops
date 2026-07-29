@@ -80,7 +80,9 @@ GitHub Actions builds and tests the project on push, pull request, and manual di
 - Android arm64 Go cross-compilation
 - Flutter analyze and Flutter tests
 - Debug APK build and SHA-256 packaging
-- Release APK build only when all signing secrets are present
+- Release APK signing and GitHub Release publishing from `v*` tags
+
+See [docs/RELEASING.md](docs/RELEASING.md) for signing setup and release steps. Release tags must match the version in `app/pubspec.yaml`; signing material is provided only through GitHub Actions Secrets.
 
 ## Changelog
 
