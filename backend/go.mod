@@ -6,7 +6,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/pkg/sftp v1.13.11
-	golang.org/x/crypto v0.35.0
+	golang.org/x/crypto v0.54.0
 	modernc.org/sqlite v1.54.0
 	mvdan.cc/sh/v3 v3.13.1
 )
