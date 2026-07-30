@@ -187,9 +187,24 @@ extension HostsPageActions on _HostsPageState {
         ),
       );
       if (ok == true) {
+        final savedHost = Map<String, dynamic>.from(h);
         await state.removeHost(id);
         if (!mounted) return;
         setState(() => _summary.remove(id));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已删除 $name'),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: '撤销',
+              onPressed: () {
+                if (mounted) {
+                  state.addHost(savedHost).then((_) => _refreshAll(state));
+                }
+              },
+            ),
+          ),
+        );
       }
     }
   }

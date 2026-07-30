@@ -4,7 +4,7 @@ extension _TerminalPageWidgets on _TerminalPageState {
   Widget _buildEmptyState(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 44,
+        toolbarHeight: 48,
         leading: NavMenuButton.leadingOf(context),
         leadingWidth: NavMenuButton.leadingWidthOf(context),
         title: const Text('终端'),
@@ -23,7 +23,7 @@ extension _TerminalPageWidgets on _TerminalPageState {
               ),
               const SizedBox(height: 6),
               const Text(
-                '终端会通过 WebSocket 挂到这台主机的交互 shell。',
+                '终端通过 WebSocket 挂到主机的交互 shell。',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12.5, color: AppColors.textFaint, height: 1.4),
               ),

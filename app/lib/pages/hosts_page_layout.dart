@@ -104,7 +104,15 @@ extension HostsPageLayout on _HostsPageState {
         index: i,
         child: Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: card,
+          child: Row(
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(right: 4),
+                child: Icon(Icons.drag_handle, size: 20, color: AppColors.iconFaint),
+              ),
+              Expanded(child: card),
+            ],
+          ),
         ),
       );
     }
@@ -164,7 +172,7 @@ extension HostsPageLayout on _HostsPageState {
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        toolbarHeight: 44,
+        toolbarHeight: 48,
         leading: NavMenuButton.leadingOf(context),
         leadingWidth: NavMenuButton.leadingWidthOf(context),
         titleSpacing: 4,
@@ -202,7 +210,7 @@ extension HostsPageLayout on _HostsPageState {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          '添加后可在 Agent、终端、文件中使用。支持密码或密钥登录。',
+                          '添加后可在 Agent、终端、文件中使用。',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 13, color: AppColors.textFaint, height: 1.4),
                         ),
