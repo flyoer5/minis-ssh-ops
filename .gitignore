@@ -3,7 +3,8 @@ backend/bin/
 backend/vendor/
 *.exe
 *.test
-# Rebuilt by scripts/build-go-android.sh / CI (do not commit ~10MB blobs)
+# Rebuilt by scripts/build-go-android.sh / CI (do not commit large binaries)
+# Keep the legacy asset path ignored so stale local builds cannot be committed.
 app/android/app/src/main/assets/go/ssh-ai-agent
 app/android/app/src/main/jniLibs/
 app/assets/go/ssh-ai-agent-arm64

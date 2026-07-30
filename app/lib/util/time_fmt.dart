@@ -5,16 +5,54 @@
 /// be wrong. We format in fixed UTC+8 (China) for display.
 library;
 
-/// Parse API time (UTC RFC3339 or local-ish) → wall clock in China (UTC+8).
+/// Parse API time into wall clock time in China (UTC+8).
+///
+/// Zoned values are converted to UTC+8. Values without a zone are treated as
+/// China wall clock values so the device time zone cannot shift them again.
 DateTime? parseAsChina(String? raw) {
   if (raw == null) return null;
-  final s = raw.trim();
-  if (s.isEmpty) return null;
-  var dt = DateTime.tryParse(s);
-  if (dt == null) return null;
-  // If string has no zone, DateTime.tryParse treats as local — still convert via UTC.
-  final utc = dt.isUtc ? dt : dt.toUtc();
-  return utc.add(const Duration(hours: 8));
+  final value = raw.trim();
+  if (value.isEmpty) return null;
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null) return null;
+  final hasZone = RegExp(r'(Z|[+-]\d{2}:?\d{2})$', caseSensitive: false).hasMatch(value);
+  if (!hasZone) {
+    return DateTime(
+      parsed.year,
+      parsed.month,
+      parsed.day,
+      parsed.hour,
+      parsed.minute,
+      parsed.second,
+      parsed.millisecond,
+      parsed.microsecond,
+    );
+  }
+  return parsed.toUtc().add(const Duration(hours: 8));
+}
+
+/// Parse persisted/API time into an instant suitable for comparisons.
+///
+/// Values without a zone are treated as China wall clock values and converted
+/// to UTC, avoiding dependence on the Android device time zone.
+DateTime? parseChinaInstant(String? raw) {
+  if (raw == null) return null;
+  final value = raw.trim();
+  if (value.isEmpty) return null;
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null) return null;
+  final hasZone = RegExp(r'(Z|[+-]\d{2}:?\d{2})$', caseSensitive: false).hasMatch(value);
+  if (hasZone) return parsed.toUtc();
+  return DateTime.utc(
+    parsed.year,
+    parsed.month,
+    parsed.day,
+    parsed.hour - 8,
+    parsed.minute,
+    parsed.second,
+    parsed.millisecond,
+    parsed.microsecond,
+  );
 }
 
 String two(int n) => n.toString().padLeft(2, '0');

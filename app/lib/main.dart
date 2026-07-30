@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/pages/agent_page.dart';
@@ -97,6 +98,9 @@ class SshAiAgentApp extends StatelessWidget {
       child: MaterialApp(
         title: '机枢',
         debugShowCheckedModeBanner: false,
+        locale: const Locale('zh', 'CN'),
+        supportedLocales: const [Locale('zh', 'CN')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
         theme: buildAppTheme(),
         builder: (context, child) {
           // Keep ErrorWidget theme-consistent even outside routes.

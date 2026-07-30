@@ -251,7 +251,7 @@ class MainActivity : FlutterActivity() {
 
 /**
  * Process lifecycle for the embedded Go backend.
- * Prefer jniLibs `libssh_ai_agent.so` (Android-extracted, executable), fall back to assets.
+ * Run the Android-extracted `jniLibs` backend executable.
  */
 object BackendRuntime {
     /**
@@ -428,49 +428,12 @@ object BackendRuntime {
     }
 
     private fun resolveBinary(app: android.content.Context): File {
-        // 1) jniLibs: Android extracts libssh_ai_agent.so into nativeLibraryDir
-        try {
-            val so = File(app.applicationInfo.nativeLibraryDir, "libssh_ai_agent.so")
-            if (so.exists() && so.length() > 1024) {
-                Log.i(TAG, "using jniLibs ${so.absolutePath}")
-                return so
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "nativeLibraryDir: ${e.message}")
+        val binary = File(app.applicationInfo.nativeLibraryDir, "libssh_ai_agent.so")
+        if (!binary.exists() || binary.length() <= 1024) {
+            throw IllegalStateException("bundled Go backend is missing: ${binary.absolutePath}")
         }
-
-        // 2) extract from APK assets
-        val outDir = File(app.filesDir, "bin").apply { mkdirs() }
-        val out = File(outDir, "ssh-ai-agent")
-        val names = listOf("go/ssh-ai-agent", "go/libssh_ai_agent.so")
-        var opened = false
-        for (name in names) {
-            try {
-                app.assets.open(name).use { input ->
-                    FileOutputStream(out).use { output -> input.copyTo(output) }
-                }
-                opened = true
-                Log.i(TAG, "extracted asset $name -> ${out.absolutePath}")
-                break
-            } catch (_: Exception) {
-            }
-        }
-        if (!opened) {
-            throw IllegalStateException("no go backend asset found (go/ssh-ai-agent)")
-        }
-        out.setReadable(true, true)
-        out.setExecutable(true, true)
-        out.setWritable(true, true)
-        if (!out.canExecute()) {
-            try {
-                Runtime.getRuntime().exec(arrayOf("chmod", "700", out.absolutePath)).waitFor()
-            } catch (_: Exception) {
-            }
-        }
-        if (!out.canExecute()) {
-            throw IllegalStateException("backend binary not executable: ${out.absolutePath}")
-        }
-        return out
+        Log.i(TAG, "using jniLibs ${binary.absolutePath}")
+        return binary
     }
 
     private fun publishDebugToken(app: android.content.Context, token: String) {
