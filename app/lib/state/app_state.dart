@@ -187,7 +187,7 @@ class AppState extends ChangeNotifier
   }
 
 
-  Future<String> exportConfigJson({bool includeSecrets = false}) async {
+  Future<String> exportConfigJson() async {
     final hostsOut = <Map<String, dynamic>>[];
     for (final h in hosts) {
       if (h is! Map) continue;
@@ -210,9 +210,7 @@ class AppState extends ChangeNotifier
       'hosts': hostsOut,
       'llm': llmOut,
       'prefs': uiPrefsExport(),
-      'note': includeSecrets
-          ? 'secrets not exported via this path'
-          : 'passwords/keys not included',
+      'note': '不包含密码、私钥、口令、本地 Token 或 API Key',
     };
     return JsonEncoder.withIndent('  ').convert(obj);
   }
