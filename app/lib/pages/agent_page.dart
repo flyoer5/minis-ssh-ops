@@ -127,7 +127,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
         SnackBar(
           content: const Text('Please select a host first.'),
           duration: const Duration(seconds: 3),
-          action: SnackBarAction(label: 'Go to hosts', onPressed: () => NavScope.maybeOf(context)?.go(0)),
+          action: SnackBarAction(label: '前往主机', onPressed: () => NavScope.maybeOf(context)?.go(0)),
         ),
       );
       return;

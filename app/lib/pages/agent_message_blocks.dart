@@ -1,4 +1,4 @@
-﻿part of 'agent_page.dart';
+part of 'agent_page.dart';
 
 class _Bubble extends StatelessWidget {
   final ChatMessage msg;
@@ -11,7 +11,7 @@ class _Bubble extends StatelessWidget {
     await Clipboard.setData(ClipboardData(text: text));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Copied'), duration: Duration(seconds: 1)),
+        const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
       );
     }
   }

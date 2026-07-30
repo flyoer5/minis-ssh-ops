@@ -5,8 +5,8 @@ extension _SettingsPageBackendSection on _SettingsPageState {
     return _section(
       icon: Icons.dns_outlined,
       accent: AppColors.success,
-      title: 'Backend',
-      subtitle: 'Local Go service and token',
+      title: '后端服务',
+      subtitle: '本地 Go 服务与访问令牌',
       children: [
         Wrap(
           spacing: 8,
@@ -75,7 +75,7 @@ extension _SettingsPageBackendSection on _SettingsPageState {
           controller: baseUrl,
           style: const TextStyle(fontSize: 13.5),
           decoration: const InputDecoration(
-            labelText: 'Go Base URL',
+            labelText: 'Go 后端地址',
             isDense: true,
             prefixIcon: Icon(Icons.link, size: 18),
           ),

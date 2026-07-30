@@ -129,13 +129,13 @@ extension _AgentPageActions on _AgentPageState {
     final go = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Host key changed'),
+        title: const Text('主机密钥已变更'),
         content: const Text(
           'The SSH host key on the server does not match the local record. This can happen after a reinstall, or it may indicate a man-in-the-middle risk. If the environment is trusted, clear the old record and trust the new key on the next connection.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Clear and trust')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('清除并信任')),
         ],
       ),
     );

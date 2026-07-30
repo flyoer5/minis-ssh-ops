@@ -58,8 +58,8 @@ extension _FilesPageTransferHelpers on _FilesPageState {
         builder: (c) => AlertDialog(
           title: Text('Delete ${paths.length} item(s)?'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('删除')),
           ],
         ),
       );
@@ -207,7 +207,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
             if (isDir)
               ListTile(
                 leading: const Icon(Icons.folder_open),
-                title: const Text('Open folder'),
+                title: const Text('打开文件夹'),
                 onTap: () {
                   Navigator.pop(c);
                   _go(active, p);
@@ -215,7 +215,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
               ),
             ListTile(
               leading: const Icon(Icons.drive_file_rename_outline),
-              title: const Text('Rename'),
+              title: const Text('重命名'),
               onTap: () {
                 Navigator.pop(c);
                 _rename(p, name);
@@ -224,7 +224,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
             if (!isDir)
               ListTile(
                 leading: const Icon(Icons.download),
-                title: const Text('Download'),
+                title: const Text('下载'),
                 onTap: () {
                   Navigator.pop(c);
                   _download(p, name);
@@ -232,7 +232,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
               ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: AppColors.danger),
-              title: const Text('Delete', style: TextStyle(color: AppColors.danger)),
+              title: const Text('删除', style: TextStyle(color: AppColors.danger)),
               onTap: () {
                 Navigator.pop(c);
                 active.selected

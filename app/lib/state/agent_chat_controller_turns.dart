@@ -78,7 +78,7 @@ extension AgentChatControllerTurns on AgentChatController {
     if (!_turnExecutor.isCurrent(turn)) return;
 
     _pushMsg(ChatMessage(role: 'user', content: userText));
-    if (agentSessionTitle == 'New session' || agentSessionTitle.isEmpty) {
+    if (agentSessionTitle == '新建会话' || agentSessionTitle.isEmpty) {
       final t = userText.trim().replaceAll(RegExp(r'\s+'), ' ');
       agentSessionTitle = t.length > 32 ? '${t.substring(0, 32)}...' : t;
     }

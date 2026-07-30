@@ -22,7 +22,7 @@ extension AgentChatControllerSessions on AgentChatController {
     lastPlan = null;
     stepResults.clear();
     agentSessionId = null;
-    agentSessionTitle = 'New session';
+    agentSessionTitle = '新建会话';
     sessionOvMaxRounds = null;
     sessionOvTemperature = null;
     sessionOvConfirm = null;
@@ -70,7 +70,7 @@ extension AgentChatControllerSessions on AgentChatController {
       ..clear()
       ..addAll(s.messages);
     agentSessionId = s.id;
-    agentSessionTitle = s.title.isNotEmpty ? s.title : 'Session';
+    agentSessionTitle = s.title.isNotEmpty ? s.title : '会话';
     if (s.hostId != null && s.hostId != selectedHostId) {
       selectedHostId = s.hostId;
       SharedPreferences.getInstance().then((p) {
@@ -127,7 +127,7 @@ extension AgentChatControllerSessions on AgentChatController {
     } else if (msgs.isNotEmpty) {
       agentSessionTitle = _sessionTitleFromMessages(msgs);
     } else {
-      agentSessionTitle = 'Session';
+      agentSessionTitle = '会话';
     }
     applySessionOverrides(
       maxRounds: ovMaxRounds,
@@ -195,7 +195,7 @@ extension AgentChatControllerSessions on AgentChatController {
       _supersedeAgentTurn();
       agentMessages.clear();
       agentSessionId = null;
-      agentSessionTitle = 'New session';
+      agentSessionTitle = '新建会话';
       sessionOvMaxRounds = null;
       sessionOvTemperature = null;
       sessionOvConfirm = null;

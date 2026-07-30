@@ -5,8 +5,8 @@ extension _SettingsPageConnectivitySection on _SettingsPageState {
     return _section(
       icon: Icons.network_check,
       accent: AppColors.accentMint,
-      title: 'Connectivity',
-      subtitle: 'Quick backend reachability checks',
+      title: '连接测试',
+      subtitle: '快速检查后端与服务连通性',
       children: [
         Wrap(
           spacing: 8,
@@ -32,7 +32,7 @@ extension _SettingsPageConnectivitySection on _SettingsPageState {
                       }
                     },
               icon: const Icon(Icons.terminal, size: 16),
-              label: const Text('Test SSH'),
+              label: const Text('测试 SSH'),
             ),
             FilledButton.tonalIcon(
               onPressed: !state.backendOk || state.selectedHostId == null || pinging
@@ -54,7 +54,7 @@ extension _SettingsPageConnectivitySection on _SettingsPageState {
                       }
                     },
               icon: const Icon(Icons.psychology_outlined, size: 16),
-              label: const Text('Test model'),
+              label: const Text('测试模型'),
             ),
             if (pinging)
               const Padding(

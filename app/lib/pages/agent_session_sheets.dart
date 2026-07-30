@@ -1,4 +1,4 @@
-﻿part of 'agent_page.dart';
+part of 'agent_page.dart';
 
 Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, AppState state) async {
   Future<List<AgentSession>> load() async {
@@ -23,8 +23,8 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
                 padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                 child: Row(children: [
                   const Expanded(child: Text('Sessions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
-                  IconButton(onPressed: () => setSheetState(() => sessionsFuture = load()), icon: const Icon(Icons.refresh), tooltip: 'Refresh'),
-                  IconButton(onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close), tooltip: 'Close'),
+                  IconButton(onPressed: () => setSheetState(() => sessionsFuture = load()), icon: const Icon(Icons.refresh), tooltip: '刷新'),
+                  IconButton(onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close), tooltip: '关闭'),
                 ]),
               ),
               Expanded(
@@ -56,7 +56,7 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
                             },
                             trailing: IconButton(
                               icon: const Icon(Icons.delete_outline),
-                              tooltip: 'Delete session',
+                              tooltip: '删除会话',
                               onPressed: () async {
                                 state.deleteAgentSession(session.id);
                                 setSheetState(() => sessionsFuture = load());
@@ -108,7 +108,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                   Row(
                     children: [
                       const Expanded(
-                        child: Text('Session settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                        child: Text('会话设置', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                       ),
                       TextButton(
                         onPressed: () {
@@ -119,7 +119,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                             promptCtrl.clear();
                           });
                         },
-                        child: const Text('Reset defaults'),
+                        child: const Text('恢复默认值'),
                       ),
                       IconButton(onPressed: () => Navigator.pop(c, false), icon: const Icon(Icons.close)),
                     ],
@@ -170,17 +170,17 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                     spacing: 8,
                     children: [
                       ChoiceChip(
-                        label: const Text('Follow global'),
+                        label: const Text('跟随全局设置'),
                         selected: confirm == null,
                         onSelected: (_) => setM(() => confirm = null),
                       ),
                       ChoiceChip(
-                        label: const Text('Force on'),
+                        label: const Text('强制开启'),
                         selected: confirm == 1,
                         onSelected: (_) => setM(() => confirm = 1),
                       ),
                       ChoiceChip(
-                        label: const Text('Force off'),
+                        label: const Text('强制关闭'),
                         selected: confirm == 0,
                         onSelected: (_) => setM(() => confirm = 0),
                       ),
@@ -194,7 +194,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                     maxLines: 3,
                     minLines: 1,
                     decoration: const InputDecoration(
-                      hintText: 'Appended to the global custom prompt',
+                      hintText: '追加到全局自定义提示词',
                       isDense: true,
                       border: OutlineInputBorder(),
                     ),
@@ -203,7 +203,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: () => Navigator.pop(c, true),
-                    child: const Text('Save settings'),
+                    child: const Text('保存设置'),
                   ),
                 ],
               ),
@@ -292,7 +292,7 @@ Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) a
             Row(
               children: [
                 const Expanded(
-                  child: Text('Session memory', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  child: Text('会话记忆', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
                 TextButton(
                   onPressed: summary.isEmpty && facts.isEmpty
@@ -304,8 +304,8 @@ Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) a
                               title: const Text('Delete memory?'),
                               content: const Text('This clears the summary and facts, but keeps the chat history.'),
                               actions: [
-                                TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-                                FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Delete')),
+                                TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('取消')),
+                                FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('删除')),
                               ],
                             ),
                           );
@@ -316,7 +316,7 @@ Future<void> showAgentSessionMemorySheet(BuildContext context, AppState state) a
                             if (c.mounted) Navigator.pop(c);
                           }
                         },
-                  child: const Text('Delete memory'),
+                  child: const Text('删除记忆'),
                 ),
                 IconButton(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.close)),
               ],

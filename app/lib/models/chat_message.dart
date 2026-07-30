@@ -1,3 +1,5 @@
+import 'package:ssh_ai_agent/util/time_fmt.dart';
+
 /// One line in the Agent chat transcript (Minis-style session).
 class ChatMessage {
   ChatMessage({
@@ -22,7 +24,7 @@ class ChatMessage {
     DateTime at = DateTime.now();
     final rawAt = j['createdAt'] ?? j['at'] ?? j['timestamp'];
     if (rawAt != null) {
-      at = DateTime.tryParse(rawAt.toString())?.toLocal() ?? DateTime.now();
+      at = parseChinaInstant(rawAt.toString()) ?? DateTime.now().toUtc();
     }
 
     Map<String, dynamic>? meta;

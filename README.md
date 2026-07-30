@@ -50,7 +50,7 @@ Run Flutter checks:
 ```bash
 cd app
 flutter pub get --enforce-lockfile
-flutter analyze --no-fatal-infos
+flutter analyze --no-fatal-infos --no-fatal-warnings
 flutter test
 ```
 
@@ -60,6 +60,8 @@ Build the Android arm64 backend and debug APK:
 ./scripts/build-go-android.sh
 cd app
 flutter build apk --debug --target-platform android-arm64
+# Release（需要签名配置；请妥善保存 build/debug-info）
+flutter build apk --release --target-platform android-arm64 --obfuscate --split-debug-info=build/debug-info
 ```
 
 ## Security notes

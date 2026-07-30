@@ -15,17 +15,17 @@ extension _AgentPageChrome on _AgentPageState {
                 final name = await showDialog<String>(
                   context: context,
                   builder: (d) => AlertDialog(
-                    title: const Text('Session title'),
+                    title: const Text('会话标题'),
                     content: TextField(
                       controller: ctrl,
                       autofocus: true,
                       maxLength: 48,
-                      decoration: const InputDecoration(labelText: 'Title'),
+                      decoration: const InputDecoration(labelText: '标题'),
                       onSubmitted: (x) => Navigator.pop(d, x),
                     ),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
-                      FilledButton(onPressed: () => Navigator.pop(d, ctrl.text), child: const Text('Save')),
+                      TextButton(onPressed: () => Navigator.pop(d), child: const Text('取消')),
+                      FilledButton(onPressed: () => Navigator.pop(d, ctrl.text), child: const Text('保存')),
                     ],
                   ),
                 );
@@ -79,7 +79,7 @@ extension _AgentPageChrome on _AgentPageState {
             ),
           ),
         PopupMenuButton<String>(
-          tooltip: 'Session',
+          tooltip: '会话',
           icon: const Icon(Icons.tune, size: 20),
           color: AppColors.surface,
           onSelected: (v) {
@@ -90,17 +90,17 @@ extension _AgentPageChrome on _AgentPageState {
               showDialog<String>(
                 context: context,
                 builder: (d) => AlertDialog(
-                  title: const Text('Session title'),
+                  title: const Text('会话标题'),
                   content: TextField(
                     controller: ctrl,
                     autofocus: true,
                     maxLength: 48,
-                    decoration: const InputDecoration(labelText: 'Title'),
+                    decoration: const InputDecoration(labelText: '标题'),
                     onSubmitted: (x) => Navigator.pop(d, x),
                   ),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
-                    FilledButton(onPressed: () => Navigator.pop(d, ctrl.text), child: const Text('Save')),
+                    TextButton(onPressed: () => Navigator.pop(d), child: const Text('取消')),
+                    FilledButton(onPressed: () => Navigator.pop(d, ctrl.text), child: const Text('保存')),
                   ],
                 ),
               ).then((name) {
@@ -111,20 +111,20 @@ extension _AgentPageChrome on _AgentPageState {
             }
           },
           itemBuilder: (_) => [
-            const PopupMenuItem(value: 'settings', child: Text('Session settings')),
-            const PopupMenuItem(value: 'memory', child: Text('Session memory')),
-            const PopupMenuItem(value: 'rename', child: Text('Rename')),
+            const PopupMenuItem(value: 'settings', child: Text('会话设置')),
+            const PopupMenuItem(value: 'memory', child: Text('会话记忆')),
+            const PopupMenuItem(value: 'rename', child: Text('重命名')),
           ],
         ),
         IconButton(
           visualDensity: VisualDensity.compact,
-          tooltip: 'History',
+          tooltip: '历史记录',
           onPressed: () => _showSessions(state),
           icon: const Icon(Icons.history, size: 20),
         ),
         IconButton(
           visualDensity: VisualDensity.compact,
-          tooltip: 'New session',
+          tooltip: '新建会话',
           onPressed: () async {
             if (_busy || state.agentBusy) {
               _stopGeneration(state);
@@ -134,12 +134,12 @@ extension _AgentPageChrome on _AgentPageState {
               final r = await state.api.createAgentSession(hostId: state.selectedHostId);
               final sid = r['sessionId'] ?? r['id'] ?? '';
               if (sid is String && sid.isNotEmpty) {
-                state.setAgentSessionMeta(sid, 'New session');
+                state.setAgentSessionMeta(sid, '新建会话');
               }
             } catch (_) {}
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('New session created'), duration: Duration(seconds: 1)),
+                const SnackBar(content: Text('已创建新会话'), duration: Duration(seconds: 1)),
               );
             }
           },

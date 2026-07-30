@@ -20,16 +20,16 @@ extension _FilesPagePaneHelpers on _FilesPageState {
           trailing: pane.selecting
               ? Icon(selected ? Icons.check_circle : Icons.radio_button_unchecked, color: selected ? AppColors.cyan : AppColors.textFaint)
               : PopupMenuButton<String>(
-                  tooltip: 'More',
+                  tooltip: '更多',
                   onSelected: (action) {
                     if (action == 'rename') _rename(path, name);
                     if (action == 'delete') _deletePaths([path], ask: true);
                     if (action == 'copy') _copyToOther(singlePath: path);
                   },
                   itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'rename', child: Text('Rename')),
-                    PopupMenuItem(value: 'copy', child: Text('Copy to other pane')),
-                    PopupMenuItem(value: 'delete', child: Text('Delete')),
+                    PopupMenuItem(value: 'rename', child: Text('重命名')),
+                    PopupMenuItem(value: 'copy', child: Text('复制到另一侧')),
+                    PopupMenuItem(value: 'delete', child: Text('删除')),
                   ],
                 ),
           onTap: () {
@@ -126,7 +126,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                            tooltip: 'Favorite path',
+                            tooltip: '收藏路径',
                             icon: Builder(
                               builder: (ctx) {
                                 final s = ctx.watch<AppState>();
@@ -156,7 +156,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                            tooltip: 'Up',
+                            tooltip: '返回上级',
                             icon: const Icon(Icons.arrow_upward, size: 18),
                             onPressed: () {
                               setState(() => focus = idx);
@@ -167,7 +167,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                            tooltip: 'Refresh',
+                            tooltip: '刷新',
                             icon: const Icon(Icons.refresh, size: 18),
                             onPressed: pane.loading
                                 ? null
@@ -246,7 +246,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                                 TextButton.icon(
                                   onPressed: () => _load(pane),
                                   icon: const Icon(Icons.refresh, size: 16),
-                                  label: const Text('Refresh'),
+                                  label: const Text('刷新'),
                                 ),
                               ],
                             ),

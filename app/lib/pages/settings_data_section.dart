@@ -5,8 +5,8 @@ extension _SettingsPageDataSection on _SettingsPageState {
     return _section(
       icon: Icons.medical_services_outlined,
       accent: AppColors.accentPink,
-      title: 'Data & Diagnostics',
-      subtitle: 'Export, import, logs, and trusted host records',
+      title: '数据与诊断',
+      subtitle: '导入导出、日志与可信主机记录',
       children: [
         Wrap(
           spacing: 8,
@@ -22,7 +22,7 @@ extension _SettingsPageDataSection on _SettingsPageState {
                         await showDialog(
                           context: context,
                           builder: (c) => AlertDialog(
-                            title: const Text('Export config'),
+                            title: const Text('导出配置'),
                             content: SizedBox(
                               width: double.maxFinite,
                               height: 280,
@@ -35,9 +35,9 @@ extension _SettingsPageDataSection on _SettingsPageState {
                                   Navigator.pop(c);
                                   _toast('copied');
                                 },
-                                child: const Text('Copy'),
+                                child: const Text('复制'),
                               ),
-                              TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close')),
+                              TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
                             ],
                           ),
                         );
@@ -46,7 +46,7 @@ extension _SettingsPageDataSection on _SettingsPageState {
                       }
                     },
               icon: const Icon(Icons.upload_outlined, size: 16),
-              label: const Text('Export config'),
+              label: const Text('导出配置'),
             ),
             FilledButton.tonalIcon(
               onPressed: !state.backendOk
@@ -57,15 +57,15 @@ extension _SettingsPageDataSection on _SettingsPageState {
                         final ok = await showDialog<bool>(
                           context: context,
                           builder: (c) => AlertDialog(
-                            title: const Text('Import config JSON'),
+                            title: const Text('导入配置 JSON'),
                             content: TextField(
                               controller: ctrl,
                               maxLines: 12,
                               style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
                             ),
                             actions: [
-                              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-                              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Import')),
+                              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+                              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('导入')),
                             ],
                           ),
                         );
@@ -79,7 +79,7 @@ extension _SettingsPageDataSection on _SettingsPageState {
                       }
                     },
               icon: const Icon(Icons.download_outlined, size: 16),
-              label: const Text('Import config'),
+              label: const Text('导入配置'),
             ),
             FilledButton.tonalIcon(
               onPressed: () async {
@@ -105,25 +105,25 @@ extension _SettingsPageDataSection on _SettingsPageState {
                           Clipboard.setData(ClipboardData(text: log));
                           Navigator.pop(c);
                         },
-                        child: const Text('Copy'),
+                        child: const Text('复制'),
                       ),
-                      TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close')),
+                      TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
                     ],
                   ),
                 );
               },
               icon: const Icon(Icons.article_outlined, size: 16),
-              label: const Text('Backend log'),
+              label: const Text('后端日志'),
             ),
             FilledButton.tonalIcon(
               onPressed: !state.backendOk ? null : () => _openHostKeySheet(state),
               icon: const Icon(Icons.vpn_key_outlined, size: 16),
-              label: const Text('Host keys'),
+              label: const Text('主机密钥'),
             ),
             FilledButton.tonalIcon(
               onPressed: !state.backendOk ? null : () => _openLongMemSheet(state),
               icon: const Icon(Icons.psychology_outlined, size: 16),
-              label: const Text('Session memory'),
+              label: const Text('会话记忆'),
             ),
           ],
         ),

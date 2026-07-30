@@ -5,15 +5,15 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
     return _section(
       icon: Icons.text_fields,
       accent: AppColors.chipBlue,
-      title: 'Display',
-      subtitle: 'Navigation, markdown, probe, and font sizes',
+      title: '显示设置',
+      subtitle: '导航、Markdown、探测和字体大小',
       children: [
         const Text('Navigation mode', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.text)),
         const SizedBox(height: 6),
         SegmentedButton<String>(
           segments: const [
-            ButtonSegment(value: 'bottom', label: Text('Bottom'), icon: Icon(Icons.space_dashboard_outlined, size: 16)),
-            ButtonSegment(value: 'menu', label: Text('Menu'), icon: Icon(Icons.menu, size: 16)),
+            ButtonSegment(value: 'bottom', label: Text('底部导航'), icon: Icon(Icons.space_dashboard_outlined, size: 16)),
+            ButtonSegment(value: 'menu', label: Text('菜单导航'), icon: Icon(Icons.menu, size: 16)),
           ],
           selected: {state.navMode},
           onSelectionChanged: (s) {

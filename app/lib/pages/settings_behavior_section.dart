@@ -5,8 +5,8 @@ extension _SettingsPageBehaviorSection on _SettingsPageState {
     return _section(
       icon: Icons.rule_folder_outlined,
       accent: AppColors.warning,
-      title: 'Behavior',
-      subtitle: 'Agent interaction settings',
+      title: '行为设置',
+      subtitle: '智能体交互设置',
       children: [
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
@@ -103,7 +103,7 @@ extension _SettingsPageBehaviorSection on _SettingsPageState {
         TextField(
           controller: customPrompt,
           decoration: const InputDecoration(
-            hintText: 'Optional prompt prefix for the agent',
+            hintText: '可选的智能体提示词前缀',
             isDense: true,
             contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             border: OutlineInputBorder(),

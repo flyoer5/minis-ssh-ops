@@ -6,20 +6,20 @@ extension _FilesPageActionHelpers on _FilesPageState {
     final next = await showDialog<String>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Open path'),
+        title: const Text('打开路径'),
         content: TextField(
           controller: ctrl,
           autofocus: true,
           style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
           decoration: const InputDecoration(
             hintText: '/var/log',
-            helperText: 'Enter an absolute path or a path relative to root.',
+            helperText: '请输入绝对路径，或相对于根目录的路径。',
           ),
           onSubmitted: (v) => Navigator.pop(c, v),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text), child: const Text('Open')),
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text), child: const Text('打开')),
         ],
       ),
     );
@@ -80,17 +80,17 @@ extension _FilesPageActionHelpers on _FilesPageState {
           children: [
             ListTile(
               leading: Icon(sortBy == 'name' ? Icons.check : null, size: 18),
-              title: const Text('Name'),
+              title: const Text('名称'),
               onTap: () => Navigator.pop(c, 'name'),
             ),
             ListTile(
               leading: Icon(sortBy == 'size' ? Icons.check : null, size: 18),
-              title: const Text('Size'),
+              title: const Text('大小'),
               onTap: () => Navigator.pop(c, 'size'),
             ),
             ListTile(
               leading: Icon(sortBy == 'mtime' ? Icons.check : null, size: 18),
-              title: const Text('Time'),
+              title: const Text('时间'),
               onTap: () => Navigator.pop(c, 'mtime'),
             ),
             const Divider(height: 1),
@@ -128,11 +128,11 @@ extension _FilesPageActionHelpers on _FilesPageState {
         final go = await showDialog<bool>(
           context: context,
           builder: (c) => AlertDialog(
-            title: const Text('File too large'),
+            title: const Text('文件过大'),
             content: Text('${r['error'] ?? 'This file is too large to preview.'}\nForce open anyway?'),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Open')),
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('打开')),
             ],
           ),
         );
@@ -146,11 +146,11 @@ extension _FilesPageActionHelpers on _FilesPageState {
         final go = await showDialog<bool>(
           context: context,
           builder: (c) => AlertDialog(
-            title: const Text('Binary file'),
+            title: const Text('二进制文件'),
             content: const Text('This looks like a binary file. Open it anyway?'),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Open')),
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('打开')),
             ],
           ),
         );
@@ -202,11 +202,11 @@ extension _FilesPageActionHelpers on _FilesPageState {
     final name = await showDialog<String>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Create folder'),
+        title: const Text('新建文件夹'),
         content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'new-folder')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('Create')),
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('创建')),
         ],
       ),
     );
@@ -231,20 +231,20 @@ extension _FilesPageActionHelpers on _FilesPageState {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Create file'),
+        title: const Text('新建文件'),
         content: SizedBox(
           width: double.maxFinite,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Filename')),
-              TextField(controller: bodyCtrl, maxLines: 6, decoration: const InputDecoration(labelText: 'Content')),
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: '文件名')),
+              TextField(controller: bodyCtrl, maxLines: 6, decoration: const InputDecoration(labelText: '内容')),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Create')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('创建')),
         ],
       ),
     );
@@ -269,11 +269,11 @@ extension _FilesPageActionHelpers on _FilesPageState {
     final name = await showDialog<String>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Rename'),
+        title: const Text('重命名'),
         content: TextField(controller: ctrl),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('Save')),
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('保存')),
         ],
       ),
     );

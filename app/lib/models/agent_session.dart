@@ -1,4 +1,5 @@
 import 'package:ssh_ai_agent/models/chat_message.dart';
+import 'package:ssh_ai_agent/util/time_fmt.dart';
 
 class AgentSession {
   AgentSession({
@@ -43,8 +44,7 @@ class AgentSession {
   factory AgentSession.fromJson(Map<String, dynamic> j) {
     DateTime parseT(dynamic v) {
       if (v == null) return DateTime.now();
-      final d = DateTime.tryParse(v.toString());
-      return d?.toLocal() ?? DateTime.now();
+      return parseChinaInstant(v.toString()) ?? DateTime.now().toUtc();
     }
 
     int? asInt(dynamic v) {
