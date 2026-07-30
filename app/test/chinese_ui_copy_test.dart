@@ -71,4 +71,58 @@ void main() {
       }
     }
   });
+
+  test('设置页高频区域不包含已知英文文案或原始错误', () {
+    const files = [
+      'lib/pages/settings_backend_section.dart',
+      'lib/pages/settings_behavior_section.dart',
+      'lib/pages/settings_connectivity_section.dart',
+      'lib/pages/settings_battery_section.dart',
+      'lib/pages/settings_display_section.dart',
+      'lib/pages/settings_data_section.dart',
+      'lib/pages/settings_about_section.dart',
+      'lib/pages/settings_longmem_sheet.dart',
+      'lib/pages/settings_hostkey_sheet.dart',
+    ];
+    const forbidden = [
+      "title: 'Backend'",
+      "title: 'Display'",
+      'Data & Diagnostics',
+      'Local Go service and token',
+      'Navigation mode',
+      'Compact host cards',
+      'Stream markdown',
+      'Probe concurrency',
+      'Auto probe interval',
+      'Export config',
+      'Import config',
+      'Backend log',
+      'Host keys',
+      "title: 'Behavior'",
+      "title: 'Connectivity'",
+      "title: 'Battery'",
+      "title: 'About'",
+      'Confirm writes',
+      'Max rounds',
+      'Custom prompt',
+      'Show reasoning',
+      'Collapse tools',
+      'Auto scroll',
+      'Enter to send',
+      'Keep keyboard open',
+      'Haptic feedback',
+      'Test SSH',
+      'Test model',
+      'Battery optimization',
+      'Open system settings',
+      r"_toast('$e')",
+    ];
+
+    for (final path in files) {
+      final source = File(path).readAsStringSync();
+      for (final text in forbidden) {
+        expect(source, isNot(contains(text)), reason: '$path 仍包含英文界面文案或原始错误：$text');
+      }
+    }
+  });
 }
