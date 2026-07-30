@@ -19,52 +19,43 @@ mixin UiPrefs on ChangeNotifier {
   bool get navIsMenu => navMode == 'menu';
   bool get navIsBottom => !navIsMenu;
 
+  /// Theme mode: 'system' | 'dark' | 'light'
+  String themeMode = 'system';
+
   /// Host card: MEM+HDD only when true.
   bool hostCardCompact = false;
 
   bool confirmWrites = false;
 
   /// Absolute remote paths for files page shortcuts, keyed by host id.
-  /// Legacy global list (pre-1.5.38) lives under [kPathFavShared] until a host
-  /// gets its own list.
   static const kPathFavShared = '*';
   Map<String, List<String>> pathFavoritesByHost = {};
 
   /// When true, render assistant Markdown while tokens stream (may jitter).
-  /// Default false: plain text while streaming, Markdown after final.
   bool streamMarkdown = false;
 
   /// Concurrent SSH probes when refreshing host list (1–6).
   int probeConcurrency = 4;
 
   // --- Agent ---
-  /// Tool-loop rounds per user turn (1–99). Backend clamps.
   int agentMaxRounds = 12;
-
-  /// Follow the bottom of the chat while streaming.
   bool agentAutoScroll = true;
-
-  /// Show model "thinking / reasoning" blocks.
   bool agentShowReasoning = true;
-
-  /// Collapse successful tool cards by default (failed still expand).
   bool agentCollapseTools = true;
-
-  /// Enter sends message; when false, Enter inserts newline (IME action: newline).
   bool agentEnterToSend = true;
-
-  /// Keep soft keyboard after send.
   bool agentKeepKeyboard = false;
-
-  /// Light haptic on send / confirm run.
   bool hapticFeedback = true;
-
-  /// LLM temperature (0.0–2.0). 0 => use backend default.
   double agentTemperature = 0;
-
-  /// Custom system prompt suffix appended to every agent request.
   String agentCustomPrompt = '';
-
-  /// Auto-refresh host probes in background (seconds; 0 = off).
   int hostAutoProbeSec = 0;
+
+  /// Global UI scale factor applied on top of individual font sizes (0.8–1.3).
+  double uiScale = 1.0;
+
+  /// Actual font size helpers that include [uiScale].
+  double effectiveTermFontSize() => (termFontSize * uiScale).clamp(8, 28);
+  double effectiveAgentFontSize() => (agentFontSize * uiScale).clamp(10, 28);
+  double effectiveRecordsFontSize() => (recordsFontSize * uiScale).clamp(9, 24);
+  double effectiveUiFontSize() => (uiFontSize * uiScale).clamp(9, 26);
+  double effectiveEditorFontSize() => (editorFontSize * uiScale).clamp(8, 32);
 }

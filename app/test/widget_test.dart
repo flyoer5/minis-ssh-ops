@@ -4,10 +4,16 @@ import 'package:ssh_ai_agent/theme/app_theme.dart';
 
 void main() {
   test('buildAppTheme is dark Material 3', () {
-    final t = buildAppTheme();
+    final t = buildAppTheme(dark: true);
     expect(t.useMaterial3, isTrue);
     expect(t.brightness, equals(Brightness.dark));
     expect(t.scaffoldBackgroundColor, AppColors.bg);
+  });
+
+  test('buildAppTheme is light Material 3', () {
+    final t = buildAppTheme(dark: false);
+    expect(t.useMaterial3, isTrue);
+    expect(t.brightness, equals(Brightness.light));
   });
 
   test('AppColors tokens are stable', () {

@@ -2,13 +2,67 @@ part of 'settings_page.dart';
 
 extension _SettingsPageDisplaySection on _SettingsPageState {
   Widget _displaySection(AppState state) {
+    final themeText = switch (state.themeMode) {
+      'dark' => '暗色',
+      'light' => '亮色',
+      _ => '跟随系统',
+    };
     return _section(
       icon: Icons.text_fields,
       accent: AppColors.chipBlue,
       title: '显示设置',
-      subtitle: '导航、流式渲染、探测与字号',
+      subtitle: '主题、导航、字体缩放与探测',
       children: [
-        const Text('导航方式', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.text)),
+        const Text('外观主题', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'system', label: Text('跟随系统'), icon: Icon(Icons.phone_android, size: 16)),
+            ButtonSegment(value: 'dark', label: Text('暗色'), icon: Icon(Icons.dark_mode, size: 16)),
+            ButtonSegment(value: 'light', label: Text('亮色'), icon: Icon(Icons.light_mode, size: 16)),
+          ],
+          selected: {state.themeMode},
+          onSelectionChanged: (s) {
+            if (s.isEmpty) return;
+            state.setThemeMode(s.first);
+          },
+          style: const ButtonStyle(textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 12))),
+        ),
+        const SizedBox(height: 4),
+        Text('当前模式：$themeText', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+        const SizedBox(height: 12),
+        const Text('全局缩放', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: '缩小',
+              icon: const Icon(Icons.remove, size: 18),
+              onPressed: () => state.setUiScale((state.uiScale - 0.05).clamp(0.8, 1.3)),
+            ),
+            Expanded(
+              child: Slider(
+                value: state.uiScale,
+                min: 0.8,
+                max: 1.3,
+                divisions: 10,
+                label: '${(state.uiScale * 100).toInt()}%',
+                onChanged: (v) => state.setUiScale(v.roundToDouble() / 100.0),
+              ),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: '放大',
+              icon: const Icon(Icons.add, size: 18),
+              onPressed: () => state.setUiScale((state.uiScale + 0.05).clamp(0.8, 1.3)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text('影响所有页面字体大小（${(state.uiScale * 100).round()}%）。', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+        const SizedBox(height: 12),
+        const Text('导航方式', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         SegmentedButton<String>(
           segments: const [
@@ -195,42 +249,42 @@ extension _SettingsPageDisplaySection on _SettingsPageState {
           width: double.infinity,
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: AppColors.bg,
+            color: context.surface,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: context.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('预览：Agent 对话', style: TextStyle(fontSize: state.agentFontSize, color: AppColors.text)),
+              Text('预览：Agent 对话', style: TextStyle(fontSize: state.effectiveAgentFontSize(), color: context.text)),
               const SizedBox(height: 4),
               Text(
                 '预览：等宽字体记录内容',
                 style: TextStyle(
-                  fontSize: state.recordsFontSize,
+                  fontSize: state.effectiveRecordsFontSize(),
                   fontFamily: 'monospace',
-                  color: AppColors.textMuted,
+                  color: context.textMuted,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 '预览：界面标签',
-                style: TextStyle(fontSize: state.uiFontSize, color: AppColors.textCode),
+                style: TextStyle(fontSize: state.effectiveUiFontSize(), color: context.textMuted),
               ),
               const SizedBox(height: 4),
               Text(
                 '预览：终端文本',
                 style: TextStyle(
-                  fontSize: state.termFontSize,
+                  fontSize: state.effectiveTermFontSize(),
                   fontFamily: 'monospace',
-                  color: AppColors.success,
+                  color: context.success,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 '预览：编辑器文本',
                 style: TextStyle(
-                  fontSize: state.editorFontSize,
+                  fontSize: state.effectiveEditorFontSize(),
                   fontFamily: 'monospace',
                   color: AppColors.chipBlue,
                 ),

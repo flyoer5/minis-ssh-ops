@@ -10,7 +10,7 @@ extension HostsPageLayout on _HostsPageState {
         style: const TextStyle(fontSize: 14),
         decoration: InputDecoration(
           isDense: true,
-          hintText: '搜索名称 / IP / 用户 - 无搜索时长按排序',
+          hintText: '搜索名称 / IP / 用户',
           prefixIcon: const Icon(Icons.search, size: 20),
           suffixIcon: _query.isEmpty
               ? null
