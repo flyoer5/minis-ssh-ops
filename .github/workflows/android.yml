@@ -66,6 +66,9 @@ jobs:
         working-directory: backend
         run: go test ./...
 
+        env:
+          GONOSUMCHECK: "*"
+          GONOSUMDB: "*"
       - name: Build Go backend (linux smoke)
         shell: bash
         run: |
@@ -86,6 +89,9 @@ jobs:
           curl -sf "http://127.0.0.1:17890/v1/health"
           kill "$(cat "$RUNNER_TEMP/be.pid")" || true
 
+        env:
+          GONOSUMCHECK: "*"
+          GONOSUMDB: "*"
       - name: Cross-compile Go for android/arm64
         run: |
           chmod +x scripts/build-go-android.sh
