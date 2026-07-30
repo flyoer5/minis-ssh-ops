@@ -43,6 +43,30 @@ abstract final class AppColors {
   static const accentMint = Color(0xFF39D353);
   static const accentPink = Color(0xFFF778BA);
 
+  // Additional colors referenced by other files (kept for compatibility)
+  static const textCode = Color(0xFFC9D1D9);
+  static const errorBorder = Color(0xFF6E2A2E);
+  static const monoGray = Color(0xFF9CA3AF);
+  static const slateLine = Color(0xFFE2E8F0);
+  static const warnBright = Color(0xFFFBBF24);
+  static const warnAlt = Color(0xFFF59E0B);
+  static const pureBlack = Color(0xFF0A0A0A);
+  static const dividerSoft = Color(0xFF2A2A2A);
+  static const errPanelBg = Color(0xFF3D1F1F);
+  static const errTextSoft = Color(0xFFFF8A80);
+  static const gray12 = Color(0xFF121212);
+  static const gray33 = Color(0xFF333333);
+  static const gray66 = Color(0xFF666666);
+  static const gray9e = Color(0xFF9E9E9E);
+  static const grayBd = Color(0xFFBDBDBD);
+  static const panelFocus = Color(0xFF1A2A33);
+  static const cardBg = Color(0xFF0F1419);
+  static const selectBlue2 = Color(0xFF3B82F6);
+  static const slateBar = Color(0xFF334155);
+  static const slateMuted = Color(0xFF475569);
+  static const slateText = Color(0xFF94A3B8);
+  static const dangerAlt = Color(0xFFEF4444);
+
   // Light palette (GitHub light default)
   static const _lightBg = Color(0xFFFFFFFF);
   static const _lightSurface = Color(0xFFF6F8FA);
