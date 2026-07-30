@@ -172,7 +172,6 @@ ThemeData buildAppTheme({required bool dark}) {
       contentTextStyle: TextStyle(color: text, fontSize: 13),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      insetMargin: const EdgeInsets.fromLTRB(12, 0, 12, 64),
       elevation: 4,
     ),
     dialogTheme: DialogThemeData(
