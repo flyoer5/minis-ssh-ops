@@ -74,6 +74,12 @@ class _RecordsPageState extends State<RecordsPage> with AutomaticKeepAliveClient
     });
   }
 
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return _buildRecordsPage(context);
+  }
+
   String _csvEscape(String s) {
     if (s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r')) {
       return '"${s.replaceAll('"', '""')}"';

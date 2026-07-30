@@ -229,8 +229,7 @@ extension RecordsPageLayout on _RecordsPageState {
     );
   }
 
-  Widget build(BuildContext context) {
-    super.build(context);
+  Widget _buildRecordsPage(BuildContext context) {
     context.select((AppState s) => s.audit.length);
     context.select((AppState s) => s.hosts.length);
     final fs = context.select((AppState s) => s.recordsFontSize);
