@@ -37,6 +37,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   final _sessionsSearch = TextEditingController();
 
   bool _busy = false;
+  bool _expanding = false;
   bool _onlyCurrentHost = true;
   bool _showJumpBottom = false;
   bool _sessionsLoading = false;

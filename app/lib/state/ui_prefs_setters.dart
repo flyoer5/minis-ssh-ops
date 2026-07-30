@@ -10,6 +10,11 @@ extension UiPrefsSetters on UiPrefs {
     confirmWrites = prefs.getBool('confirmWrites') ?? false;
     final nm = prefs.getString('navMode') ?? 'bottom';
     navMode = (nm == 'menu') ? 'menu' : 'bottom';
+    themeMode = prefs.getString('themeMode') ?? 'system';
+    if (themeMode != 'system' && themeMode != 'dark' && themeMode != 'light') {
+      themeMode = 'system';
+    }
+    uiScale = (prefs.getDouble('uiScale') ?? 1.0).clamp(0.8, 1.3);
     hostCardCompact = prefs.getBool('hostCardCompact') ?? false;
     pathFavoritesByHost = {};
     final byHostRaw = prefs.getString('pathFavoritesByHost');
@@ -54,6 +59,8 @@ extension UiPrefsSetters on UiPrefs {
         'editorFontSize': editorFontSize,
         'confirmWrites': confirmWrites,
         'navMode': navMode,
+        'themeMode': themeMode,
+        'uiScale': uiScale,
         'hostCardCompact': hostCardCompact,
         'pathFavoritesByHost': pathFavoritesByHost,
         'streamMarkdown': streamMarkdown,
@@ -78,6 +85,8 @@ extension UiPrefsSetters on UiPrefs {
     if (pr['editorFontSize'] is num) await setEditorFontSize((pr['editorFontSize'] as num).toDouble());
     if (pr['confirmWrites'] is bool) await setConfirmWrites(pr['confirmWrites'] as bool);
     if (pr['navMode'] is String) await setNavMode(pr['navMode'] as String);
+    if (pr['themeMode'] is String) await setThemeMode(pr['themeMode'] as String);
+    if (pr['uiScale'] is num) await setUiScale((pr['uiScale'] as num).toDouble());
     if (pr['hostCardCompact'] is bool) await setHostCardCompact(pr['hostCardCompact'] as bool);
     if (pr['pathFavoritesByHost'] is Map) {
       final m = <String, List<String>>{};
@@ -113,6 +122,8 @@ extension UiPrefsSetters on UiPrefs {
     await setUiFontSize(14);
     await setEditorFontSize(13);
     await setNavMode('bottom');
+    await setThemeMode('system');
+    await setUiScale(1.0);
     await setHostCardCompact(false);
     await setStreamMarkdown(false);
     await setProbeConcurrency(4);
@@ -134,6 +145,8 @@ extension UiPrefsSetters on UiPrefs {
   Future<void> setUiFontSize(double v) async { uiFontSize = v.clamp(11, 20); final prefs = await SharedPreferences.getInstance(); await prefs.setDouble('uiFontSize', uiFontSize); notifyListeners(); }
   Future<void> setEditorFontSize(double v) async { editorFontSize = v.clamp(10, 24); final prefs = await SharedPreferences.getInstance(); await prefs.setDouble('editorFontSize', editorFontSize); notifyListeners(); }
   Future<void> setNavMode(String mode) async { navMode = mode == 'menu' ? 'menu' : 'bottom'; final prefs = await SharedPreferences.getInstance(); await prefs.setString('navMode', navMode); notifyListeners(); }
+  Future<void> setThemeMode(String mode) async { themeMode = (mode == 'dark' || mode == 'light') ? mode : 'system'; final prefs = await SharedPreferences.getInstance(); await prefs.setString('themeMode', themeMode); notifyListeners(); }
+  Future<void> setUiScale(double v) async { uiScale = v.clamp(0.8, 1.3); final prefs = await SharedPreferences.getInstance(); await prefs.setDouble('uiScale', uiScale); notifyListeners(); }
   Future<void> setHostCardCompact(bool v) async { hostCardCompact = v; final prefs = await SharedPreferences.getInstance(); await prefs.setBool('hostCardCompact', hostCardCompact); notifyListeners(); }
   Future<void> setConfirmWrites(bool v) async { confirmWrites = v; final prefs = await SharedPreferences.getInstance(); await prefs.setBool('confirmWrites', v); notifyListeners(); }
   Future<void> setStreamMarkdown(bool v) async { streamMarkdown = v; final prefs = await SharedPreferences.getInstance(); await prefs.setBool('streamMarkdown', v); notifyListeners(); }
