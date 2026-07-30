@@ -43,6 +43,19 @@ jobs:
             exit 1
           fi
 
+      - name: Verify release workflow packaging contract
+        shell: bash
+        run: |
+          workflow=.github/workflows/release.yml
+          if grep -Fq 'app/android/app/src/main/assets/go/ssh-ai-agent' "$workflow"; then
+            echo "::error::Release workflow still references the removed backend asset"
+            exit 1
+          fi
+          grep -Fq -- '--split-per-abi' "$workflow"
+          grep -Fq -- '--obfuscate' "$workflow"
+          grep -Fq 'app-arm64-v8a-release.apk' "$workflow"
+          grep -Fq 'verify-apk-packaging.sh' "$workflow"
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
