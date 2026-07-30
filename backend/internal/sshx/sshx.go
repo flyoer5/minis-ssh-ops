@@ -71,7 +71,17 @@ func ExecContext(ctx context.Context, p ConnectParams, command string) (ExecResu
 		if pooled {
 			pool.invalidate(key)
 		}
-		return ExecResult{}, err
+		// Retry once: re-dial and create a fresh session. The pool may have
+		// returned a stale connection whose channel negotiation failed.
+		if pooled {
+			cli, pooled, err = pool.DialPooled(p)
+			if err == nil {
+				sess, err = cli.NewSession()
+			}
+		}
+		if err != nil {
+			return ExecResult{}, err
+		}
 	}
 	defer sess.Close()
 

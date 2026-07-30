@@ -168,9 +168,11 @@ ThemeData buildAppTheme({required bool dark}) {
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: linkFocus)),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: surface2,
-      contentTextStyle: TextStyle(color: text),
+      backgroundColor: surface,
+      contentTextStyle: TextStyle(color: text, fontSize: 13),
       behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 4,
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: surface,
