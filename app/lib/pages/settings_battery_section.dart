@@ -5,8 +5,8 @@ extension _SettingsPageBatterySection on _SettingsPageState {
     return _section(
       icon: Icons.battery_charging_full,
       accent: AppColors.success,
-      title: 'Battery',
-      subtitle: 'Keep the app alive in the background',
+      title: '电池与后台运行',
+      subtitle: '提高应用后台存活能力',
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
@@ -24,7 +24,7 @@ extension _SettingsPageBatterySection on _SettingsPageState {
               await state.requestBatteryExempt();
               _toast(state.batteryIgnored ? 'granted' : 'check system settings');
             },
-            child: const Text('Request'),
+            child: const Text('申请权限'),
           ),
         ),
         Align(
@@ -32,7 +32,7 @@ extension _SettingsPageBatterySection on _SettingsPageState {
           child: TextButton.icon(
             onPressed: () => state.openBatterySettings(),
             icon: const Icon(Icons.open_in_new, size: 16),
-            label: const Text('Open system settings'),
+            label: const Text('打开系统设置'),
           ),
         ),
       ],

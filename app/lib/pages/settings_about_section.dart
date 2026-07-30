@@ -5,8 +5,8 @@ extension _SettingsPageAboutSection on _SettingsPageState {
     return _section(
       icon: Icons.info_outline,
       accent: AppColors.accentSoft,
-      title: 'About',
-      subtitle: 'Build and backend summary',
+      title: '关于',
+      subtitle: '版本与后端信息概览',
       children: [
         Row(
           children: [
