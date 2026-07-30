@@ -10,9 +10,9 @@ import 'package:flutter/material.dart';
 void showSnack(
   BuildContext context,
   String message, {
-  int seconds = 2,
+  int seconds = 1,
   SnackBarAction? action,
-  bool floating = false,
+  bool floating = true,
 }) {
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
