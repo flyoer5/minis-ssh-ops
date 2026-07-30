@@ -266,7 +266,7 @@ extension RecordsPageLayout on _RecordsPageState {
       backgroundColor: AppColors.bg,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        toolbarHeight: 44,
+        toolbarHeight: 48,
         leading: NavMenuButton.leadingOf(context),
         leadingWidth: NavMenuButton.leadingWidthOf(context),
         titleSpacing: 12,

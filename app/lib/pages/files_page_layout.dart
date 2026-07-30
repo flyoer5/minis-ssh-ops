@@ -58,7 +58,7 @@ extension _FilesPageLayout on _FilesPageState {
   Widget _buildNoHostScaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 44,
+        toolbarHeight: 48,
         leading: NavMenuButton.leadingOf(context),
         leadingWidth: NavMenuButton.leadingWidthOf(context),
         title: const Text('文件', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -250,7 +250,7 @@ extension _FilesPageLayout on _FilesPageState {
   AppBar _buildAppBar(BuildContext context, double fs, List<Widget> actions) {
     return AppBar(
       backgroundColor: AppColors.darkBar,
-      toolbarHeight: 44,
+      toolbarHeight: 48,
       leading: NavMenuButton.leadingOf(context),
       leadingWidth: NavMenuButton.leadingWidthOf(context),
       titleSpacing: 4,

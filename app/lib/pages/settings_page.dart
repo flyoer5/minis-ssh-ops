@@ -159,7 +159,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       appBar: AppBar(
         leading: NavMenuButton.leadingOf(context),
         leadingWidth: NavMenuButton.leadingWidthOf(context),
-        toolbarHeight: 44,
+        toolbarHeight: 48,
         backgroundColor: AppColors.bg,
         titleSpacing: 12,
         title: const Text('设置', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),

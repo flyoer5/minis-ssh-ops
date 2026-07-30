@@ -96,6 +96,7 @@ extension RecordsPageActions on _RecordsPageState {
     final cmd = e['command']?.toString() ?? '';
     final stdout = e['stdout']?.toString() ?? '';
     final stderr = e['stderr']?.toString() ?? '';
+    final hostId = e['hostId']?.toString() ?? '';
     final at = _fmtLocal(e['createdAt']?.toString() ?? '');
     showModalBottomSheet<void>(
       context: context,
@@ -130,6 +131,54 @@ extension RecordsPageActions on _RecordsPageState {
               const SizedBox(height: 4),
               SelectableText(stderr, style: TextStyle(fontFamily: 'monospace', fontSize: fs - 2, color: AppColors.dangerSoft)),
             ],
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: cmd));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('命令已复制')),
+                    );
+                  },
+                  icon: const Icon(Icons.copy, size: 16),
+                  label: const Text('复制命令'),
+                ),
+                if (hostId.isNotEmpty)
+                  FilledButton.tonalIcon(
+                    onPressed: () {
+                      final s = context.read<AppState>();
+                      s.selectHost(hostId);
+                      NavScope.maybeOf(context)?.go(2); // terminal tab
+                      // After navigation delay, send command via PTY
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('已切换主机，请在终端粘贴执行: $cmd'),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      });
+                    },
+                    icon: const Icon(Icons.terminal, size: 16),
+                    label: const Text('终端执行'),
+                  ),
+                if (hostId.isNotEmpty)
+                  FilledButton.tonalIcon(
+                    onPressed: () {
+                      final s = context.read<AppState>();
+                      s.selectHost(hostId);
+                      NavScope.maybeOf(context)?.go(1); // agent tab
+                    },
+                    icon: const Icon(Icons.smart_toy_outlined, size: 16),
+                    label: const Text('Agent 执行'),
+                  ),
+              ],
+            ),
           ],
         ),
       ),

@@ -25,8 +25,8 @@ extension _AgentPageLayout on _AgentPageState {
             const SizedBox(height: 8),
             Text(
               state.selectedHostId == null
-                  ? '在「主机」页点选卡片，或添加主机后再回来。'
-                  : '当前是 ${state.hostLabel}\n可以让它查状态、改配置、排故。生成中可点停止。',
+                  ? '去主机页点选卡片，或添加后再回来'
+                  : '当前是 ${state.hostLabel}\n可查状态、改配置、排故。生成中可点停止。',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: state.agentFontSize - 2,
