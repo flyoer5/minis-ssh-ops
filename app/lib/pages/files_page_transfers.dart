@@ -26,9 +26,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
         saved = await NativeBackend.saveBytesToDownloads(name: n, b64: b64);
       } catch (_) {}
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(saved != null && saved.isNotEmpty ? '已保存 $n' : '下载完成')),
-      );
+      showSnack(context, saved != null && saved.isNotEmpty ? '已保存 $n' : '下载完成');
     } catch (e) {
       if (mounted) {
         String msg = cleanError(e);
@@ -125,9 +123,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
     await _load(inactive);
     if (mounted) {
       final detail = files + dirs > 0 ? '（$files 个文件${dirs > 0 ? '，$dirs 个文件夹' : ''}）' : '';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(failN == 0 ? '已复制 $okN 项$detail' : '复制完成：成功 $okN 项，失败 $failN 项$detail'),
-      ));
+      showSnack(context, failN == 0 ? '已复制 $okN 项$detail' : '复制完成：成功 $okN 项，失败 $failN 项$detail', seconds: failN == 0 ? 1 : 3);
     }
   }
 
@@ -178,9 +174,7 @@ extension _FilesPageTransferHelpers on _FilesPageState {
     await _load(active);
     await _load(inactive);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(failN == 0 ? '已移动 $okN 项' : '移动完成：成功 $okN 项，失败 $failN 项'),
-      ));
+      showSnack(context, failN == 0 ? '已移动 $okN 项' : '移动完成：成功 $okN 项，失败 $failN 项', seconds: failN == 0 ? 1 : 3);
     }
   }
 

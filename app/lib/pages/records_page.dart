@@ -4,6 +4,7 @@ import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/util/feedback.dart';
 import 'package:ssh_ai_agent/util/time_fmt.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';

@@ -119,17 +119,13 @@ extension _TerminalPageWidgets on _TerminalPageState {
                     final plain = stripAnsi(_buf.toString());
                     await Clipboard.setData(ClipboardData(text: plain));
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已复制纯文本'), duration: Duration(seconds: 1)),
-                      );
+                      showSnack(context, '已复制纯文本');
                     }
                     break;
                   case 'copy_raw':
                     await Clipboard.setData(ClipboardData(text: _buf.toString()));
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已复制原始输出'), duration: Duration(seconds: 1)),
-                      );
+                      showSnack(context, '已复制原始输出');
                     }
                     break;
                   case 'search':
