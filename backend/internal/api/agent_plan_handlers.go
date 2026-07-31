@@ -51,6 +51,7 @@ func (s *Server) handleAgentPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cli := agent.NewClient(llmCfg.BaseURL, llmCfg.APIKey, llmCfg.Model)
+	defer cli.Close()
 	cli.ThinkingLevel = llmCfg.ThinkingLevel
 	_ = s.Store.AddChat(body.SessionID, "user", body.Goal)
 	raw, err := cli.Chat([]agent.Msg{
