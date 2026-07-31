@@ -11,7 +11,8 @@ func TestAllowLocalWSOrigin(t *testing.T) {
 		origin string
 		want   bool
 	}{
-		{name: "native client", want: true},
+		{name: "native client", origin: "", want: true},
+		{name: "webview null", origin: "null", want: true},
 		{name: "loopback", origin: "http://127.0.0.1:17890", want: true},
 		{name: "localhost", origin: "http://localhost:17890", want: true},
 		{name: "ipv6 loopback", origin: "http://[::1]:17890", want: true},
@@ -24,8 +25,9 @@ func TestAllowLocalWSOrigin(t *testing.T) {
 			if tt.origin != "" {
 				r.Header.Set("Origin", tt.origin)
 			}
-			if got := allowLocalWSOrigin(r); got != tt.want {
-				t.Fatalf("allowLocalWSOrigin() = %v, want %v", got, tt.want)
+			// isLocalWebSocketOrigin accepts the raw Origin header string.
+			if got := isLocalWebSocketOrigin(r.Header.Get("Origin")); got != tt.want {
+				t.Fatalf("isLocalWebSocketOrigin() = %v, want %v", got, tt.want)
 			}
 		})
 	}
