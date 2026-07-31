@@ -242,12 +242,7 @@ Future<void> showAgentSessionSettingsSheet(BuildContext context, AppState state)
       clearAll: clearAll,
     );
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(clearAll ? '已恢复全局设置' : '本会话设置已保存'),
-          duration: const Duration(seconds: 1),
-        ),
-      );
+      showSnack(context, clearAll ? '已恢复全局设置' : '本会话设置已保存');
     }
   } catch (e) {
     if (context.mounted) {

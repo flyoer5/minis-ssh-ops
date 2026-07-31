@@ -267,9 +267,7 @@ class _ConfirmPlanCardState extends State<_ConfirmPlanCard> {
                               onTap: () async {
                                 await Clipboard.setData(ClipboardData(text: cmd));
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('已复制命令'), duration: Duration(seconds: 1)),
-                                  );
+                                  showSnack(context, '已复制命令');
                                 }
                               },
                               child: const Padding(
@@ -324,12 +322,7 @@ class _ConfirmPlanCardState extends State<_ConfirmPlanCard> {
                                       : () async {
                                           await Clipboard.setData(ClipboardData(text: cmd));
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('已复制；可在终端手动执行'),
-                                                duration: Duration(seconds: 1),
-                                              ),
-                                            );
+                                            showSnack(context, '已复制，可在终端手动执行');
                                           }
                                         },
                                   child: Text('仅复制', style: TextStyle(fontSize: fs - 3)),

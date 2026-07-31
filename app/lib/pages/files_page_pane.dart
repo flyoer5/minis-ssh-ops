@@ -103,9 +103,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                                 final path = pane.path.isEmpty ? '/' : pane.path;
                                 await Clipboard.setData(ClipboardData(text: path));
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('已复制路径：$path'), duration: const Duration(seconds: 1)),
-                                  );
+                                  showSnack(context, '已复制路径');
                                 }
                               },
                               child: Text(

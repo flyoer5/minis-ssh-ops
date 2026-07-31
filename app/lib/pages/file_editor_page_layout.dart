@@ -150,9 +150,7 @@ extension _FileEditorPageLayout on _FileEditorPageState {
               case 'copy':
                 await Clipboard.setData(ClipboardData(text: _ctrl.text));
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('已复制全文'), duration: Duration(seconds: 1)),
-                  );
+                  showSnack(context, '已复制全文');
                 }
                 break;
             }

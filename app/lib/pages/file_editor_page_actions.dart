@@ -156,9 +156,7 @@ extension _FileEditorPageActions on _FileEditorPageState {
       _dirty = next != widget.initialText;
       _recomputeFinds();
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已替换'), duration: Duration(seconds: 1)),
-    );
+    showSnack(context, '已替换');
   }
 
   Future<void> _save() async {
@@ -171,9 +169,7 @@ extension _FileEditorPageActions on _FileEditorPageState {
         _dirty = false;
       });
       _cleanBaseline = _ctrl.text;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已保存'), duration: Duration(seconds: 1)),
-      );
+      showSnack(context, '已保存');
     } catch (e) {
       if (mounted) {
         showSnack(context, '保存失败: ${cleanError(e)}');
