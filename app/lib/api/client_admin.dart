@@ -12,7 +12,7 @@ mixin _ApiClientAdmin on _ApiTransport {
   }
 
   Future<Map<String, dynamic>> listKnownHosts() async {
-    final r = await _c.get(_u('/v1/known-hosts'), headers: _headers).timeout(const Duration(seconds: 10));
+    final r = await _c.get(_u('/v1/known-hosts'), headers: _headers).apiTimeout(const Duration(seconds: 10));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -22,7 +22,7 @@ mixin _ApiClientAdmin on _ApiTransport {
       'host': host,
       'port': '$port',
     });
-    final r = await _c.delete(uri, headers: _headers).timeout(const Duration(seconds: 10));
+    final r = await _c.delete(uri, headers: _headers).apiTimeout(const Duration(seconds: 10));
     _ensureOk(r);
   }
 
@@ -30,13 +30,13 @@ mixin _ApiClientAdmin on _ApiTransport {
     final uri = Uri.parse('$baseUrl/v1/known-hosts').replace(queryParameters: {
       'all': '1',
     });
-    final r = await _c.delete(uri, headers: _headers).timeout(const Duration(seconds: 10));
+    final r = await _c.delete(uri, headers: _headers).apiTimeout(const Duration(seconds: 10));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> listSessionMemory() async {
-    final r = await _c.get(_u('/v1/session-memory'), headers: _headers).timeout(const Duration(seconds: 15));
+    final r = await _c.get(_u('/v1/session-memory'), headers: _headers).apiTimeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -51,7 +51,7 @@ mixin _ApiClientAdmin on _ApiTransport {
       throw Exception('sessionId or all required');
     }
     final uri = Uri.parse('$baseUrl/v1/session-memory').replace(queryParameters: q);
-    final r = await _c.delete(uri, headers: _headers).timeout(const Duration(seconds: 15));
+    final r = await _c.delete(uri, headers: _headers).apiTimeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }

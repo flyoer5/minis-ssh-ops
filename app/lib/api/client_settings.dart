@@ -2,7 +2,7 @@ part of 'client.dart';
 
 mixin _ApiClientSettings on _ApiTransport {
   Future<Map<String, dynamic>> health() async {
-    final r = await _c.get(_u('/v1/health')).timeout(const Duration(milliseconds: 800));
+    final r = await _c.get(_u('/v1/health')).apiTimeout(const Duration(milliseconds: 800));
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
@@ -13,13 +13,13 @@ mixin _ApiClientSettings on _ApiTransport {
   }
 
   Future<Map<String, dynamic>> getLlm() async {
-    final r = await _c.get(_u('/v1/settings/llm'), headers: _headers).timeout(const Duration(seconds: 6));
+    final r = await _c.get(_u('/v1/settings/llm'), headers: _headers).apiTimeout(const Duration(seconds: 6));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
   Future<List<String>> listModels() async {
-    final r = await _c.get(_u('/v1/settings/llm/models'), headers: _headers).timeout(const Duration(seconds: 20));
+    final r = await _c.get(_u('/v1/settings/llm/models'), headers: _headers).apiTimeout(const Duration(seconds: 20));
     _ensureOk(r);
     final m = jsonDecode(r.body) as Map<String, dynamic>;
     final list = m['models'];
@@ -30,7 +30,7 @@ mixin _ApiClientSettings on _ApiTransport {
   Future<Map<String, dynamic>> putLlm(Map<String, dynamic> body) async {
     final r = await _c
         .put(_u('/v1/settings/llm'), headers: _headers, body: jsonEncode(body))
-        .timeout(const Duration(seconds: 15));
+        .apiTimeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }

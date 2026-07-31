@@ -87,6 +87,16 @@ class ApiClient extends _ApiTransport
   }
 }
 
+extension ApiFutureTimeout<T> on Future<T> {
+  Future<T> apiTimeout(Duration duration) async {
+    try {
+      return await timeout(duration);
+    } on TimeoutException {
+      throw ApiTimeoutException(duration);
+    }
+  }
+}
+
 class ApiTimeoutException implements Exception {
   final Duration duration;
   ApiTimeoutException(this.duration);

@@ -16,7 +16,7 @@ mixin _ApiClientAgent on _ApiTransport {
             if (sessionId != null) 'sessionId': sessionId,
           }),
         )
-        .timeout(const Duration(seconds: 120));
+        .apiTimeout(const Duration(seconds: 120));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -44,7 +44,7 @@ mixin _ApiClientAgent on _ApiTransport {
             if (customPrompt.isNotEmpty) 'customPrompt': customPrompt,
           }),
         )
-        .timeout(const Duration(seconds: 180));
+        .apiTimeout(const Duration(seconds: 180));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -82,7 +82,7 @@ mixin _ApiClientAgent on _ApiTransport {
         if (temperature > 0) 'temperature': temperature,
         if (customPrompt.isNotEmpty) 'customPrompt': customPrompt,
       });
-      final res = await client.send(req).timeout(const Duration(seconds: 180));
+      final res = await client.send(req).apiTimeout(const Duration(seconds: 180));
       if (res.statusCode >= 400) {
         final body = await res.stream.bytesToString();
         throw ApiException(res.statusCode, body);
@@ -129,7 +129,7 @@ mixin _ApiClientAgent on _ApiTransport {
           headers: _headers,
           body: jsonEncode({'ids': ids}),
         )
-        .timeout(const Duration(seconds: 20));
+        .apiTimeout(const Duration(seconds: 20));
     _ensureOk(r);
     final m = jsonDecode(r.body) as Map<String, dynamic>;
     final list = m['hosts'];
@@ -146,7 +146,7 @@ mixin _ApiClientAgent on _ApiTransport {
     if (hostId != null && hostId.isNotEmpty) qp['hostId'] = hostId;
     if (q != null && q.trim().isNotEmpty) qp['q'] = q.trim();
     final uri = Uri.parse('$baseUrl/v1/agent/sessions').replace(queryParameters: qp);
-    final r = await _c.get(uri, headers: _headers).timeout(const Duration(seconds: 20));
+    final r = await _c.get(uri, headers: _headers).apiTimeout(const Duration(seconds: 20));
     _ensureOk(r);
     final m = jsonDecode(r.body) as Map<String, dynamic>;
     final list = m['sessions'];
@@ -164,7 +164,7 @@ mixin _ApiClientAgent on _ApiTransport {
             if (title != null && title.isNotEmpty) 'title': title,
           }),
         )
-        .timeout(const Duration(seconds: 15));
+        .apiTimeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -172,7 +172,7 @@ mixin _ApiClientAgent on _ApiTransport {
   Future<List<Map<String, dynamic>>> getAgentSessionMessages(String id, {int limit = 500}) async {
     final uri = Uri.parse('$baseUrl/v1/agent/sessions/$id/messages')
         .replace(queryParameters: {'limit': '$limit'});
-    final r = await _c.get(uri, headers: _headers).timeout(const Duration(seconds: 30));
+    final r = await _c.get(uri, headers: _headers).apiTimeout(const Duration(seconds: 30));
     _ensureOk(r);
     final m = jsonDecode(r.body) as Map<String, dynamic>;
     final list = m['messages'];
@@ -187,7 +187,7 @@ mixin _ApiClientAgent on _ApiTransport {
           headers: _headers,
           body: jsonEncode({'title': title}),
         )
-        .timeout(const Duration(seconds: 15));
+        .apiTimeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -195,7 +195,7 @@ mixin _ApiClientAgent on _ApiTransport {
   Future<void> deleteAgentSessionRemote(String id) async {
     final r = await _c
         .delete(_u('/v1/agent/sessions/$id'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .apiTimeout(const Duration(seconds: 15));
     _ensureOk(r);
   }
 
@@ -242,7 +242,7 @@ mixin _ApiClientAgent on _ApiTransport {
           headers: _headers,
           body: jsonEncode(body),
         )
-        .timeout(const Duration(seconds: 15));
+        .apiTimeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -250,7 +250,7 @@ mixin _ApiClientAgent on _ApiTransport {
   Future<Map<String, dynamic>> getAgentSessionMemory(String id) async {
     final r = await _c
         .get(_u('/v1/agent/sessions/$id/memory'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .apiTimeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -258,14 +258,14 @@ mixin _ApiClientAgent on _ApiTransport {
   Future<void> deleteAgentSessionMemory(String id) async {
     final r = await _c
         .delete(_u('/v1/agent/sessions/$id/memory'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .apiTimeout(const Duration(seconds: 15));
     _ensureOk(r);
   }
 
   Future<Map<String, dynamic>> getAgentSession(String id) async {
     final r = await _c
         .get(_u('/v1/agent/sessions/$id'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .apiTimeout(const Duration(seconds: 15));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }

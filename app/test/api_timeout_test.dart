@@ -10,10 +10,7 @@ void main() {
 
     Object? caught;
     try {
-      await api.testTimeoutForTest(
-        Completer<void>().future,
-        const Duration(milliseconds: 1),
-      );
+      await Completer<void>().future.apiTimeout(const Duration(milliseconds: 1));
     } catch (e) {
       caught = e;
     }

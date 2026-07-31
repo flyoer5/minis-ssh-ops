@@ -8,7 +8,7 @@ mixin _ApiClientFiles on _ApiTransport {
           headers: _headers,
           body: jsonEncode({'path': path}),
         )
-        .timeout(const Duration(seconds: 30));
+        .apiTimeout(const Duration(seconds: 30));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -27,7 +27,7 @@ mixin _ApiClientFiles on _ApiTransport {
           headers: _headers,
           body: jsonEncode(body),
         )
-        .timeout(const Duration(seconds: 60));
+        .apiTimeout(const Duration(seconds: 60));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -48,7 +48,7 @@ mixin _ApiClientFiles on _ApiTransport {
             'confirmed': confirmed,
           }),
         )
-        .timeout(const Duration(seconds: 60));
+        .apiTimeout(const Duration(seconds: 60));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -60,7 +60,7 @@ mixin _ApiClientFiles on _ApiTransport {
           headers: _headers,
           body: jsonEncode({'path': path, 'confirmed': confirmed}),
         )
-        .timeout(const Duration(seconds: 30));
+        .apiTimeout(const Duration(seconds: 30));
     _ensureOk(r);
   }
 
@@ -71,7 +71,7 @@ mixin _ApiClientFiles on _ApiTransport {
           headers: _headers,
           body: jsonEncode({'path': path, 'recursive': recursive, 'confirmed': confirmed}),
         )
-        .timeout(const Duration(seconds: 30));
+        .apiTimeout(const Duration(seconds: 30));
     _ensureOk(r);
   }
 
@@ -82,7 +82,7 @@ mixin _ApiClientFiles on _ApiTransport {
           headers: _headers,
           body: jsonEncode({'oldPath': oldPath, 'newPath': newPath, 'confirmed': confirmed}),
         )
-        .timeout(const Duration(seconds: 30));
+        .apiTimeout(const Duration(seconds: 30));
     _ensureOk(r);
   }
 
@@ -103,7 +103,7 @@ mixin _ApiClientFiles on _ApiTransport {
             'confirmed': confirmed,
           }),
         )
-        .timeout(const Duration(seconds: 180));
+        .apiTimeout(const Duration(seconds: 180));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -124,7 +124,7 @@ mixin _ApiClientFiles on _ApiTransport {
             'confirmed': confirmed,
           }),
         )
-        .timeout(const Duration(seconds: 180));
+        .apiTimeout(const Duration(seconds: 180));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -136,7 +136,7 @@ mixin _ApiClientFiles on _ApiTransport {
           headers: _headers,
           body: jsonEncode({'path': path, 'maxBytes': maxBytes}),
         )
-        .timeout(const Duration(seconds: 120));
+        .apiTimeout(const Duration(seconds: 120));
     _ensureOk(r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
