@@ -30,6 +30,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   String _query = '';
   Timer? _autoProbeTimer;
   int _autoProbeSecBound = -1;
+  Timer? _searchDebounce;
 
   @override
   bool get wantKeepAlive => true;
@@ -37,6 +38,7 @@ class _HostsPageState extends State<HostsPage> with AutomaticKeepAliveClientMixi
   @override
   void dispose() {
     _autoProbeTimer?.cancel();
+    _searchDebounce?.cancel();
     _search.dispose();
     super.dispose();
   }
