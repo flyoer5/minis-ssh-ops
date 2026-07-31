@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -17,6 +18,7 @@ abstract class _ApiTransport {
   Map<String, String> get _headers;
   Uri _u(String path);
   void _ensureOk(http.Response response);
+  Future<T> _withTimeout<T>(Future<T> request, Duration duration);
 }
 
 class ApiClient extends _ApiTransport
@@ -60,6 +62,18 @@ class ApiClient extends _ApiTransport
   @override
   Uri _u(String path) => Uri.parse('$baseUrl$path');
 
+  Future<T> testTimeoutForTest<T>(Future<T> request, Duration duration) =>
+      _withTimeout(request, duration);
+
+  @override
+  Future<T> _withTimeout<T>(Future<T> request, Duration duration) async {
+    try {
+      return await request.timeout(duration);
+    } on TimeoutException {
+      throw ApiTimeoutException(duration);
+    }
+  }
+
   @override
   void _ensureOk(http.Response r) {
     if (r.statusCode >= 200 && r.statusCode < 300) return;
@@ -71,6 +85,14 @@ class ApiClient extends _ApiTransport
     } catch (_) {}
     throw ApiException(r.statusCode, msg, body: body);
   }
+}
+
+class ApiTimeoutException implements Exception {
+  final Duration duration;
+  ApiTimeoutException(this.duration);
+
+  @override
+  String toString() => '请求超时，请检查网络或主机连接';
 }
 
 class ApiException implements Exception {

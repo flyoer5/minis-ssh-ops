@@ -2,9 +2,10 @@ part of 'client.dart';
 
 mixin _ApiClientAdmin on _ApiTransport {
   Future<List<dynamic>> listAudit({int limit = 100}) async {
-    final r = await _c
-        .get(_u('/v1/audit?limit=$limit'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+    final r = await _withTimeout(
+      _c.get(_u('/v1/audit?limit=$limit'), headers: _headers),
+      const Duration(seconds: 15),
+    );
     _ensureOk(r);
     final m = jsonDecode(r.body) as Map<String, dynamic>;
     return (m['entries'] as List<dynamic>? ?? []);

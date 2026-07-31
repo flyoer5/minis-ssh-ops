@@ -277,16 +277,19 @@ mixin _ApiClientAgent on _ApiTransport {
     String sessionId = 'agent',
     int stepId = 0,
   }) async {
-    final r = await _c.post(
-      _u('/v1/agent/exec-step'),
-      headers: _headers,
-      body: jsonEncode({
-        'hostId': hostId,
-        'command': command,
-        'confirmed': confirmed,
-        'sessionId': sessionId,
-        'stepId': stepId,
-      }),
+    final r = await _withTimeout(
+      _c.post(
+        _u('/v1/agent/exec-step'),
+        headers: _headers,
+        body: jsonEncode({
+          'hostId': hostId,
+          'command': command,
+          'confirmed': confirmed,
+          'sessionId': sessionId,
+          'stepId': stepId,
+        }),
+      ),
+      const Duration(seconds: 60),
     );
     if (r.statusCode == 409) {
       final m = jsonDecode(r.body) as Map<String, dynamic>;
