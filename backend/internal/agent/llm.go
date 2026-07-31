@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -170,7 +171,7 @@ func friendlyLLMError(err error) error {
 	if err == nil {
 		return fmt.Errorf("llm unknown error")
 	}
-	if err == context.Canceled || err == context.DeadlineExceeded {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return err
 	}
 	s := err.Error()
