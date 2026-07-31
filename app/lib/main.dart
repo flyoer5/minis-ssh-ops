@@ -11,6 +11,7 @@ import 'package:ssh_ai_agent/pages/settings_page.dart';
 import 'package:ssh_ai_agent/pages/terminal_page.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
+import 'package:ssh_ai_agent/util/feedback.dart';
 import 'package:ssh_ai_agent/widgets/ime_inset.dart';
 import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
@@ -76,9 +77,7 @@ class _AppErrorSurface extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: msg));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('错误信息已复制'), duration: Duration(seconds: 1)),
-                        );
+                        showSnack(context, '错误信息已复制');
                       },
                       icon: const Icon(Icons.copy, size: 18),
                       label: const Text('复制错误'),
