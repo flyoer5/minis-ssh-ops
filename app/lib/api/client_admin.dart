@@ -1,6 +1,21 @@
 part of 'client.dart';
 
 mixin _ApiClientAdmin on _ApiTransport {
+  Future<String> createPtyTicket(String hostId) async {
+    final r = await _c
+        .post(
+          _u('/v1/pty/ticket'),
+          headers: _headers,
+          body: jsonEncode({'hostId': hostId}),
+        )
+        .apiTimeout(const Duration(seconds: 10));
+    _ensureOk(r);
+    final m = jsonDecode(r.body) as Map<String, dynamic>;
+    final ticket = m['ticket']?.toString() ?? '';
+    if (ticket.isEmpty) throw ApiException(500, 'PTY ticket missing');
+    return ticket;
+  }
+
   Future<List<dynamic>> listAudit({int limit = 100}) async {
     final r = await _withTimeout(
       _c.get(_u('/v1/audit?limit=$limit'), headers: _headers),

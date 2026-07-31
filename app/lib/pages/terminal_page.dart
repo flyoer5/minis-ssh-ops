@@ -144,7 +144,7 @@ class _TerminalPageState extends State<TerminalPage>
     });
   }
 
-  void _connect(AppState state) {
+  Future<void> _connect(AppState state) async {
     final gen = ++_connGen;
     _sub?.cancel();
     _sub = null;
@@ -168,20 +168,37 @@ class _TerminalPageState extends State<TerminalPage>
       return;
     }
     final base = Uri.parse(state.api.baseUrl);
+    late final String ticket;
+    try {
+      ticket = await state.api.createPtyTicket(hostId).timeout(const Duration(seconds: 10));
+    } catch (e) {
+      if (gen != _connGen || !mounted) return;
+      setState(() {
+        _connecting = false;
+        _status = '终端授权失败';
+      });
+      _append('\n终端授权失败：$e\n');
+      return;
+    }
+    if (gen != _connGen || !mounted) return;
     final ws = Uri(
       scheme: base.scheme == 'https' ? 'wss' : 'ws',
       host: base.host.isEmpty ? '127.0.0.1' : base.host,
       port: base.hasPort ? base.port : 17890,
       path: '/v1/pty',
       queryParameters: {
-        'token': state.api.localToken,
+        'ticket': ticket,
         'hostId': hostId,
         'cols': '80',
         'rows': '28',
       },
     );
     try {
-      final ch = IOWebSocketChannel.connect(ws);
+      final ch = IOWebSocketChannel.connect(
+        ws,
+        pingInterval: const Duration(seconds: 25),
+        connectTimeout: const Duration(seconds: 15),
+      );
       if (gen != _connGen) {
         ch.sink.close();
         return;
