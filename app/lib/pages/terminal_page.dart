@@ -53,6 +53,7 @@ class _TerminalPageState extends State<TerminalPage>
   TextSpan? _spanCache;
   Timer? _searchDebounce;
   Timer? _appendFlush;
+  Timer? _heartbeat;
   bool _appendPending = false;
 
   static const _bg = AppColors.terminalBlack;
@@ -78,6 +79,7 @@ class _TerminalPageState extends State<TerminalPage>
     WidgetsBinding.instance.removeObserver(this);
     _appendFlush?.cancel();
     _searchDebounce?.cancel();
+    _heartbeat?.cancel();
     _input.removeListener(_onChanged);
     _sub?.cancel();
     _ch?.sink.close();
@@ -110,11 +112,11 @@ class _TerminalPageState extends State<TerminalPage>
 
   void _append(String s) {
     _buf.write(s);
-    final t = _buf.toString();
-    if (t.length > 400000) {
+    if (_buf.length > 400000) {
+      final text = _buf.toString();
       _buf
         ..clear()
-        ..write(t.substring(t.length - 200000));
+        ..write(text.substring(text.length - 200000));
     }
     if (!mounted) return;
     if (_appendFlush?.isActive == true) {
@@ -148,6 +150,8 @@ class _TerminalPageState extends State<TerminalPage>
     final gen = ++_connGen;
     _sub?.cancel();
     _sub = null;
+    _heartbeat?.cancel();
+    _heartbeat = null;
     try {
       _ch?.sink.close();
     } catch (_) {}
@@ -212,6 +216,11 @@ class _TerminalPageState extends State<TerminalPage>
               final m = jsonDecode(data) as Map<String, dynamic>;
               final t = m['type']?.toString();
               if (t == 'ready') {
+                _heartbeat?.cancel();
+                _heartbeat = Timer.periodic(const Duration(seconds: 25), (_) {
+                  if (gen != _connGen || !_connected) return;
+                  ch.sink.add(jsonEncode({'type': 'ping'}));
+                });
                 setState(() {
                   _connected = true;
                   _connecting = false;
@@ -238,6 +247,8 @@ class _TerminalPageState extends State<TerminalPage>
         },
         onError: (e) {
           if (gen != _connGen || !mounted) return;
+          _heartbeat?.cancel();
+          _heartbeat = null;
           setState(() {
             _connected = false;
             _connecting = false;
@@ -247,6 +258,8 @@ class _TerminalPageState extends State<TerminalPage>
         },
         onDone: () {
           if (gen != _connGen || !mounted) return;
+          _heartbeat?.cancel();
+          _heartbeat = null;
           setState(() {
             _connected = false;
             _connecting = false;

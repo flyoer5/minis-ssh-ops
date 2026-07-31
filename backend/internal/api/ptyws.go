@@ -15,6 +15,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const maxPtyMessageBytes = 1 << 20
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  8192,
 	WriteBufferSize: 8192,
@@ -72,8 +74,8 @@ func (s *Server) handlePtyWS(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "hostId required")
 		return
 	}
-	cols := queryInt(r, "cols", 80)
-	rows := queryInt(r, "rows", 24)
+	cols := queryIntRange(r, "cols", 80, 20, 500)
+	rows := queryIntRange(r, "rows", 24, 5, 200)
 
 	h, err := s.Store.GetHost(hostID)
 	if err != nil {
@@ -107,6 +109,7 @@ func (s *Server) handlePtyWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	conn.SetReadLimit(maxPtyMessageBytes)
 	_ = writeWSJSON(conn, ptyOut{Type: "ready", Data: "connected"})
 
 	var writeMu sync.Mutex
@@ -177,7 +180,9 @@ func (s *Server) handlePtyWS(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 				case "resize":
-					_ = pty.WindowChange(msg.Cols, msg.Rows)
+					cols := clampInt(msg.Cols, 20, 500)
+					rows := clampInt(msg.Rows, 5, 200)
+					_ = pty.WindowChange(cols, rows)
 				case "ping":
 					writeMu.Lock()
 					_ = writeWSJSON(conn, ptyOut{Type: "pong"})
@@ -201,14 +206,24 @@ func writeWSJSON(conn *websocket.Conn, v any) error {
 	return conn.WriteMessage(websocket.TextMessage, b)
 }
 
-func queryInt(r *http.Request, key string, def int) int {
+func queryIntRange(r *http.Request, key string, def, min, max int) int {
 	v := r.URL.Query().Get(key)
 	if v == "" {
 		return def
 	}
 	n, err := strconv.Atoi(v)
-	if err != nil || n <= 0 {
+	if err != nil {
 		return def
 	}
-	return n
+	return clampInt(n, min, max)
+}
+
+func clampInt(v, min, max int) int {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
 }
