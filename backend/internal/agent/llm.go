@@ -18,7 +18,7 @@ type Client struct {
 	APIKey        string
 	Model         string
 	Temperature   float64 // 0.0–2.0; 0 → use default
-	ThinkingLevel string // none|low|medium|high|xhigh|auto
+	ThinkingLevel string  // none|low|medium|high|xhigh|auto
 	HTTP          *http.Client
 	// Req is cancelled when the SSE client disconnects (user stop).
 	// LLM HTTP requests and tool rounds should respect it.
@@ -32,8 +32,8 @@ type Msg struct {
 
 func NewClient(baseURL, apiKey, model string) *Client {
 	tr := &http.Transport{
-		Proxy:       http.ProxyFromEnvironment,
-		DialContext: netx.Dialer(15 * time.Second).DialContext,
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           netx.Dialer(15 * time.Second).DialContext,
 		ForceAttemptHTTP2:     false, // some gateways flake on h2
 		MaxIdleConns:          4,
 		IdleConnTimeout:       60 * time.Second,
@@ -67,7 +67,9 @@ func (c *Client) Chat(messages []Msg) (string, error) {
 		if !isRetryable(err) || attempt == 3 {
 			break
 		}
-		time.Sleep(time.Duration(attempt) * 800 * time.Millisecond)
+		if err := waitContext(c.context(), time.Duration(attempt)*800*time.Millisecond); err != nil {
+			return "", err
+		}
 	}
 	return "", friendlyLLMError(last)
 }
@@ -80,7 +82,7 @@ func (c *Client) chatOnce(messages []Msg) (string, error) {
 	}
 	applyThinkingParams(payload, c.ThinkingLevel)
 	body, _ := json.Marshal(payload)
-	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/chat/completions", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(c.context(), http.MethodPost, c.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
@@ -125,6 +127,24 @@ func (c *Client) chatOnce(messages []Msg) (string, error) {
 	return content, nil
 }
 
+func (c *Client) context() context.Context {
+	if c.Ctx != nil {
+		return c.Ctx
+	}
+	return context.Background()
+}
+
+func waitContext(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func isRetryable(err error) bool {
 	if err == nil {
 		return false
@@ -149,6 +169,9 @@ func isRetryable(err error) bool {
 func friendlyLLMError(err error) error {
 	if err == nil {
 		return fmt.Errorf("llm unknown error")
+	}
+	if err == context.Canceled || err == context.DeadlineExceeded {
+		return err
 	}
 	s := err.Error()
 	low := strings.ToLower(s)
