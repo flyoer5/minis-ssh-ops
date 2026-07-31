@@ -11,11 +11,18 @@ import (
 
 func TestChatCancellationStopsInFlightRequest(t *testing.T) {
 	started := make(chan struct{})
+	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		close(started)
-		<-r.Context().Done()
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
 	}))
-	defer srv.Close()
+	defer func() {
+		close(release)
+		srv.Close()
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	client := NewClient(srv.URL, "", "test-model")
