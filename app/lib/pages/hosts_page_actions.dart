@@ -87,9 +87,7 @@ extension HostsPageActions on _HostsPageState {
                         ..writeln(s.detail.isNotEmpty ? s.detail : s.oneLine);
                       await Clipboard.setData(ClipboardData(text: buf.toString()));
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('已复制错误详情'), duration: Duration(seconds: 1)),
-                        );
+                        showSnack(context, '已复制错误详情');
                       }
                     },
                     icon: const Icon(Icons.copy_all, size: 16),
@@ -165,9 +163,7 @@ extension HostsPageActions on _HostsPageState {
     if (action == 'copy') {
       await Clipboard.setData(ClipboardData(text: addr));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已复制主机地址'), duration: Duration(seconds: 1)),
-        );
+        showSnack(context, '已复制主机地址');
       }
       return;
     }
@@ -191,18 +187,17 @@ extension HostsPageActions on _HostsPageState {
         await state.removeHost(id);
         if (!mounted) return;
         setState(() => _summary.remove(id));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('已删除 $name'),
-            duration: const Duration(seconds: 4),
-            action: SnackBarAction(
-              label: '撤销',
-              onPressed: () {
-                if (mounted) {
-                  state.addHost(savedHost).then((_) => _refreshAll(state));
-                }
-              },
-            ),
+        showSnack(
+          context,
+          '已删除 $name',
+          seconds: 4,
+          action: SnackBarAction(
+            label: '撤销',
+            onPressed: () {
+              if (mounted) {
+                state.addHost(savedHost).then((_) => _refreshAll(state));
+              }
+            },
           ),
         );
       }
@@ -240,14 +235,13 @@ extension HostsPageActions on _HostsPageState {
       if (!context.mounted) return;
       final s = _summary[id];
       if (s != null && !s.ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            content: const Text('已添加，但暂时连不上'),
-            action: SnackBarAction(
-              label: '详情',
-              onPressed: () {
+        showSnack(
+          context,
+          '已添加，但暂时连不上',
+          seconds: 3,
+          action: SnackBarAction(
+            label: '详情',
+            onPressed: () {
                 final h = state.hosts.cast<dynamic>().whereType<Map>().cast<Map<String, dynamic>>().firstWhere(
                       (e) => e['id'] == id,
                       orElse: () => <String, dynamic>{
@@ -267,18 +261,13 @@ extension HostsPageActions on _HostsPageState {
                   hostId: id,
                   onRetry: () => _refreshProbe(state, id, force: true),
                 );
-              },
-            ),
+            },
           ),
         );
       } else if (s != null && s.ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已添加并探测成功'), duration: Duration(seconds: 2)),
-        );
+        showSnack(context, '已添加并探测成功');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已添加主机'), duration: Duration(seconds: 2)),
-        );
+        showSnack(context, '已添加主机');
       }
     } catch (e) {
       if (context.mounted) {

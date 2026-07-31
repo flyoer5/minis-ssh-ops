@@ -122,19 +122,11 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       return;
     }
     if (state.selectedHostId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('先选主机'),
-          duration: const Duration(seconds: 3),
-          action: SnackBarAction(label: '去主机', onPressed: () => NavScope.maybeOf(context)?.go(0)),
-        ),
-      );
+      showSnack(context, '先选主机', seconds: 3, action: SnackBarAction(label: '去主机', onPressed: () => NavScope.maybeOf(context)?.go(0)));
       return;
     }
     if (_busy || state.agentBusy) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('上一轮还在进行，可点停止'), duration: Duration(seconds: 2)),
-      );
+      showSnack(context, '上一轮还在进行，可点停止', seconds: 2);
       return;
     }
     _input.clear();

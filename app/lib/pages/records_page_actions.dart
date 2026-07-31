@@ -62,12 +62,13 @@ extension RecordsPageActions on _RecordsPageState {
         : (savedPath != null && savedPath.isNotEmpty
             ? '已导出 ${list.length} 条到下载目录，并复制到剪贴板'
             : '已复制 ${list.length} 条 CSV 到剪贴板');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        action: SnackBarAction(
-          label: '预览',
-          onPressed: () {
+    showSnack(
+      context,
+      msg,
+      seconds: 3,
+      action: SnackBarAction(
+        label: '预览',
+        onPressed: () {
             showDialog(
               context: context,
               builder: (c) => AlertDialog(
@@ -85,8 +86,7 @@ extension RecordsPageActions on _RecordsPageState {
                 actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭'))],
               ),
             );
-          },
-        ),
+        },
       ),
     );
   }
