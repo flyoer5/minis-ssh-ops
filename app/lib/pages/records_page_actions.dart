@@ -141,9 +141,7 @@ extension RecordsPageActions on _RecordsPageState {
                 FilledButton.tonalIcon(
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: cmd));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('命令已复制')),
-                    );
+                    showSnack(context, '命令已复制');
                   },
                   icon: const Icon(Icons.copy, size: 16),
                   label: const Text('复制命令'),
@@ -156,12 +154,7 @@ extension RecordsPageActions on _RecordsPageState {
                       NavScope.maybeOf(context)?.go(2); // terminal tab
                       // After navigation delay, send command via PTY
                       Future.delayed(const Duration(milliseconds: 500), () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('已切换主机，请在终端粘贴执行: $cmd'),
-                            duration: const Duration(seconds: 3),
-                          ),
-                        );
+                        showSnack(context, '已切换主机，请在终端粘贴执行', seconds: 2);
                       });
                     },
                     icon: const Icon(Icons.terminal, size: 16),
