@@ -21,6 +21,7 @@ type Client struct {
 	Temperature   float64 // 0.0–2.0; 0 → use default
 	ThinkingLevel string  // none|low|medium|high|xhigh|auto
 	HTTP          *http.Client
+	StreamHTTP    *http.Client
 	// Req is cancelled when the SSE client disconnects (user stop).
 	// LLM HTTP requests and tool rounds should respect it.
 	Ctx context.Context
@@ -31,17 +32,21 @@ type Msg struct {
 	Content string `json:"content"`
 }
 
-func NewClient(baseURL, apiKey, model string) *Client {
-	tr := &http.Transport{
+func newTransport(responseHeaderTimeout time.Duration) *http.Transport {
+	return &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		DialContext:           netx.Dialer(15 * time.Second).DialContext,
 		ForceAttemptHTTP2:     false, // some gateways flake on h2
-		MaxIdleConns:          4,
+		MaxIdleConns:          8,
+		MaxIdleConnsPerHost:   4,
 		IdleConnTimeout:       60 * time.Second,
 		TLSHandshakeTimeout:   15 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-		ResponseHeaderTimeout: 90 * time.Second,
+		ResponseHeaderTimeout: responseHeaderTimeout,
 	}
+}
+
+func NewClient(baseURL, apiKey, model string) *Client {
 	return &Client{
 		BaseURL: strings.TrimRight(baseURL, "/"),
 		APIKey:  apiKey,
@@ -49,8 +54,21 @@ func NewClient(baseURL, apiKey, model string) *Client {
 		Ctx:     context.Background(),
 		HTTP: &http.Client{
 			Timeout:   120 * time.Second,
-			Transport: tr,
+			Transport: newTransport(90 * time.Second),
 		},
+		StreamHTTP: &http.Client{
+			Timeout:   0,
+			Transport: newTransport(120 * time.Second),
+		},
+	}
+}
+
+func (c *Client) Close() {
+	if c.HTTP != nil {
+		c.HTTP.CloseIdleConnections()
+	}
+	if c.StreamHTTP != nil && c.StreamHTTP != c.HTTP {
+		c.StreamHTTP.CloseIdleConnections()
 	}
 }
 

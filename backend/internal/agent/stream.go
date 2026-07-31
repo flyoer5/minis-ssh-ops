@@ -2,21 +2,20 @@ package agent
 
 import (
 	"bufio"
-	"context"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/flyoer5/ssh-ai-agent/backend/internal/netx"
 )
 
 // chatToolsStream calls chat/completions with stream=true and emits:
 //   - assistant_delta / reasoning_delta as tokens arrive
 //   - returns the assembled assistant message (content + tool_calls + reasoning)
+//
 // Falls back to non-stream postChat if the gateway rejects stream or returns non-SSE.
 func (c *Client) chatToolsStream(messages []LoopMsg, onDelta func(kind, text string)) (LoopMsg, error) {
 	if c.BaseURL == "" || c.Model == "" {
@@ -106,19 +105,14 @@ func (c *Client) postChatStream(body []byte, onDelta func(kind, text string)) (L
 	if c.APIKey != "" {
 		req.Header.Set("Authorization", "Bearer "+c.APIKey)
 	}
-	// Streaming needs no overall body timeout — use generous response header timeout only.
-	httpClient := c.HTTP
-	if httpClient == nil || httpClient.Timeout > 0 {
-		httpClient = &http.Client{
-			Timeout: 0,
-			Transport: &http.Transport{
-				Proxy:                 http.ProxyFromEnvironment,
-				DialContext:           netx.Dialer(15 * time.Second).DialContext,
-				ForceAttemptHTTP2:     false,
-				TLSHandshakeTimeout:   15 * time.Second,
-				ResponseHeaderTimeout: 120 * time.Second,
-			},
-		}
+	// Streaming has no overall body timeout. Reuse the dedicated client so
+	// transports and idle connections do not accumulate across agent rounds.
+	httpClient := c.StreamHTTP
+	if httpClient == nil {
+		httpClient = c.HTTP
+	}
+	if httpClient == nil {
+		return LoopMsg{}, fmt.Errorf("llm http client unavailable")
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -171,9 +165,9 @@ func (c *Client) postChatStream(body []byte, onDelta func(kind, text string)) (L
 		var chunk struct {
 			Choices []struct {
 				Delta struct {
-					Content          any        `json:"content"`
-					ReasoningContent string     `json:"reasoning_content"`
-					Reasoning        any        `json:"reasoning"`
+					Content          any    `json:"content"`
+					ReasoningContent string `json:"reasoning_content"`
+					Reasoning        any    `json:"reasoning"`
 					ToolCalls        []struct {
 						Index    int    `json:"index"`
 						ID       string `json:"id"`
