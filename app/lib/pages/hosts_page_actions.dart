@@ -233,9 +233,7 @@ extension HostsPageActions on _HostsPageState {
       final id = await state.addHost(result.body);
       if (!context.mounted) return;
       if (id == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('主机已添加，但未拿到 ID，请下拉刷新')),
-        );
+        showSnack(context, '主机已添加，请下拉刷新', seconds: 2);
         return;
       }
       await _refreshProbe(state, id, force: true);
@@ -244,9 +242,9 @@ extension HostsPageActions on _HostsPageState {
       if (s != null && !s.ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 3),
             behavior: SnackBarBehavior.floating,
-            content: Text('已添加，但暂时连不上：${s.oneLine}'),
+            content: const Text('已添加，但暂时连不上'),
             action: SnackBarAction(
               label: '详情',
               onPressed: () {
@@ -284,7 +282,7 @@ extension HostsPageActions on _HostsPageState {
       }
     } catch (e) {
       if (context.mounted) {
-        showSnack(context, '添加失败：${cleanError(e)}', seconds: 4);
+        showErrorSnack(context, e, prefix: '添加失败：');
       }
     }
   }

@@ -118,9 +118,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     final text = _input.text.trim();
     if (text.isEmpty || _busy) return;
     if (!state.backendOk) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('本地后端未连接'), duration: Duration(seconds: 2)),
-      );
+      showSnack(context, '本地后端未连接', seconds: 2);
       return;
     }
     if (state.selectedHostId == null) {
@@ -157,14 +155,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       if (msg.contains('HOSTKEY_MISMATCH') || msg.toLowerCase().contains('hostkey_mismatch')) {
         if (mounted) await _handleHostKeyMismatch(state);
       } else if (mounted) {
-        final short = cleanError(msg);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(short.length > 160 ? '${short.substring(0, 160)}...' : short),
-            duration: const Duration(seconds: 4),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showErrorSnack(context, msg);
       }
     } finally {
       if (mounted) {
