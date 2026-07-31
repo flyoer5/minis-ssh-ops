@@ -22,6 +22,7 @@ type pooled struct {
 	cli     *ssh.Client
 	created time.Time
 	last    time.Time
+	probeMu sync.Mutex
 }
 
 func NewPool() *Pool {
@@ -49,32 +50,70 @@ func poolKey(p ConnectParams) string {
 
 func (p *Pool) get(key string) *ssh.Client {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	e, ok := p.clients[key]
 	if !ok {
+		p.mu.Unlock()
 		return nil
 	}
-	if time.Since(e.created) > p.ttl {
-		_ = e.cli.Close()
+	now := time.Now()
+	if now.Sub(e.created) > p.ttl {
 		delete(p.clients, key)
+		p.mu.Unlock()
+		_ = e.cli.Close()
 		return nil
 	}
-	// Skip keepalive RTT when connection was used recently (probe/exec burst).
-	if time.Since(e.last) < 45*time.Second {
-		e.last = time.Now()
+	if now.Sub(e.last) < 45*time.Second {
+		e.last = now
+		p.mu.Unlock()
 		return e.cli
 	}
-	// Liveness only after idle gap.
-	if _, _, err := e.cli.Conn.SendRequest("kevin@golang.org/keepalive@golang", true, nil); err != nil {
-		s, err2 := e.cli.NewSession()
-		if err2 != nil {
-			_ = e.cli.Close()
-			delete(p.clients, key)
-			return nil
-		}
-		_ = s.Close()
+	p.mu.Unlock()
+
+	// Never hold the global pool lock across network I/O. Serialize liveness
+	// probes per connection so unrelated hosts remain responsive.
+	e.probeMu.Lock()
+	defer e.probeMu.Unlock()
+
+	p.mu.Lock()
+	current, stillCurrent := p.clients[key]
+	if !stillCurrent || current != e {
+		p.mu.Unlock()
+		return nil
 	}
-	e.last = time.Now()
+	if time.Since(e.last) < 45*time.Second {
+		e.last = time.Now()
+		p.mu.Unlock()
+		return e.cli
+	}
+	p.mu.Unlock()
+
+	alive := true
+	if _, _, err := e.cli.Conn.SendRequest("kevin@golang.org/keepalive@golang", true, nil); err != nil {
+		s, sessionErr := e.cli.NewSession()
+		if sessionErr != nil {
+			alive = false
+		} else {
+			_ = s.Close()
+		}
+	}
+
+	p.mu.Lock()
+	current, stillCurrent = p.clients[key]
+	if stillCurrent && current == e {
+		if alive {
+			e.last = time.Now()
+		} else {
+			delete(p.clients, key)
+		}
+	}
+	p.mu.Unlock()
+	if !alive {
+		_ = e.cli.Close()
+		return nil
+	}
+	if !stillCurrent || current != e {
+		return nil
+	}
 	return e.cli
 }
 
