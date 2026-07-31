@@ -138,9 +138,7 @@ extension _AgentPageChrome on _AgentPageState {
               }
             } catch (_) {}
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('已开新会话'), duration: Duration(seconds: 1)),
-              );
+              showSnack(context, '已开新会话');
             }
           },
           icon: const Icon(Icons.add_comment_outlined, size: 20),
