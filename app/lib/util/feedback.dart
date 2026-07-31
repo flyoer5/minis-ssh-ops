@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 /// UI feedback helpers — single place for snackbar + error-string cleanup so
 /// the 40+ call sites stay consistent (duration, styling, message shape).
 
-/// Show a snackbar with sane defaults. [seconds] defaults to 2 (most are
-/// transient confirmations); pass a longer duration for errors the user must
-/// read, or an [action] for actionable messages. [floating] lifts it off the
-/// bottom edge (settings-style).
+/// Show a compact snackbar with consistent styling and timing. One-second
+/// feedback is used for transient confirmations; pass a longer duration only
+/// when the message needs reading or exposes an action.
 void showSnack(
   BuildContext context,
   String message, {
@@ -15,14 +14,21 @@ void showSnack(
   bool floating = true,
 }) {
   if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
     SnackBar(
-      content: Text(message),
+      content: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
       duration: Duration(seconds: seconds),
       action: action,
       behavior: floating ? SnackBarBehavior.floating : null,
     ),
   );
+}
+
+void showErrorSnack(BuildContext context, Object error, {String prefix = ''}) {
+  final message = shortError(error, max: 96);
+  showSnack(context, '$prefix$message', seconds: 3);
 }
 
 /// Strip framework exception wrappers so the user sees the real cause, not

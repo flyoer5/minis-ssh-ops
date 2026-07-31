@@ -72,7 +72,7 @@ class AppState extends ChangeNotifier
           }
         } catch (e) {
           lastErr = e;
-          backendNote = 'Starting backend retry ${i + 1}/2';
+          backendNote = '正在重试启动内置后端（${i + 1}/2）';
           notifyListeners();
           await Future<void>.delayed(Duration(milliseconds: 120 * (i + 1)));
         }
