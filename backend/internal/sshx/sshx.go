@@ -23,10 +23,10 @@ type ConnectParams struct {
 }
 
 type ExecResult struct {
-	ExitCode int    `json:"exitCode"`
-	Stdout   string `json:"stdout"`
-	Stderr   string `json:"stderr"`
-	DurationMs int64 `json:"durationMs"`
+	ExitCode   int    `json:"exitCode"`
+	Stdout     string `json:"stdout"`
+	Stderr     string `json:"stderr"`
+	DurationMs int64  `json:"durationMs"`
 }
 
 // DefaultPool is used by Exec/SFTP when Pool field is not set on params.
@@ -154,10 +154,13 @@ func clientConfig(p ConnectParams) (*ssh.ClientConfig, error) {
 	if len(auths) == 0 {
 		return nil, fmt.Errorf("need password or private key")
 	}
-	hkcb := ssh.InsecureIgnoreHostKey()
-	if p.HostKeys != nil {
-		hkcb = p.HostKeys.Callback(p.Host, p.Port)
+	// Production connections must always verify the server identity. Silently
+	// falling back to InsecureIgnoreHostKey makes a missed call-site parameter
+	// disable host-key protection for the whole operation.
+	if p.HostKeys == nil {
+		return nil, fmt.Errorf("host key store required")
 	}
+	hkcb := p.HostKeys.Callback(p.Host, p.Port)
 	return &ssh.ClientConfig{
 		User:            p.Username,
 		Auth:            auths,
