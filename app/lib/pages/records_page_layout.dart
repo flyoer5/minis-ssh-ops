@@ -151,15 +151,18 @@ extension RecordsPageLayout on _RecordsPageState {
       separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.surface2),
       itemBuilder: (ctx, i) {
         if (i == list.length) {
-          final st = context.watch<AppState>();
-          if (list.length < st.auditLimit) return const SizedBox.shrink();
+          final auditLimit = context.select((AppState s) => s.auditLimit);
+          if (list.length < auditLimit) return const SizedBox.shrink();
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Center(
               child: TextButton.icon(
-                onPressed: () => st.refreshAudit(limit: st.auditLimit + 100),
+                onPressed: () {
+                  final s = context.read<AppState>();
+                  s.refreshAudit(limit: auditLimit + 100);
+                },
                 icon: const Icon(Icons.expand_more, size: 16),
-                label: Text('加载更多（当前 ${st.auditLimit} 条）', style: TextStyle(fontSize: fs - 1)),
+                label: Text('加载更多（当前 $auditLimit 条）', style: TextStyle(fontSize: fs - 1)),
               ),
             ),
           );

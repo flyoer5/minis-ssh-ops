@@ -127,10 +127,11 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                             tooltip: '收藏当前路径',
                             icon: Builder(
                               builder: (ctx) {
-                                final s = ctx.watch<AppState>();
-                                final hid = s.selectedHostId;
-                                final path = pane.path.isEmpty ? '/' : pane.path;
-                                final starred = hid != null && s.pathFavoritesFor(hid).contains(path);
+                                final starred = ctx.select((AppState s) {
+                                  final hid = s.selectedHostId;
+                                  final path = pane.path.isEmpty ? '/' : pane.path;
+                                  return hid != null && s.pathFavoritesFor(hid).contains(path);
+                                });
                                 return Icon(
                                   starred ? Icons.star : Icons.star_border,
                                   size: 18,
@@ -179,8 +180,7 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                     ),
                     Builder(
                       builder: (context) {
-                        final st = context.watch<AppState>();
-                        final favs = st.pathFavoritesFor(st.selectedHostId);
+                        final favs = context.select((AppState s) => s.pathFavoritesFor(s.selectedHostId));
                         if (favs.isEmpty) return const SizedBox.shrink();
                         return SizedBox(
                           height: 32,
@@ -200,8 +200,9 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                                   _go(pane, p);
                                 },
                                 onDeleted: () {
-                                  final hid = st.selectedHostId;
-                                  if (hid != null) st.removePathFavorite(hid, p);
+                                  final s = context.read<AppState>();
+                                  final hid = s.selectedHostId;
+                                  if (hid != null) s.removePathFavorite(hid, p);
                                 },
                                 deleteIconColor: AppColors.gray9e,
                                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

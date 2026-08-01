@@ -163,7 +163,20 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final state = context.watch<AppState>();
+    // Narrow rebuild scope: ignore unrelated AppState changes (probes, prefs, hosts).
+    context.select((AppState s) => Object.hash(
+      s.agentMessages.length,
+      s.agentMessages.isNotEmpty ? s.agentMessages.last.content.length : 0,
+    ));
+    context.select((AppState s) => s.agentBusy);
+    context.select((AppState s) => s.selectedHostId);
+    context.select((AppState s) => s.hostLabel);
+    context.select((AppState s) => s.agentSessionId);
+    context.select((AppState s) => s.agentSessionTitle);
+    context.select((AppState s) => s.backendOk);
+    context.select((AppState s) => s.agentAutoScroll);
+    context.select((AppState s) => s.agentKeepKeyboard);
+    final state = context.read<AppState>();
     _autoFollow(state);
     return Scaffold(
       backgroundColor: AppColors.bg,

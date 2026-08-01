@@ -6,7 +6,12 @@ extension HostsPageLayout on _HostsPageState {
       padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
       child: TextField(
         controller: _search,
-        onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+        onChanged: (v) {
+          _searchDebounce?.cancel();
+          _searchDebounce = Timer(const Duration(milliseconds: 200), () {
+            if (mounted) setState(() => _query = v.trim().toLowerCase());
+          });
+        },
         style: const TextStyle(fontSize: 14),
         decoration: InputDecoration(
           isDense: true,
