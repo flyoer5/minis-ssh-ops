@@ -117,10 +117,6 @@ ThemeData buildAppTheme({required bool dark}) {
   final textFaint = dark ? AppColors.textFaint : AppColors._lightTextFaint;
   final accent = dark ? AppColors.accent : AppColors._lightAccent;
   final accentSoft = dark ? AppColors.accentSoft : AppColors._lightAccentSoft;
-  final danger = dark ? AppColors.danger : AppColors._lightDanger;
-  final dangerSoft = dark ? AppColors.dangerSoft : const Color(0xFFFF8182);
-  final errorPanel = dark ? AppColors.errorPanel : AppColors._lightErrorPanel;
-  final sendGreen = dark ? AppColors.sendGreen : AppColors._lightSuccess;
   final linkFocus = dark ? AppColors.linkFocus : AppColors._lightAccentSoft;
 
   return ThemeData(
