@@ -165,10 +165,10 @@ class _ConfirmPlanCardState extends State<_ConfirmPlanCard> {
   @override
   Widget build(BuildContext context) {
     // Only rebuild when step results change (ignore unrelated state).
-    context.select((AppState s) => Object.hash(
+    context.select((AppState s) => Object.hashAll([
       s.stepResults.length,
       ...s.stepResults.values.map((v) => v.hashCode),
-    ));
+    ]));
     final state = context.read<AppState>();
     final plan = widget.msg.meta?['plan'];
     final steps = plan is Map ? (plan['steps'] as List?) ?? const [] : const [];
