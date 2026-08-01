@@ -5,7 +5,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,10 +15,28 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const maxPtyMessageBytes = 1 << 20
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  8192,
 	WriteBufferSize: 8192,
-	CheckOrigin:     func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		return isLocalWebSocketOrigin(r.Header.Get("Origin"))
+	},
+}
+
+func isLocalWebSocketOrigin(raw string) bool {
+	if raw == "" || raw == "null" {
+		// Native clients omit Origin; bundled WebViews may send null. Strong
+		// ticket/token authentication still happens below.
+		return true
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 type ptyIn struct {
@@ -32,25 +52,30 @@ type ptyOut struct {
 }
 
 func (s *Server) handlePtyWS(w http.ResponseWriter, r *http.Request) {
-	// Auth via query token (WS cannot always set custom headers from WebView).
-	tok := r.URL.Query().Get("token")
-	if tok == "" {
-		tok = r.Header.Get("X-Local-Token")
-	}
-	if s.LocalToken != "" && tok != s.LocalToken {
-		writeErr(w, http.StatusUnauthorized, "invalid or missing token")
-		return
-	}
 	hostID := r.URL.Query().Get("hostId")
 	if hostID == "" {
 		hostID = r.URL.Query().Get("host_id")
+	}
+	// Prefer a short-lived one-use ticket. The legacy token path remains for
+	// older clients, but new clients should never put the long-lived token in
+	// a WebSocket URL.
+	ticket := r.URL.Query().Get("ticket")
+	legacyToken := r.Header.Get("X-Local-Token")
+	if ticket != "" {
+		if !s.consumePtyTicket(ticket, hostID) {
+			writeErr(w, http.StatusUnauthorized, "invalid or expired PTY ticket")
+			return
+		}
+	} else if s.LocalToken != "" && legacyToken != s.LocalToken {
+		writeErr(w, http.StatusUnauthorized, "invalid or missing token")
+		return
 	}
 	if hostID == "" {
 		writeErr(w, http.StatusBadRequest, "hostId required")
 		return
 	}
-	cols := queryInt(r, "cols", 80)
-	rows := queryInt(r, "rows", 24)
+	cols := queryIntRange(r, "cols", 80, 20, 500)
+	rows := queryIntRange(r, "rows", 24, 5, 200)
 
 	h, err := s.Store.GetHost(hostID)
 	if err != nil {
@@ -84,6 +109,7 @@ func (s *Server) handlePtyWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	conn.SetReadLimit(maxPtyMessageBytes)
 	_ = writeWSJSON(conn, ptyOut{Type: "ready", Data: "connected"})
 
 	var writeMu sync.Mutex
@@ -154,7 +180,9 @@ func (s *Server) handlePtyWS(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 				case "resize":
-					_ = pty.WindowChange(msg.Cols, msg.Rows)
+					cols := clampInt(msg.Cols, 20, 500)
+					rows := clampInt(msg.Rows, 5, 200)
+					_ = pty.WindowChange(cols, rows)
 				case "ping":
 					writeMu.Lock()
 					_ = writeWSJSON(conn, ptyOut{Type: "pong"})
@@ -178,14 +206,24 @@ func writeWSJSON(conn *websocket.Conn, v any) error {
 	return conn.WriteMessage(websocket.TextMessage, b)
 }
 
-func queryInt(r *http.Request, key string, def int) int {
+func queryIntRange(r *http.Request, key string, def, min, max int) int {
 	v := r.URL.Query().Get(key)
 	if v == "" {
 		return def
 	}
 	n, err := strconv.Atoi(v)
-	if err != nil || n <= 0 {
+	if err != nil {
 		return def
 	}
-	return n
+	return clampInt(n, min, max)
+}
+
+func clampInt(v, min, max int) int {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
 }

@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/flyoer5/ssh-ai-agent/backend/internal/sshx"
@@ -18,10 +19,19 @@ type Server struct {
 	HostKeys   *sshx.HostKeyStore
 	StartedAt  time.Time
 	mux        *http.ServeMux
+
+	ptyTicketMu sync.Mutex
+	ptyTickets  map[string]ptyTicket
 }
 
 func New(st *store.Store, localToken string, hostKeys *sshx.HostKeyStore) *Server {
-	s := &Server{Store: st, LocalToken: localToken, HostKeys: hostKeys, StartedAt: time.Now().UTC()}
+	s := &Server{
+		Store:      st,
+		LocalToken: localToken,
+		HostKeys:   hostKeys,
+		StartedAt:  time.Now().UTC(),
+		ptyTickets: make(map[string]ptyTicket),
+	}
 	s.mux = http.NewServeMux()
 	s.routes()
 	return s
@@ -33,6 +43,7 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/health", s.handleHealth)
+	s.mux.HandleFunc("POST /v1/pty/ticket", s.handleCreatePtyTicket)
 	s.mux.HandleFunc("GET /v1/settings/llm", s.handleGetLLM)
 	s.mux.HandleFunc("PUT /v1/settings/llm", s.handlePutLLM)
 	s.mux.HandleFunc("GET /v1/settings/llm/models", s.handleListLLMModels)

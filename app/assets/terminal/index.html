@@ -62,15 +62,15 @@
       connected = on;
     }
 
-    function wsURL() {
+    function wsURL(ticket) {
       const u = new URL(base);
       const proto = u.protocol === 'https:' ? 'wss:' : 'ws:';
       const cols = term.cols || 80;
       const rows = term.rows || 24;
-      return `${proto}//${u.host}/v1/pty?token=${encodeURIComponent(token)}&hostId=${encodeURIComponent(hostId)}&cols=${cols}&rows=${rows}`;
+      return `${proto}//${u.host}/v1/pty?ticket=${encodeURIComponent(ticket)}&hostId=${encodeURIComponent(hostId)}&cols=${cols}&rows=${rows}`;
     }
 
-    function connect() {
+    async function connect() {
       if (!token || !hostId) {
         term.writeln('\r\n\x1b[31mmissing token/hostId\x1b[0m');
         return;
@@ -78,7 +78,21 @@
       if (ws) { try { ws.close(); } catch(e){} }
       term.writeln('\r\n\x1b[90mconnecting…\x1b[0m');
       setDot(false);
-      ws = new WebSocket(wsURL());
+      let ticket;
+      try {
+        const res = await fetch(`${base}/v1/pty/ticket`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Local-Token': token },
+          body: JSON.stringify({ hostId }),
+        });
+        const body = await res.json();
+        if (!res.ok || !body.ticket) throw new Error(body.error || 'terminal authorization failed');
+        ticket = body.ticket;
+      } catch (e) {
+        term.writeln('\r\n\x1b[31mterminal authorization failed: ' + (e.message || e) + '\x1b[0m');
+        return;
+      }
+      ws = new WebSocket(wsURL(ticket));
       ws.binaryType = 'arraybuffer';
       ws.onopen = () => {
         setDot(true);
