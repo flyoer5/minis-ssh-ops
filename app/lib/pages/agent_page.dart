@@ -47,6 +47,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
 
   int _lastMsgCount = 0;
   int _lastTailLen = 0;
+  /// User scrolled away from the bottom — pause auto-follow so history is readable.
+  bool _userPausedFollow = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -72,6 +74,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     final pos = _scroll.position;
     final near = pos.maxScrollExtent - pos.pixels < 160;
     final show = !near && pos.maxScrollExtent > 80;
+    // 用户离开底部时暂停自动跟随，便于翻看历史（回到底部恢复）。
+    _userPausedFollow = !near;
     if (_showJumpBottom != show && mounted) {
       setState(() => _showJumpBottom = show);
     }
@@ -88,6 +92,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       } else {
         _scroll.jumpTo(max);
       }
+      // 回到底部后恢复自动跟随。
+      _userPausedFollow = false;
       if (_showJumpBottom && mounted) setState(() => _showJumpBottom = false);
     });
   }
@@ -101,6 +107,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     _lastMsgCount = count;
     _lastTailLen = tailLen;
     if (!grew || !_busy) return;
+    // 用户已上翻查看历史时，不强制拉回底部。
+    if (_userPausedFollow) return;
     if (!_scroll.hasClients) return;
     final pos = _scroll.position;
     final nearBottom = pos.maxScrollExtent - pos.pixels < 160;
