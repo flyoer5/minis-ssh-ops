@@ -22,11 +22,13 @@ extension _AgentPageComposer on _AgentPageState {
                   controller: _input,
                   focusNode: _focus,
                   minLines: 1,
-                  maxLines: 4,
-                  expands: _expanding,
+                  maxLines: _expanding ? 6 : 3,
                   style: TextStyle(fontSize: state.effectiveAgentFontSize(), color: AppColors.text),
                   textInputAction: state.agentEnterToSend ? TextInputAction.send : TextInputAction.newline,
-                  onChanged: (v) => setState(() => _expanding = v.length > 100),
+                  onChanged: (v) {
+                    final next = v.length > 100;
+                    if (next != _expanding) setState(() => _expanding = next);
+                  },
                   onSubmitted: (_) {
                     if (state.agentEnterToSend && !(_busy || state.agentBusy)) {
                       _send(state);
