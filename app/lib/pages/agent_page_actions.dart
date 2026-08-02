@@ -15,11 +15,38 @@ extension _AgentPageActions on _AgentPageState {
     }
   }
 
+  /// If a generation is running, ask the user to confirm before an action
+  /// (switch session / host / new session) interrupts it. Protects against
+  /// silently disrupting an in-progress turn.
+  Future<bool> _confirmInterrupt(AppState state, {required String action}) async {
+    if (!_busy && !state.agentBusy) return true;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(action),
+        content: const Text(
+          '当前正在生成回复。继续此操作会中断当前生成，确定继续吗？',
+          style: TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('中断生成'),
+          ),
+        ],
+      ),
+    );
+    if (go == true && mounted) {
+      _stopGeneration(state);
+    }
+    return go == true;
+  }
+
   Future<void> _openSession(AppState state, String id, {String? title}) async {
+    if (!await _confirmInterrupt(state, action: '切换会话')) return;
     try {
-      if (_busy || state.agentBusy) {
-        _stopGeneration(state);
-      }
       setState(() => _sessionsLoading = true);
       try {
         final results = await Future.wait([
