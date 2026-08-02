@@ -78,6 +78,7 @@ jobs:
         with:
           go-version: "1.25.0"
           cache: true
+          cache-dependency-path: backend/go.mod
 
       - name: Build Go backend for Android arm64
         run: |

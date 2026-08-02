@@ -34,6 +34,8 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
   final llmKey = TextEditingController();
   final llmModel = TextEditingController(text: 'grok-4.5');
   final customPrompt = TextEditingController();
+  final _searchCtrl = TextEditingController();
+  String _settingsQuery = '';
   String thinkingLevel = 'auto';
   bool loaded = false;
   String? pingMsg;
@@ -87,6 +89,7 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
     llmKey.dispose();
     llmModel.dispose();
     customPrompt.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -166,7 +169,45 @@ class _SettingsPageState extends State<SettingsPage> with AutomaticKeepAliveClie
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 28),
-        children: _buildSettingsSections(state),
+        children: [
+          TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() => _settingsQuery = v.trim().toLowerCase()),
+            style: const TextStyle(fontSize: 13.5),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: '搜索设置项（如：主题、字体、确认、日志）',
+              prefixIcon: const Icon(Icons.search, size: 18),
+              suffixIcon: _settingsQuery.isEmpty
+                  ? null
+                  : IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.clear, size: 16),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _settingsQuery = '');
+                      },
+                    ),
+              filled: true,
+              fillColor: AppColors.surface,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.accentSoft),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ..._buildSettingsSections(state),
+        ],
       ),
     );
   }

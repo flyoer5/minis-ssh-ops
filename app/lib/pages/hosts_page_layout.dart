@@ -89,7 +89,10 @@ extension HostsPageLayout on _HostsPageState {
           fontSize: state.uiFontSize,
           compact: state.hostCardCompact,
           authKind: auth,
-          onSelect: () => state.selectHost(id),
+          onSelect: () {
+            hapticTap(state.hapticFeedback);
+            state.selectHost(id);
+          },
           onRefresh: () => _refreshProbe(state, id, force: true),
           onMenu: () => _hostMenu(context, state, h),
           longPressOpensMenu: !canReorder,

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:ssh_ai_agent/backend/native_backend.dart';
 import 'package:ssh_ai_agent/pages/file_editor_page.dart';
 import 'package:ssh_ai_agent/state/app_state.dart';
+import 'package:ssh_ai_agent/widgets/shimmer.dart';
 
 part 'files_page_actions.dart';
 part 'files_page_transfers.dart';

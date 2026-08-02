@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Semantic palette shared across pages.
 abstract final class AppColors {
@@ -186,6 +187,15 @@ ThemeData buildAppTheme({required bool dark}) {
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: accentSoft),
     iconTheme: IconThemeData(color: textMuted),
+    pageTransitionsTheme: PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: const FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.iOS: const CupertinoPageTransitionsBuilder(),
+        TargetPlatform.linux: const FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.macOS: const CupertinoPageTransitionsBuilder(),
+        TargetPlatform.windows: const FadeUpwardsPageTransitionsBuilder(),
+      },
+    ),
     textTheme: TextTheme(
       bodyLarge: TextStyle(color: text),
       bodyMedium: TextStyle(color: text),

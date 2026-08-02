@@ -8,6 +8,7 @@ import 'package:ssh_ai_agent/state/app_state.dart';
 import 'package:ssh_ai_agent/theme/app_theme.dart';
 import 'package:ssh_ai_agent/util/feedback.dart';
 import 'package:ssh_ai_agent/util/time_fmt.dart';
+import 'package:ssh_ai_agent/widgets/animations.dart';
 import 'package:ssh_ai_agent/widgets/ime_inset.dart';
 import 'package:ssh_ai_agent/widgets/nav_menu.dart';
 
@@ -130,9 +131,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       return;
     }
     _input.clear();
-    if (state.hapticFeedback) {
-      HapticFeedback.lightImpact();
-    }
+    hapticTap(state.hapticFeedback);
     if (!state.agentKeepKeyboard) {
       _focus.unfocus();
     }
