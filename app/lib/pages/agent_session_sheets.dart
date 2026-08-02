@@ -179,7 +179,7 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
                                   ),
                                 );
                                 if (go == true) {
-                                  await state.deleteAgentSession(session.id);
+                                  state.deleteAgentSession(session.id);
                                   if (isCurrent) {
                                     state.clearAgentChat();
                                   }
