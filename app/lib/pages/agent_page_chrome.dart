@@ -144,9 +144,7 @@ extension _AgentPageChrome on _AgentPageState {
           visualDensity: VisualDensity.compact,
           tooltip: '新会话',
           onPressed: () async {
-            if (_busy || state.agentBusy) {
-              _stopGeneration(state);
-            }
+            if (!await _confirmInterrupt(state, action: '开新会话')) return;
             state.clearAgentChat();
             try {
               final r = await state.api.createAgentSession(hostId: state.selectedHostId);
@@ -277,6 +275,7 @@ extension _AgentPageChrome on _AgentPageState {
       ),
     );
     if (picked != null && picked.isNotEmpty && picked != state.selectedHostId) {
+      if (!await _confirmInterrupt(state, action: '切换主机')) return;
       hapticTap(state.hapticFeedback);
       state.selectHost(picked);
       showSnack(context, '已切换到该主机，新消息将发往它');
