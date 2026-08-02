@@ -12,11 +12,33 @@ extension _FilesPagePaneHelpers on _FilesPageState {
         final path = raw['path']?.toString() ?? (pane.path.endsWith('/') || pane.path.isEmpty ? '${pane.path}$name' : '${pane.path}/$name');
         final isDir = raw['isDir'] == true || raw['directory'] == true || raw['type']?.toString() == 'dir';
         final selected = pane.selected.contains(path);
+        final size = raw['size'];
+        final sizeStr = size != null ? _fmtSize(size) : null;
+        final isImage = name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.webp');
+
         return ListTile(
           dense: true,
           selected: selected,
-          leading: Icon(isDir ? Icons.folder_outlined : Icons.insert_drive_file_outlined, color: isDir ? AppColors.warnBright : AppColors.textMuted),
+          leading: isDir
+              ? const Icon(Icons.folder_outlined, color: AppColors.warnBright)
+              : (isImage
+                  ? Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface2,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(Icons.image_outlined, size: 18, color: AppColors.textFaint),
+                    )
+                  : Icon(
+                      name.contains('.') ? Icons.insert_drive_file_outlined : Icons.description_outlined,
+                      color: AppColors.textMuted,
+                    )),
           title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: fs, fontFamily: isDir ? null : 'monospace')),
+          subtitle: sizeStr != null
+              ? Text(sizeStr, style: const TextStyle(fontSize: 10, color: AppColors.textFaint))
+              : null,
           trailing: pane.selecting
               ? Icon(selected ? Icons.check_circle : Icons.radio_button_unchecked, color: selected ? AppColors.cyan : AppColors.textFaint)
               : PopupMenuButton<String>(
@@ -225,27 +247,49 @@ extension _FilesPagePaneHelpers on _FilesPageState {
                 ),
               Expanded(
                 child: pane.loading
-                    ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)))
+                    ? const Column(
+                        children: [
+                          ShimmerListItem(),
+                          ShimmerListItem(),
+                          ShimmerListItem(),
+                          ShimmerListItem(),
+                          ShimmerListItem(),
+                        ],
+                      )
                     : pane.entries.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.folder_open, size: 36, color: Colors.white24),
-                                const SizedBox(height: 8),
-                                const Text('此文件夹为空', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                                Container(
+                                  width: 52,
+                                  height: 52,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface2,
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: const Icon(Icons.folder_open, size: 28, color: Colors.white38),
+                                ),
+                                const SizedBox(height: 10),
+                                const Text('此文件夹为空', style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w600)),
                                 const SizedBox(height: 4),
                                 Text(
                                   pane.path.isEmpty ? '/' : pane.path,
-                                  style: const TextStyle(color: Colors.white24, fontSize: 11, fontFamily: 'monospace'),
+                                  style: const TextStyle(color: Colors.white30, fontSize: 11, fontFamily: 'monospace'),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 10),
-                                TextButton.icon(
+                                const SizedBox(height: 12),
+                                FilledButton.tonalIcon(
                                   onPressed: () => _load(pane),
                                   icon: const Icon(Icons.refresh, size: 16),
                                   label: const Text('刷新'),
+                                ),
+                                const SizedBox(height: 4),
+                                TextButton.icon(
+                                  onPressed: () => _up(pane),
+                                  icon: const Icon(Icons.arrow_upward, size: 14),
+                                  label: const Text('返回上级'),
                                 ),
                               ],
                             ),

@@ -186,6 +186,15 @@ ThemeData buildAppTheme({required bool dark}) {
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: accentSoft),
     iconTheme: IconThemeData(color: textMuted),
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+      },
+    ),
     textTheme: TextTheme(
       bodyLarge: TextStyle(color: text),
       bodyMedium: TextStyle(color: text),

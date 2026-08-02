@@ -85,32 +85,8 @@ extension _AgentPageLayout on _AgentPageState {
           itemBuilder: (_, i) {
             if (_busy && i == state.agentMessages.length) {
               return Padding(
-                padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentSoft),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _busyHint,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                      ),
-                    ),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        foregroundColor: AppColors.danger,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      onPressed: () => _stopGeneration(state),
-                      child: const Text('停止', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                    ),
-                  ],
-                ),
+                padding: const EdgeInsets.fromLTRB(0, 4, 0, 10),
+                child: TypingIndicator(hint: _busyHint),
               );
             }
             final m = state.agentMessages[i];
@@ -119,11 +95,14 @@ extension _AgentPageLayout on _AgentPageState {
             final streaming = _busy && i == state.agentMessages.length - 1 &&
                 (part == 'text_delta' || part == 'text' || part == 'reasoning');
             return RepaintBoundary(
-              child: _Bubble(
-                key: ValueKey('$id|$part|${m.role}'),
-                msg: m,
-                fontSize: state.agentFontSize,
-                streaming: streaming,
+              child: _AnimatedMsgEntry(
+                index: i,
+                child: _Bubble(
+                  key: ValueKey('$id|$part|${m.role}'),
+                  msg: m,
+                  fontSize: state.agentFontSize,
+                  streaming: streaming,
+                ),
               ),
             );
           },
@@ -145,6 +124,55 @@ extension _AgentPageLayout on _AgentPageState {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// One-shot fade+slide entrance for new messages.
+class _AnimatedMsgEntry extends StatefulWidget {
+  final int index;
+  final Widget child;
+  const _AnimatedMsgEntry({required this.index, required this.child});
+
+  @override
+  State<_AnimatedMsgEntry> createState() => _AnimatedMsgEntryState();
+}
+
+class _AnimatedMsgEntryState extends State<_AnimatedMsgEntry>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: widget.child,
+      ),
     );
   }
 }

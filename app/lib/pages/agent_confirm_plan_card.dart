@@ -104,9 +104,7 @@ class _ConfirmPlanCardState extends State<_ConfirmPlanCard> {
     if (_running.contains(stepId) || _batchRunning) return;
     setState(() => _running.add(stepId));
     try {
-      if (state.hapticFeedback) {
-        HapticFeedback.lightImpact();
-      }
+      hapticTap(state.hapticFeedback);
       final res = await state.runAgentStep(stepId: stepId, command: cmd, confirmed: true);
       final result = Map<String, dynamic>.from(res);
       if (!context.mounted) return;

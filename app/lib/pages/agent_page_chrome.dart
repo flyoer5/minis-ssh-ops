@@ -73,7 +73,10 @@ extension _AgentPageChrome on _AgentPageState {
                 visualDensity: VisualDensity.compact,
                 foregroundColor: AppColors.danger,
               ),
-              onPressed: () => _stopGeneration(state),
+              onPressed: () {
+                hapticConfirm(state.hapticFeedback);
+                _stopGeneration(state);
+              },
               icon: const Icon(Icons.stop_circle_outlined, size: 18),
               label: const Text('停止', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
             ),
@@ -154,14 +157,17 @@ extension _AgentPageChrome on _AgentPageState {
         padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
         child: Row(
           children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: !state.backendOk
-                    ? AppColors.danger
-                    : (state.selectedHostId == null ? AppColors.textFaint : AppColors.success),
+            PulseRing(
+              active: state.backendOk && state.selectedHostId != null,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: !state.backendOk
+                      ? AppColors.danger
+                      : (state.selectedHostId == null ? AppColors.textFaint : AppColors.success),
+                ),
               ),
             ),
             const SizedBox(width: 8),

@@ -1,7 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// UI feedback helpers — single place for snackbar + error-string cleanup so
 /// the 40+ call sites stay consistent (duration, styling, message shape).
+
+/// Light haptic pulse when enabled. Call at the start of user actions
+/// (select, toggle, send, refresh) for tactile confirmation.
+void hapticTap(bool enabled) {
+  if (!enabled) return;
+  HapticFeedback.lightImpact();
+}
+
+/// Medium haptic for heavier actions (delete, stop, destructive confirms).
+void hapticConfirm(bool enabled) {
+  if (!enabled) return;
+  HapticFeedback.mediumImpact();
+}
 
 /// Show a compact snackbar with consistent styling and timing. One-second
 /// feedback is used for transient confirmations; pass a longer duration only
