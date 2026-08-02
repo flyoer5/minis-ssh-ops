@@ -36,7 +36,7 @@ extension _AgentPageComposer on _AgentPageState {
                     hintText: state.selectedHostId == null
                         ? '先选择主机'
                         : ((_busy || state.agentBusy)
-                            ? '正在生成，点右侧停止'
+                            ? '生成中... 可输入，发送将停止当前轮'
                             : (state.agentEnterToSend ? '输入消息 · 回车发送' : '输入消息 · 回车换行')),
                     hintStyle: const TextStyle(color: AppColors.textFaint),
                     filled: true,

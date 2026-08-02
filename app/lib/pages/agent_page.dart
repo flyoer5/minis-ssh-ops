@@ -44,7 +44,6 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   bool _sessionsLoading = false;
   String _sessionsQuery = '';
   String _busyHint = '处理中...';
-  List<AgentSession> _cachedSessions = [];
 
   int _lastMsgCount = 0;
   int _lastTailLen = 0;
@@ -77,8 +76,6 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       setState(() => _showJumpBottom = show);
     }
   }
-
-  String _relTime(DateTime when) => formatChinaRelativeDt(when);
 
   void _bottom({bool force = false}) {
     final state = context.read<AppState>();
@@ -117,7 +114,7 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
 
   Future<void> _send(AppState state) async {
     final text = _input.text.trim();
-    if (text.isEmpty || _busy) return;
+    if (text.isEmpty) return;
     if (!state.backendOk) {
       showSnack(context, '本地后端未连接', seconds: 2);
       return;
@@ -127,8 +124,9 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       return;
     }
     if (_busy || state.agentBusy) {
-      showSnack(context, '上一轮还在进行，可点停止', seconds: 2);
-      return;
+      // 生成中发送：先停止当前轮，再立即发送新消息（主流聊天体验）。
+      _stopGeneration(state);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
     }
     _input.clear();
     hapticTap(state.hapticFeedback);

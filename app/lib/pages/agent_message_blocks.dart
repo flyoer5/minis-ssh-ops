@@ -4,13 +4,45 @@ class _Bubble extends StatelessWidget {
   final ChatMessage msg;
   final double fontSize;
   final bool streaming;
+  final VoidCallback? onRetry;
 
-  const _Bubble({super.key, required this.msg, this.fontSize = 15, this.streaming = false});
+  const _Bubble({super.key, required this.msg, this.fontSize = 15, this.streaming = false, this.onRetry});
 
   Future<void> _copy(BuildContext context, String text) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (context.mounted) {
       showSnack(context, '已复制');
+    }
+  }
+
+  /// Long-press action sheet for messages: copy + (retry where applicable).
+  Future<void> _showMsgActions(BuildContext context, {String? copyText}) async {
+    final act = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.copy_all_outlined, size: 20),
+              title: const Text('复制内容', style: TextStyle(fontSize: 14)),
+              onTap: () => Navigator.pop(c, 'copy'),
+            ),
+            if (onRetry != null)
+              ListTile(
+                leading: const Icon(Icons.replay, size: 20, color: AppColors.accentSoft),
+                title: const Text('重新生成回复', style: TextStyle(fontSize: 14, color: AppColors.accentSoft)),
+                onTap: () => Navigator.pop(c, 'retry'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (act == 'copy' && copyText != null) {
+      await _copy(context, copyText);
+    } else if (act == 'retry' && onRetry != null) {
+      onRetry!();
     }
   }
 
@@ -68,7 +100,7 @@ class _Bubble extends StatelessWidget {
           return Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
-              onLongPress: () => _copy(context, msg.content),
+              onLongPress: () => _showMsgActions(context, copyText: msg.content),
               child: Container(
                 constraints: BoxConstraints(maxWidth: maxW),
                 margin: const EdgeInsets.only(bottom: 8, left: 40),
@@ -163,6 +195,14 @@ class _Bubble extends StatelessWidget {
                   style: TextStyle(fontSize: fs - 3, fontWeight: FontWeight.w700, color: AppColors.dangerSoft),
                 ),
                 const Spacer(),
+                if (onRetry != null)
+                  InkWell(
+                    onTap: onRetry,
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.replay, size: 14, color: AppColors.accentSoft),
+                    ),
+                  ),
                 InkWell(
                   onTap: () => _copy(context, msg.content),
                   child: const Padding(

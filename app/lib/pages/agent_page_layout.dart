@@ -102,6 +102,7 @@ extension _AgentPageLayout on _AgentPageState {
                   msg: m,
                   fontSize: state.agentFontSize,
                   streaming: streaming,
+                  onRetry: (_busy || state.agentBusy || state.selectedHostId == null) ? null : () => _retryLast(state),
                 ),
               ),
             );
