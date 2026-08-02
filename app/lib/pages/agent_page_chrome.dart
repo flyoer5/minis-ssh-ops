@@ -119,11 +119,26 @@ extension _AgentPageChrome on _AgentPageState {
             const PopupMenuItem(value: 'rename', child: Text('重命名')),
           ],
         ),
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          tooltip: '历史会话',
-          onPressed: () => _showSessions(state),
-          icon: const Icon(Icons.history, size: 20),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: '历史会话',
+              onPressed: () => _showSessions(state),
+              icon: const Icon(Icons.history, size: 20),
+            ),
+            if (_sessionsLoading)
+              const Positioned(
+                right: 4,
+                bottom: 4,
+                child: SizedBox(
+                  width: 8,
+                  height: 8,
+                  child: CircularProgressIndicator(strokeWidth: 1.4, color: AppColors.accentSoft),
+                ),
+              ),
+          ],
         ),
         IconButton(
           visualDensity: VisualDensity.compact,
@@ -151,49 +166,121 @@ extension _AgentPageChrome on _AgentPageState {
   }
 
   Widget _buildHostStrip(BuildContext context, AppState state) {
+    final canPick = state.backendOk && state.hosts.isNotEmpty;
     return Material(
       color: AppColors.surface,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
-        child: Row(
+      child: InkWell(
+        onTap: canPick
+            ? () => _pickHostSheet(context, state)
+            : (state.selectedHostId == null
+                ? () => NavScope.maybeOf(context)?.go(0)
+                : null),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+          child: Row(
+            children: [
+              PulseRing(
+                active: state.backendOk && state.selectedHostId != null,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: !state.backendOk
+                        ? AppColors.danger
+                        : (state.selectedHostId == null ? AppColors.textFaint : AppColors.success),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  !state.backendOk
+                      ? '本地后端未连接'
+                      : (state.selectedHostId == null ? '尚未选择主机' : state.hostLabel),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                ),
+              ),
+              if (canPick)
+                const Icon(Icons.swap_horiz, size: 14, color: AppColors.textFaint),
+              if (state.selectedHostId == null)
+                TextButton(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: AppColors.accentSoft,
+                  ),
+                  onPressed: () => NavScope.maybeOf(context)?.go(0),
+                  child: const Text('选主机', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Quick host switcher bottom sheet — switch the agent's target host
+  /// without leaving the chat.
+  Future<void> _pickHostSheet(BuildContext context, AppState state) async {
+    final hosts = state.hosts.toList();
+    if (hosts.isEmpty) return;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            PulseRing(
-              active: state.backendOk && state.selectedHostId != null,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: !state.backendOk
-                      ? AppColors.danger
-                      : (state.selectedHostId == null ? AppColors.textFaint : AppColors.success),
-                ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('切换主机', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                !state.backendOk
-                    ? '本地后端未连接'
-                    : (state.selectedHostId == null ? '尚未选择主机' : state.hostLabel),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: hosts.length,
+                separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.surface2),
+                itemBuilder: (_, i) {
+                  final h = hosts[i];
+                  if (h is! Map) return const SizedBox.shrink();
+                  final id = h['id']?.toString() ?? '';
+                  final name = (h['name']?.toString() ?? '').isNotEmpty
+                      ? h['name'].toString()
+                      : '${h['host']}';
+                  final addr = '${h['username']}@${h['host']}:${h['port']}';
+                  final selected = state.selectedHostId == id;
+                  return ListTile(
+                    dense: true,
+                    selected: selected,
+                    selectedTileColor: AppColors.accentDeep.withAlpha(0x14),
+                    leading: Icon(
+                      selected ? Icons.check_circle : Icons.dns_outlined,
+                      size: 20,
+                      color: selected ? AppColors.accentSoft : AppColors.textMuted,
+                    ),
+                    title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
+                    subtitle: Text(addr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
+                    onTap: () {
+                      Navigator.pop(c, id);
+                    },
+                  );
+                },
               ),
             ),
-            if (state.selectedHostId == null)
-              TextButton(
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  foregroundColor: AppColors.accentSoft,
-                ),
-                onPressed: () => NavScope.maybeOf(context)?.go(0),
-                child: const Text('选主机', style: TextStyle(fontWeight: FontWeight.w700)),
-              ),
           ],
         ),
       ),
     );
+    if (picked != null && picked.isNotEmpty && picked != state.selectedHostId) {
+      hapticTap(state.hapticFeedback);
+      state.selectHost(picked);
+      showSnack(context, '已切换到该主机，新消息将发往它');
+    }
   }
 
   Widget _buildOverrideStrip(BuildContext context, AppState state) {

@@ -43,11 +43,11 @@ extension AgentChatControllerTurns on AgentChatController {
 
     final already = agentMessages.isNotEmpty &&
         agentMessages.last.kind == ChatKind.status &&
-        (agentMessages.last.content == 'Stopped' || agentMessages.last.content == 'Canceled');
+        (agentMessages.last.content == 'Stopped' || agentMessages.last.content == 'Canceled' || agentMessages.last.content == '已停止生成');
     if (!already) {
       _pushMsg(ChatMessage(
         role: 'assistant',
-        content: 'Stopped generating',
+        content: '已停止生成',
         kind: ChatKind.status,
         meta: {'interrupted': true},
       ));
@@ -62,7 +62,7 @@ extension AgentChatControllerTurns on AgentChatController {
       return;
     }
     if (agentBusy) {
-      _pushMsg(ChatMessage(role: 'assistant', content: 'Previous turn still running', kind: ChatKind.status));
+      _pushMsg(ChatMessage(role: 'assistant', content: '上一轮仍在进行，请稍候', kind: ChatKind.status));
       return;
     }
 

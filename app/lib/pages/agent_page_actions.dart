@@ -1,23 +1,14 @@
 part of 'agent_page.dart';
 
 extension _AgentPageActions on _AgentPageState {
-  void _loadSessions(AppState state) {
-    setState(() => _sessionsLoading = true);
-    _doLoad(state);
-  }
-
   Future<void> _doLoad(AppState state) async {
     try {
-      final raw = await state.api.listAgentSessions(
+      await state.api.listAgentSessions(
         hostId: _onlyCurrentHost ? state.selectedHostId : null,
         q: _sessionsQuery.isNotEmpty ? _sessionsQuery : null,
       );
       if (mounted) {
-        final sessions = [for (final j in raw) AgentSession.fromJson(j)];
-        setState(() {
-          _cachedSessions = sessions;
-          _sessionsLoading = false;
-        });
+        setState(() => _sessionsLoading = false);
       }
     } catch (_) {
       if (mounted) setState(() => _sessionsLoading = false);

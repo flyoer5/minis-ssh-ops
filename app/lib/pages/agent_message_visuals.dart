@@ -149,12 +149,26 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
     final output = meta['output']?.toString() ?? '';
     final success = meta['success'];
     final pendingConfirm = meta['pendingConfirm'] == true;
+    final interrupted = meta['interrupted'] == true;
     final color = pendingConfirm
         ? AppColors.warning
         : (success == null ? AppColors.textMuted : (success == true ? AppColors.success : AppColors.danger));
 
     final body = widget.part == 'toolResult' ? output : command;
     final open = _autoClosed ? _open : true;
+
+    // Status label chip.
+    final String statusLabel;
+    if (pendingConfirm) {
+      statusLabel = '待确认';
+    } else if (interrupted) {
+      statusLabel = '已中断';
+    } else if (success == null) {
+      statusLabel = widget.part == 'toolUse' ? '执行中' : '';
+    } else {
+      statusLabel = success == true ? '成功' : '失败';
+    }
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8),
@@ -162,7 +176,9 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.surface2),
+        border: Border.all(
+          color: color.withAlpha(pendingConfirm || interrupted || success == false ? 0x66 : 0x33),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,18 +203,44 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
                     style: TextStyle(fontSize: widget.fontSize - 2, fontWeight: FontWeight.w700, color: color),
                   ),
                 ),
+                if (statusLabel.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withAlpha(0x18),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: color.withAlpha(0x55)),
+                    ),
+                    child: Text(
+                      statusLabel,
+                      style: TextStyle(fontSize: widget.fontSize - 4.5, fontWeight: FontWeight.w700, color: color),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 if (body.isNotEmpty && _autoClosed)
-                  Icon(open ? Icons.expand_less : Icons.expand_more, size: 18, color: AppColors.textFaint),
+                  AnimatedRotation(
+                    turns: open ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(Icons.expand_more, size: 18, color: AppColors.textFaint),
+                  ),
               ],
             ),
           ),
-          if ((open || !_autoClosed) && body.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            SelectableText(
-              body,
-              style: TextStyle(fontFamily: 'monospace', fontSize: widget.fontSize - 3, height: 1.35),
-            ),
-          ],
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: (open || !_autoClosed) && body.isNotEmpty
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: SelectableText(
+                      body,
+                      style: TextStyle(fontFamily: 'monospace', fontSize: widget.fontSize - 3, height: 1.35),
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
         ],
       ),
     );
