@@ -10,14 +10,19 @@ class AgentSessionStore {
   static const _maxSessions = 20;
   static const _maxMessages = 80;
   static const _maxContentLength = 12000;
+  static Future<void> _saveQueue = Future<void>.value();
 
   static List<AgentSession> load(SharedPreferences prefs) {
     return decode(prefs.getString(_prefsKey));
   }
 
-  static Future<void> save(List<AgentSession> sessions) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsKey, encode(sessions));
+  static Future<void> save(List<AgentSession> sessions) {
+    final snapshot = List<AgentSession>.from(sessions);
+    _saveQueue = _saveQueue.catchError((_) {}).then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsKey, encode(snapshot));
+    });
+    return _saveQueue;
   }
 
   static List<AgentSession> decode(String? raw) {

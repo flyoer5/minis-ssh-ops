@@ -91,7 +91,20 @@ void main() {
       expect(storedOutput.endsWith('…'), isTrue);
     });
 
-    test('清理当前会话会保存快照到历史列表', () async {
+    test('并发保存时最后一次快照获胜', () async {
+      SharedPreferences.setMockInitialValues({});
+      final first = AgentSession(id: 'first', title: '第一');
+      final second = AgentSession(id: 'second', title: '第二');
+      final a = AgentSessionStore.save([first]);
+      final b = AgentSessionStore.save([second]);
+      await Future.wait([a, b]);
+      final prefs = await SharedPreferences.getInstance();
+      final stored = AgentSessionStore.decode(prefs.getString('agentSessionsJson'));
+      expect(stored, hasLength(1));
+      expect(stored.single.id, 'second');
+    });
+
+
       SharedPreferences.setMockInitialValues({});
       final h = _Harness();
       for (var i = 1; i <= 2; i++) {
