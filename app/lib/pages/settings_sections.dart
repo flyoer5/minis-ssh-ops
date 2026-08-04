@@ -67,7 +67,7 @@ extension _SettingsPageSectionBuilders on _SettingsPageState {
         if (!found && s is Widget) queue.add(s);
       }
       if (w is SwitchListTile) {
-        final tile = w as SwitchListTile;
+        final tile = w;
         final t = tile.title;
         final s = tile.subtitle;
         if (t is Text && (t.data?.toLowerCase().contains(q) ?? false)) found = true;
@@ -76,7 +76,7 @@ extension _SettingsPageSectionBuilders on _SettingsPageState {
         if (!found && s is Widget) queue.add(s);
       }
       if (w is CheckboxListTile) {
-        final tile = w as CheckboxListTile;
+        final tile = w;
         final t = tile.title;
         final s = tile.subtitle;
         if (t is Text && (t.data?.toLowerCase().contains(q) ?? false)) found = true;

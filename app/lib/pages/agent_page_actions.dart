@@ -1,20 +1,6 @@
 part of 'agent_page.dart';
 
 extension _AgentPageActions on _AgentPageState {
-  Future<void> _doLoad(AppState state) async {
-    try {
-      await state.api.listAgentSessions(
-        hostId: _onlyCurrentHost ? state.selectedHostId : null,
-        q: _sessionsQuery.isNotEmpty ? _sessionsQuery : null,
-      );
-      if (mounted) {
-        setState(() => _sessionsLoading = false);
-      }
-    } catch (_) {
-      if (mounted) setState(() => _sessionsLoading = false);
-    }
-  }
-
   /// If a generation is running, ask the user to confirm before an action
   /// (switch session / host / new session) interrupts it. Protects against
   /// silently disrupting an in-progress turn.

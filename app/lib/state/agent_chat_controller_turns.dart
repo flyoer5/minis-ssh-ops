@@ -319,10 +319,6 @@ extension AgentChatControllerTurns on AgentChatController {
     );
   }
 
-  void _sealPendingToolUse(String command, {required bool success, required String output}) {
-    _transcript.sealPendingToolUse(command, success: success, output: output);
-  }
-
   void disposeAgentChat() {
     _supersedeAgentTurn();
     _streamNotifyTimer?.cancel();
