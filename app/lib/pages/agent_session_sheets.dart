@@ -2,11 +2,48 @@ part of 'agent_page.dart';
 
 Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, AppState state) async {
   Future<List<AgentSession>> load() async {
-    final raw = await state.api.listAgentSessions(
-      hostId: page._onlyCurrentHost ? state.selectedHostId : null,
-      q: page._sessionsQuery.isNotEmpty ? page._sessionsQuery : null,
-    );
-    return [for (final item in raw) AgentSession.fromJson(item)];
+    final local = state.agentSessions.where((s) {
+      final hostMatch = !page._onlyCurrentHost || state.selectedHostId == null || s.hostId == null || s.hostId == state.selectedHostId;
+      final q = page._sessionsQuery.trim().toLowerCase();
+      final queryMatch = q.isEmpty || s.title.toLowerCase().contains(q) || s.preview.toLowerCase().contains(q);
+      return hostMatch && queryMatch;
+    }).toList();
+
+    try {
+      final raw = await state.api.listAgentSessions(
+        hostId: page._onlyCurrentHost ? state.selectedHostId : null,
+        q: page._sessionsQuery.isNotEmpty ? page._sessionsQuery : null,
+      );
+      final remote = [for (final item in raw) AgentSession.fromJson(item)];
+      final byId = <String, AgentSession>{
+        for (final session in local) session.id: session,
+      };
+      for (final session in remote) {
+        final cached = byId[session.id];
+        byId[session.id] = cached == null
+            ? session
+            : AgentSession(
+                id: session.id,
+                title: session.title.isNotEmpty ? session.title : cached.title,
+                hostId: session.hostId ?? cached.hostId,
+                preview: session.preview.isNotEmpty ? session.preview : cached.preview,
+                msgCount: session.msgCount > 0 ? session.msgCount : cached.msgCount,
+                messages: cached.messages.isNotEmpty ? cached.messages : session.messages,
+                updatedAt: session.updatedAt,
+                createdAt: session.createdAt,
+                ovMaxRounds: session.ovMaxRounds ?? cached.ovMaxRounds,
+                ovTemperature: session.ovTemperature ?? cached.ovTemperature,
+                ovConfirm: session.ovConfirm ?? cached.ovConfirm,
+                ovPrompt: session.ovPrompt ?? cached.ovPrompt,
+              );
+      }
+      final result = byId.values.toList()..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return result;
+    } catch (_) {
+      // Offline mode: local snapshots remain usable.
+      local.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return local;
+    }
   }
   var sessionsFuture = load();
   await showModalBottomSheet<void>(
@@ -153,8 +190,14 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
                               ],
                             ),
                             onTap: () async {
-                              Navigator.pop(sheetContext);
-                              await page._openSession(state, session.id, title: session.title);
+                              if (session.messages.isNotEmpty) {
+                                if (!await page._confirmInterrupt(state, action: '切换会话')) return;
+                                Navigator.pop(sheetContext);
+                                state.openAgentSession(session);
+                              } else {
+                                Navigator.pop(sheetContext);
+                                await page._openSession(state, session.id, title: session.title);
+                              }
                             },
                             trailing: IconButton(
                               icon: const Icon(Icons.delete_outline, size: 20),
@@ -180,6 +223,11 @@ Future<void> showAgentSessionsSheet(BuildContext context, _AgentPageState page, 
                                 );
                                 if (go == true) {
                                   state.deleteAgentSession(session.id);
+                                  try {
+                                    await state.api.deleteAgentSessionRemote(session.id);
+                                  } catch (_) {
+                                    // 本地先删除；远程不可用时下次同步再处理。
+                                  }
                                   if (isCurrent) {
                                     state.clearAgentChat();
                                   }
