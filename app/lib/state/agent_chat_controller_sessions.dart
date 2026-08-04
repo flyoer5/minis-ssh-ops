@@ -4,16 +4,30 @@ extension AgentChatControllerSessions on AgentChatController {
   void clearAgentChat() {
     _supersedeAgentTurn();
     if (agentMessages.isNotEmpty) {
-      final title = _sessionTitleFromMessages(agentMessages);
-      agentSessions.insert(
-        0,
-        AgentSession(
-          id: agentSessionId ?? DateTime.now().millisecondsSinceEpoch.toString(),
-          title: title,
-          hostId: selectedHostId,
-          messages: List<ChatMessage>.from(agentMessages),
-        ),
+      final currentId = agentSessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
+      final existing = agentSessions.indexWhere((s) => s.id == currentId);
+      final previous = existing >= 0 ? agentSessions[existing] : null;
+      final snapshot = AgentSession(
+        id: currentId,
+        title: agentSessionTitle == '新会话' || agentSessionTitle.trim().isEmpty
+            ? _sessionTitleFromMessages(agentMessages)
+            : agentSessionTitle,
+        hostId: selectedHostId,
+        preview: _sessionPreview(agentMessages),
+        msgCount: agentMessages.length,
+        createdAt: previous?.createdAt,
+        updatedAt: DateTime.now(),
+        ovMaxRounds: sessionOvMaxRounds,
+        ovTemperature: sessionOvTemperature,
+        ovConfirm: sessionOvConfirm,
+        ovPrompt: sessionOvPrompt,
+        messages: List<ChatMessage>.from(agentMessages),
       );
+      if (existing >= 0) {
+        agentSessions[existing] = snapshot;
+      } else {
+        agentSessions.insert(0, snapshot);
+      }
       if (agentSessions.length > 30) {
         agentSessions.removeRange(30, agentSessions.length);
       }
@@ -47,6 +61,14 @@ extension AgentChatControllerSessions on AgentChatController {
     return '会话 $hh:$mm';
   }
 
+  String _sessionPreview(List<ChatMessage> msgs) {
+    for (var i = msgs.length - 1; i >= 0; i--) {
+      final text = msgs[i].content.trim().replaceAll(RegExp(r'\s+'), ' ');
+      if (text.isNotEmpty) return text.length > 80 ? '${text.substring(0, 80)}...' : text;
+    }
+    return '';
+  }
+
   void openAgentSession(AgentSession s) {
     _supersedeAgentTurn();
     if (agentMessages.isNotEmpty) {
@@ -57,6 +79,13 @@ extension AgentChatControllerSessions on AgentChatController {
           id: curId.isEmpty ? DateTime.now().millisecondsSinceEpoch.toString() : curId,
           title: _sessionTitleFromMessages(agentMessages),
           hostId: selectedHostId,
+          preview: _sessionPreview(agentMessages),
+          msgCount: agentMessages.length,
+          updatedAt: DateTime.now(),
+          ovMaxRounds: sessionOvMaxRounds,
+          ovTemperature: sessionOvTemperature,
+          ovConfirm: sessionOvConfirm,
+          ovPrompt: sessionOvPrompt,
           messages: List<ChatMessage>.from(agentMessages),
         );
         if (existing >= 0) {
@@ -71,6 +100,12 @@ extension AgentChatControllerSessions on AgentChatController {
       ..addAll(s.messages);
     agentSessionId = s.id;
     agentSessionTitle = s.title.isNotEmpty ? s.title : '会话';
+    applySessionOverrides(
+      maxRounds: s.ovMaxRounds,
+      temperature: s.ovTemperature,
+      confirm: s.ovConfirm,
+      prompt: s.ovPrompt,
+    );
     if (s.hostId != null && s.hostId != selectedHostId) {
       selectedHostId = s.hostId;
       SharedPreferences.getInstance().then((p) {
@@ -109,6 +144,13 @@ extension AgentChatControllerSessions on AgentChatController {
           id: curId.isEmpty ? DateTime.now().millisecondsSinceEpoch.toString() : curId,
           title: _sessionTitleFromMessages(agentMessages),
           hostId: selectedHostId,
+          preview: _sessionPreview(agentMessages),
+          msgCount: agentMessages.length,
+          updatedAt: DateTime.now(),
+          ovMaxRounds: sessionOvMaxRounds,
+          ovTemperature: sessionOvTemperature,
+          ovConfirm: sessionOvConfirm,
+          ovPrompt: sessionOvPrompt,
           messages: List<ChatMessage>.from(agentMessages),
         );
         if (existing >= 0) {

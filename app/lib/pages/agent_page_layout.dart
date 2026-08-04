@@ -73,6 +73,7 @@ extension _AgentPageLayout on _AgentPageState {
   }
 
   Widget _buildMessages(AppState state) {
+    final generating = _busy || state.agentBusy;
     return Stack(
       children: [
         ListView.builder(
@@ -81,9 +82,9 @@ extension _AgentPageLayout on _AgentPageState {
           cacheExtent: 480,
           physics: const ClampingScrollPhysics(),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          itemCount: state.agentMessages.length + (_busy ? 1 : 0),
+          itemCount: state.agentMessages.length + (generating ? 1 : 0),
           itemBuilder: (_, i) {
-            if (_busy && i == state.agentMessages.length) {
+            if (generating && i == state.agentMessages.length) {
               return Padding(
                 padding: const EdgeInsets.fromLTRB(0, 4, 0, 10),
                 child: TypingIndicator(hint: _busyHint),
@@ -92,7 +93,7 @@ extension _AgentPageLayout on _AgentPageState {
             final m = state.agentMessages[i];
             final id = m.meta?['id']?.toString() ?? '${m.at.microsecondsSinceEpoch}';
             final part = m.meta?['part']?.toString() ?? m.kind.name;
-            final streaming = _busy && i == state.agentMessages.length - 1 &&
+            final streaming = generating && i == state.agentMessages.length - 1 &&
                 (part == 'text_delta' || part == 'text' || part == 'reasoning');
             return RepaintBoundary(
               child: _AnimatedMsgEntry(
@@ -102,7 +103,7 @@ extension _AgentPageLayout on _AgentPageState {
                   msg: m,
                   fontSize: state.agentFontSize,
                   streaming: streaming,
-                  onRetry: (_busy || state.agentBusy || state.selectedHostId == null) ? null : () => _retryLast(state),
+                  onRetry: (generating || state.selectedHostId == null) ? null : () => _retryLast(state),
                 ),
               ),
             );

@@ -193,10 +193,19 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   Widget build(BuildContext context) {
     super.build(context);
     // Narrow rebuild scope: ignore unrelated AppState changes (probes, prefs, hosts).
-    context.select((AppState s) => Object.hash(
-      s.agentMessages.length,
-      s.agentMessages.isNotEmpty ? s.agentMessages.last.content.length : 0,
-    ));
+    context.select((AppState s) {
+      final messages = s.agentMessages;
+      final last = messages.isEmpty ? null : messages.last;
+      return Object.hash(
+        messages.length,
+        last?.content.hashCode,
+        last?.kind,
+        last?.meta?['part'],
+        last?.meta?['success'],
+        last?.meta?['interrupted'],
+        last?.meta?['output']?.toString().length,
+      );
+    });
     context.select((AppState s) => s.agentBusy);
     context.select((AppState s) => s.selectedHostId);
     context.select((AppState s) => s.hostLabel);
