@@ -79,7 +79,7 @@ extension _AgentPageLayout on _AgentPageState {
         ListView.builder(
           controller: _scroll,
           padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-          cacheExtent: 480,
+          scrollCacheExtent: 480,
           physics: const ClampingScrollPhysics(),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           itemCount: state.agentMessages.length + (generating ? 1 : 0),
@@ -116,12 +116,21 @@ extension _AgentPageLayout on _AgentPageState {
             child: Material(
               color: AppColors.surface2,
               elevation: 2,
-              shape: const CircleBorder(),
-              child: IconButton(
-                tooltip: '回到底部',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _bottom(force: true),
-                icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.accentSoft),
+              borderRadius: BorderRadius.circular(18),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => _bottom(force: true),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.accentSoft),
+                      SizedBox(width: 4),
+                      Text('回到底部', style: TextStyle(fontSize: 12, color: AppColors.accentSoft, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

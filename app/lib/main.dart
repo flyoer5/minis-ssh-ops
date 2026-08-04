@@ -181,6 +181,11 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int index = 0;
 
+  void _selectTab(int next) {
+    if (!mounted || next == index) return;
+    setState(() => index = next);
+  }
+
   final _pages = const <Widget>[
     HostsPage(),
     AgentPage(),
@@ -200,7 +205,7 @@ class _HomeShellState extends State<HomeShell> {
     final isDark = context.isDark;
     return NavScope(
       index: index,
-      go: (i) => setState(() => index = i),
+      go: _selectTab,
       menuMode: menu,
       child: Scaffold(
         resizeToAvoidBottomInset: false,
@@ -261,7 +266,7 @@ class _HomeShellState extends State<HomeShell> {
                 height: 64,
                 labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                 selectedIndex: index,
-                onDestinationSelected: (i) => setState(() => index = i),
+                onDestinationSelected: (i) => _selectTab(context, i),
                 destinations: [
                   for (var i = 0; i < AppNav.labels.length; i++)
                     NavigationDestination(
