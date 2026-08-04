@@ -44,7 +44,7 @@ extension AgentChatControllerSessions on AgentChatController {
     final now = DateTime.now();
     final hh = now.hour.toString().padLeft(2, '0');
     final mm = now.minute.toString().padLeft(2, '0');
-    return 'Session $hh:$mm';
+    return '会话 $hh:$mm';
   }
 
   void openAgentSession(AgentSession s) {
@@ -70,7 +70,7 @@ extension AgentChatControllerSessions on AgentChatController {
       ..clear()
       ..addAll(s.messages);
     agentSessionId = s.id;
-    agentSessionTitle = s.title.isNotEmpty ? s.title : 'Session';
+    agentSessionTitle = s.title.isNotEmpty ? s.title : '会话';
     if (s.hostId != null && s.hostId != selectedHostId) {
       selectedHostId = s.hostId;
       SharedPreferences.getInstance().then((p) {
@@ -127,7 +127,7 @@ extension AgentChatControllerSessions on AgentChatController {
     } else if (msgs.isNotEmpty) {
       agentSessionTitle = _sessionTitleFromMessages(msgs);
     } else {
-      agentSessionTitle = 'Session';
+      agentSessionTitle = '会话';
     }
     applySessionOverrides(
       maxRounds: ovMaxRounds,
