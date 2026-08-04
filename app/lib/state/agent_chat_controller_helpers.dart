@@ -75,10 +75,6 @@ extension AgentChatControllerHelpers on AgentChatController {
     notifyListeners();
   }
 
-  int _lastReasoningIndexInTurn() => _transcript.lastReasoningIndexInTurn;
-
-  bool _turnHasAssistantText() => _transcript.turnHasAssistantText;
-
   void _pushReasoning(String reasoning) => _transcript.pushReasoning(reasoning);
 
   void _appendAssistantDelta(String piece) => _transcript.appendAssistantDelta(piece);
