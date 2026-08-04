@@ -55,7 +55,7 @@ class AgentSessionStore {
                 'role': message.role,
                 'content': _boundedContent(message.content),
                 'kind': message.kind.name,
-                if (message.meta != null) 'meta': message.meta,
+                if (message.meta != null) 'meta': _boundedMeta(message.meta!),
               },
           ],
         },
@@ -123,6 +123,27 @@ class AgentSessionStore {
       ovPrompt: raw['ovPrompt']?.toString(),
       messages: messages,
     );
+  }
+
+  static Map<String, dynamic> _boundedMeta(Map<String, dynamic> meta) {
+    final out = <String, dynamic>{};
+    for (final entry in meta.entries) {
+      final value = entry.value;
+      if (value is String) {
+        out[entry.key] = _boundedContent(value);
+      } else if (value is Map) {
+        out[entry.key] = _boundedMeta(Map<String, dynamic>.from(value));
+      } else if (value is List) {
+        out[entry.key] = value.take(80).map((item) {
+          if (item is Map) return _boundedMeta(Map<String, dynamic>.from(item));
+          if (item is String) return _boundedContent(item);
+          return item;
+        }).toList();
+      } else {
+        out[entry.key] = value;
+      }
+    }
+    return out;
   }
 
   static String _boundedContent(String content) {
