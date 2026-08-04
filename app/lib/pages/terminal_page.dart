@@ -146,8 +146,27 @@ class _TerminalPageState extends State<TerminalPage>
     });
   }
 
-  Future<void> _connect(AppState state) async {
-    final gen = ++_connGen;
+  void _disconnect() {
+    if (!mounted) return;
+    if (_ch != null) {
+      try {
+        _ch?.sink.close();
+      } catch (_) {}
+    }
+    _sub?.cancel();
+    _sub = null;
+    _heartbeat?.cancel();
+    _heartbeat = null;
+    _ch = null;
+    _connGen++;
+    setState(() {
+      _connecting = false;
+      _connected = false;
+      _status = '已断开';
+    });
+  }
+
+  Future<void> _connect(AppState state) async {    final gen = ++_connGen;
     _sub?.cancel();
     _sub = null;
     _heartbeat?.cancel();
