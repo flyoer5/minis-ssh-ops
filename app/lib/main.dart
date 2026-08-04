@@ -266,7 +266,7 @@ class _HomeShellState extends State<HomeShell> {
                 height: 64,
                 labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                 selectedIndex: index,
-                onDestinationSelected: (i) => _selectTab(context, i),
+                onDestinationSelected: _selectTab,
                 destinations: [
                   for (var i = 0; i < AppNav.labels.length; i++)
                     NavigationDestination(

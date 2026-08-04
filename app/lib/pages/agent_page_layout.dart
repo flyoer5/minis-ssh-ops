@@ -79,7 +79,7 @@ extension _AgentPageLayout on _AgentPageState {
         ListView.builder(
           controller: _scroll,
           padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-          scrollCacheExtent: 480,
+          scrollCacheExtent: const ScrollCacheExtent.pixels(480),
           physics: const ClampingScrollPhysics(),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           itemCount: state.agentMessages.length + (generating ? 1 : 0),
