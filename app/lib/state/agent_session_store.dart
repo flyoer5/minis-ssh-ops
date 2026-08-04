@@ -40,8 +40,16 @@ class AgentSessionStore {
           'id': session.id,
           'title': session.title,
           'hostId': session.hostId,
+          'preview': session.preview,
+          'msgCount': session.msgCount,
+          'updatedAt': session.updatedAt.toIso8601String(),
+          'createdAt': session.createdAt.toIso8601String(),
+          if (session.ovMaxRounds != null) 'ovMaxRounds': session.ovMaxRounds,
+          if (session.ovTemperature != null) 'ovTemperature': session.ovTemperature,
+          if (session.ovConfirm != null) 'ovConfirm': session.ovConfirm,
+          if (session.ovPrompt != null && session.ovPrompt!.trim().isNotEmpty) 'ovPrompt': session.ovPrompt,
           'messages': [
-            for (final message in session.messages.take(_maxMessages))
+            for (final message in _latestMessages(session.messages))
               {
                 'role': message.role,
                 'content': _boundedContent(message.content),
@@ -52,6 +60,30 @@ class AgentSessionStore {
         },
     ];
     return jsonEncode(encoded);
+  }
+
+  static List<ChatMessage> _latestMessages(List<ChatMessage> messages) {
+    if (messages.length <= _maxMessages) return messages;
+    return messages.sublist(messages.length - _maxMessages);
+  }
+
+  static int? _asInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
+
+  static double? _asDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  static DateTime parseT(dynamic value) {
+    if (value == null) return DateTime.now().toUtc();
+    return parseChinaInstant(value.toString()) ?? DateTime.now().toUtc();
   }
 
   static AgentSession _decodeSession(Map<dynamic, dynamic> raw) {
@@ -80,6 +112,14 @@ class AgentSessionStore {
       id: raw['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
       title: raw['title']?.toString() ?? '会话',
       hostId: raw['hostId']?.toString(),
+      preview: raw['preview']?.toString() ?? '',
+      msgCount: (raw['msgCount'] as num?)?.toInt() ?? messages.length,
+      updatedAt: parseT(raw['updatedAt']),
+      createdAt: parseT(raw['createdAt']),
+      ovMaxRounds: _asInt(raw['ovMaxRounds']),
+      ovTemperature: _asDouble(raw['ovTemperature']),
+      ovConfirm: _asInt(raw['ovConfirm']),
+      ovPrompt: raw['ovPrompt']?.toString(),
       messages: messages,
     );
   }

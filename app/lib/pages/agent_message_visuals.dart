@@ -136,6 +136,7 @@ class _MinisToolBlock extends StatefulWidget {
 }
 
 class _MinisToolBlockState extends State<_MinisToolBlock> {
+  static const _maxPreviewChars = 8000;
   bool _open = false;
 
   bool get _autoClosed => widget.collapseSuccess && (widget.msg.meta?['success'] == true) && widget.part == 'toolResult';
@@ -155,7 +156,11 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
         : (success == null ? AppColors.textMuted : (success == true ? AppColors.success : AppColors.danger));
 
     final body = widget.part == 'toolResult' ? output : command;
-    final open = _autoClosed ? _open : true;
+    final isLong = body.length > _maxPreviewChars;
+    final preview = isLong && !_open ? '${body.substring(0, _maxPreviewChars)}\n… 已折叠 ${body.length - _maxPreviewChars} 个字符' : body;
+    final canExpand = isLong || _autoClosed;
+    final showBody = !_autoClosed || _open || isLong;
+    final visibleBody = isLong && !_open ? preview : body;
 
     // Status label chip.
     final String statusLabel;
@@ -184,7 +189,7 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            onTap: body.isEmpty || !_autoClosed ? null : () => setState(() => _open = !_open),
+            onTap: body.isEmpty || !canExpand ? null : () => setState(() => _open = !_open),
             child: Row(
               children: [
                 Icon(
@@ -227,9 +232,9 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
                     onPressed: widget.onCopy,
                     icon: const Icon(Icons.copy_all_outlined, size: 15, color: AppColors.textFaint),
                   ),
-                if (body.isNotEmpty && _autoClosed)
+                if (body.isNotEmpty && canExpand)
                   AnimatedRotation(
-                    turns: open ? 0.5 : 0,
+                    turns: _open ? 0.5 : 0,
                     duration: const Duration(milliseconds: 180),
                     child: const Icon(Icons.expand_more, size: 18, color: AppColors.textFaint),
                   ),
@@ -240,11 +245,11 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOut,
             alignment: Alignment.topCenter,
-            child: (open || !_autoClosed) && body.isNotEmpty
+            child: showBody && body.isNotEmpty
                 ? Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: SelectableText(
-                      body,
+                      visibleBody,
                       style: TextStyle(fontFamily: 'monospace', fontSize: widget.fontSize - 3, height: 1.35),
                     ),
                   )

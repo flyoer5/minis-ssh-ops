@@ -13,13 +13,13 @@ extension AgentChatControllerTurns on AgentChatController {
       if (m.kind == ChatKind.toolUse && m.meta?['success'] == null && m.meta?['pendingConfirm'] != true) {
         agentMessages[i] = ChatMessage(
           role: m.role,
-          content: 'Interrupted',
+          content: '已中断',
           kind: m.kind,
           meta: {
             if (m.meta != null) ...m.meta!,
             'success': false,
             'interrupted': true,
-            'output': 'Interrupted',
+            'output': '已中断',
           },
           at: m.at,
         );
@@ -193,14 +193,14 @@ extension AgentChatControllerTurns on AgentChatController {
   void _handleMemoryEvent(String content, Map<String, dynamic> raw) {
     final facts = (raw['facts'] ?? '').toString().trim();
     if (facts.isNotEmpty || content.trim().isNotEmpty) {
-      _pushMsg(ChatMessage(role: 'system', content: 'Memory updated', kind: ChatKind.status));
+      _pushMsg(ChatMessage(role: 'system', content: '记忆已更新', kind: ChatKind.status));
     }
   }
 
   void _handleToolEvent({required String name, required String command}) {
     String title;
     if (name == 'probe_host') {
-      title = 'Probe host status';
+      title = '检查主机状态';
     } else if (command.isNotEmpty) {
       final one = command.trim().split('\n').first;
       title = one.length > 80 ? '${one.substring(0, 80)}...' : one;
@@ -245,14 +245,14 @@ extension AgentChatControllerTurns on AgentChatController {
         final m = agentMessages[open];
         agentMessages[open] = ChatMessage(
           role: 'tool',
-          content: 'Waiting for confirm',
+          content: '等待确认',
           kind: ChatKind.toolUse,
           meta: {
             ...?m.meta,
             'part': 'toolUse',
             'name': toolName,
             'command': cmd.isNotEmpty ? cmd : (m.meta?['command'] ?? ''),
-            'description': 'Needs confirmation before execution',
+            'description': '执行前需要确认',
             'success': null,
             'pendingConfirm': true,
             'risk': risk,
@@ -269,7 +269,7 @@ extension AgentChatControllerTurns on AgentChatController {
       if (!already) {
         final step = {
           'id': (lastPlan == null ? 1 : (((lastPlan!['steps'] as List?)?.length ?? 0) + 1)),
-          'title': 'Needs confirmation',
+          'title': '需要确认',
           'command': cmd,
           'risk': risk,
         };
@@ -277,11 +277,11 @@ extension AgentChatControllerTurns on AgentChatController {
         if (lastPlan != null && lastPlan!['steps'] is List) {
           steps.insertAll(0, [for (final e in (lastPlan!['steps'] as List)) if (e is Map) Map<String, dynamic>.from(e)]);
         }
-        lastPlan = {'summary': 'Pending confirm', 'steps': steps};
+        lastPlan = {'summary': '等待确认', 'steps': steps};
         final idx = _lastPlanMsgIndex;
         final planMsg = ChatMessage(
           role: 'assistant',
-          content: 'Pending confirm',
+          content: '等待确认',
           kind: ChatKind.plan,
           meta: {'plan': lastPlan, 'outputs': <String, String>{}},
         );
