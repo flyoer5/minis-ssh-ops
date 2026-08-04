@@ -105,6 +105,7 @@ void main() {
     });
 
 
+    test('清理当前会话会保存快照到历史列表', () async {
       SharedPreferences.setMockInitialValues({});
       final h = _Harness();
       for (var i = 1; i <= 2; i++) {
