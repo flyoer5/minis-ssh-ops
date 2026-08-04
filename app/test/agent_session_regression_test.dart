@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ssh_ai_agent/api/client.dart';
 import 'package:ssh_ai_agent/models/agent_session.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
 import 'package:ssh_ai_agent/state/agent_chat_controller.dart';
@@ -10,8 +11,9 @@ import 'package:ssh_ai_agent/state/agent_session_store.dart';
 
 /// Minimal in-memory [AgentChatController] harness (no real network).
 class _Harness extends ChangeNotifier with AgentChatController {
+  // 测试不访问网络；仅满足 mixin 的类型契约。
   @override
-  dynamic get api => throw UnimplementedError('not used in these tests');
+  ApiClient get api => ApiClient();
   String? _selectedHostId = 'host-1';
   @override
   String? get selectedHostId => _selectedHostId;
