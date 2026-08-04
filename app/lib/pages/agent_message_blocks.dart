@@ -223,28 +223,44 @@ class _Bubble extends StatelessWidget {
     final useMd = !streaming || streamMd;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, right: 4),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (msg.meta?['interrupted'] == true)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '已中断',
-                style: TextStyle(fontSize: fs - 4, color: AppColors.warning, fontWeight: FontWeight.w700),
-              ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (msg.meta?['interrupted'] == true)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      '已中断',
+                      style: TextStyle(fontSize: fs - 4, color: AppColors.warning, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                if (useMd)
+                  _MdBody(data: msg.content, baseColor: AppColors.text, fontSize: fs)
+                else
+                  SelectableText(
+                    msg.content,
+                    style: TextStyle(fontSize: fs, height: 1.45, color: AppColors.text),
+                  ),
+                if (streaming)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: _BlinkCursor(fontSize: fs),
+                  ),
+              ],
             ),
-          if (useMd)
-            _MdBody(data: msg.content, baseColor: AppColors.text, fontSize: fs)
-          else
-            SelectableText(
-              msg.content,
-              style: TextStyle(fontSize: fs, height: 1.45, color: AppColors.text),
-            ),
-          if (streaming)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: _BlinkCursor(fontSize: fs),
+          ),
+          if (!streaming && msg.content.trim().isNotEmpty)
+            IconButton(
+              tooltip: '复制回复',
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.only(left: 6, top: 2),
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              onPressed: () => _copy(context, _copyText),
+              icon: const Icon(Icons.copy_all_outlined, size: 15, color: AppColors.textFaint),
             ),
         ],
       ),

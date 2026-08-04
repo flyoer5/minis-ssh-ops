@@ -218,6 +218,15 @@ class _MinisToolBlockState extends State<_MinisToolBlock> {
                   ),
                   const SizedBox(width: 6),
                 ],
+                if (widget.onCopy != null)
+                  IconButton(
+                    tooltip: '复制工具内容',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    onPressed: widget.onCopy,
+                    icon: const Icon(Icons.copy_all_outlined, size: 15, color: AppColors.textFaint),
+                  ),
                 if (body.isNotEmpty && _autoClosed)
                   AnimatedRotation(
                     turns: open ? 0.5 : 0,
