@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -49,6 +51,10 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
   int _lastTailLen = 0;
   /// User scrolled away from the bottom — pause auto-follow so history is readable.
   bool _userPausedFollow = false;
+  /// Generation start (UTC) — null when idle.
+  DateTime? _genStarted;
+  Timer? _genTimer;
+  int _generationId = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -66,6 +72,8 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
     _scroll.dispose();
     _focus.dispose();
     _sessionsSearch.dispose();
+    _genTimer?.cancel();
+    _genTimer = null;
     super.dispose();
   }
 
@@ -132,22 +140,31 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
       return;
     }
     if (_busy || state.agentBusy) {
-      // 生成中发送：先停止当前轮，再立即发送新消息（主流聊天体验）。
-      _stopGeneration(state);
-      await Future<void>.delayed(const Duration(milliseconds: 120));
+      showSnack(context, '当前回复仍在生成，请先停止或等待完成', seconds: 2);
+      return;
     }
     _input.clear();
     hapticTap(state.hapticFeedback);
     if (!state.agentKeepKeyboard) {
       _focus.unfocus();
     }
+    final generationId = ++_generationId;
     setState(() {
       _busy = true;
-      _busyHint = '思考 / 调工具... 可点停止';
+      _genStarted = DateTime.now();
+      _busyHint = '思考 / 调工具...';
+    });
+    // Keep elapsed time visible without rebuilding on every stream token.
+    _genTimer?.cancel();
+    _genTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted || !_busy || generationId != _generationId || _genStarted == null) return;
+      final sec = DateTime.now().difference(_genStarted!).inSeconds;
+      setState(() => _busyHint = '${sec ~/ 60}:${(sec % 60).toString().padLeft(2, '0')} 思考中');
     });
     try {
       await state.agentChat(text);
     } catch (e) {
+      if (generationId != _generationId) return;
       final msg = e.toString();
       if (msg.contains('HOSTKEY_MISMATCH') || msg.toLowerCase().contains('hostkey_mismatch')) {
         if (mounted) await _handleHostKeyMismatch(state);
@@ -155,11 +172,18 @@ class _AgentPageState extends State<AgentPage> with AutomaticKeepAliveClientMixi
         showErrorSnack(context, msg);
       }
     } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-        _bottom(force: true);
-        if (state.agentKeepKeyboard) {
-          _focus.requestFocus();
+      // A stopped request may finish after a newer one starts; never let the
+      // stale completion clear the new request's busy/timer state.
+      if (generationId == _generationId) {
+        _genTimer?.cancel();
+        _genTimer = null;
+        _genStarted = null;
+        if (mounted) {
+          setState(() => _busy = false);
+          _bottom(force: true);
+          if (state.agentKeepKeyboard) {
+            _focus.requestFocus();
+          }
         }
       }
     }

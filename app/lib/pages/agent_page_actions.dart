@@ -84,13 +84,28 @@ extension _AgentPageActions on _AgentPageState {
   Future<void> _showSessions(AppState state) => showAgentSessionsSheet(context, this, state);
 
   void _stopGeneration(AppState state) {
+    _generationId++;
+    _genTimer?.cancel();
+    _genTimer = null;
+    final elapsed = _elapsedLabel();
+    _genStarted = null;
     state.cancelAgentChat();
     if (mounted) {
       setState(() {
         _busy = false;
         _busyHint = '已停止';
       });
+      if (elapsed.isNotEmpty) {
+        showSnack(context, '已停止生成（用时 $elapsed）', seconds: 2);
+      }
     }
+  }
+
+  String _elapsedLabel() {
+    if (_genStarted == null) return '';
+    final sec = DateTime.now().difference(_genStarted!).inSeconds;
+    if (sec < 60) return '$sec 秒';
+    return '${sec ~/ 60}:${(sec % 60).toString().padLeft(2, '0')}';
   }
 
   String? _lastUserText(AppState state) {
@@ -124,21 +139,34 @@ extension _AgentPageActions on _AgentPageState {
 
   Future<void> _retryLast(AppState state) async {
     final text = _lastUserText(state);
-    if (text == null || _busy) return;
+    if (text == null || _busy || state.agentBusy) return;
+    final generationId = ++_generationId;
     setState(() {
       _busy = true;
+      _genStarted = DateTime.now();
       _busyHint = '重试中...';
+    });
+    _genTimer?.cancel();
+    _genTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted || !_busy || generationId != _generationId || _genStarted == null) return;
+      final sec = DateTime.now().difference(_genStarted!).inSeconds;
+      setState(() => _busyHint = '${sec ~/ 60}:${(sec % 60).toString().padLeft(2, '0')} 重试中');
     });
     try {
       await state.agentChat(text);
     } catch (e) {
-      if (mounted) {
-        showSnack(context, shortError(e));
+      if (generationId == _generationId && mounted) {
+        showSnack(context, shortError(e), seconds: 3);
       }
     } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-        _bottom();
+      if (generationId == _generationId) {
+        _genTimer?.cancel();
+        _genTimer = null;
+        _genStarted = null;
+        if (mounted) {
+          setState(() => _busy = false);
+          _bottom(force: true);
+        }
       }
     }
   }
