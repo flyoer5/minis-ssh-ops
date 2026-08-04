@@ -79,7 +79,8 @@ extension _AgentPageLayout on _AgentPageState {
         ListView.builder(
           controller: _scroll,
           padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-          scrollCacheExtent: const ScrollCacheExtent.pixels(480),
+          // 仅保留滚动缓存区域，避免长会话上下滑动时频繁重建。
+          cacheExtent: 480,
           physics: const ClampingScrollPhysics(),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           itemCount: state.agentMessages.length + (generating ? 1 : 0),
