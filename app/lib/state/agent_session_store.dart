@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ssh_ai_agent/models/agent_session.dart';
 import 'package:ssh_ai_agent/models/chat_message.dart';
+import 'package:ssh_ai_agent/util/time_fmt.dart';
 
 class AgentSessionStore {
   static const _prefsKey = 'agentSessionsJson';
