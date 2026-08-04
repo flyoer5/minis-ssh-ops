@@ -147,6 +147,9 @@ extension _TerminalPageWidgets on _TerminalPageState {
                   case 'reconnect':
                     _connect(state);
                     break;
+                  case 'disconnect':
+                    _disconnect();
+                    break;
                 }
               },
               itemBuilder: (_) => [
@@ -156,6 +159,7 @@ extension _TerminalPageWidgets on _TerminalPageState {
                 PopupMenuItem(value: 'search', child: Text(_showSearch ? '关闭搜索' : '搜索回滚')),
                 const PopupMenuItem(value: 'clear', child: Text('清屏')),
                 const PopupMenuItem(value: 'reconnect', child: Text('重连')),
+                const PopupMenuItem(value: 'disconnect', child: Text('断开')),
               ],
             ),
           ],
